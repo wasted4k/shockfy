@@ -1,0 +1,296 @@
+[2025-09-27T08:24:16+02:00] SERVER -> CLIENT: 220 smtp-relay.brevo.com ESMTP Service Ready
+
+[2025-09-27T08:24:16+02:00] CLIENT -> SERVER: EHLO localhost
+
+[2025-09-27T08:24:16+02:00] SERVER -> CLIENT: 250-Hello localhost
+250-PIPELINING
+250-8BITMIME
+250-ENHANCEDSTATUSCODES
+250-CHUNKING
+250-STARTTLS
+250-AUTH LOGIN CRAM-MD5 PLAIN
+250 SIZE 20971520
+
+[2025-09-27T08:24:16+02:00] CLIENT -> SERVER: AUTH CRAM-MD5
+
+[2025-09-27T08:24:16+02:00] SERVER -> CLIENT: 334 PDEuODk4MDg2MDBAbG9jYWxob3N0Pg==
+
+[2025-09-27T08:24:16+02:00] CLIENT -> SERVER: [credentials hidden]
+[2025-09-27T08:24:16+02:00] SERVER -> CLIENT: 235 2.0.0 Authentication succeeded
+
+[2025-09-27T08:24:16+02:00] CLIENT -> SERVER: MAIL FROM:<info.brixpay@gmail.com>
+
+[2025-09-27T08:24:16+02:00] SERVER -> CLIENT: 250 2.0.0 Roger, accepting mail from <info.brixpay@gmail.com>
+
+[2025-09-27T08:24:16+02:00] CLIENT -> SERVER: RCPT TO:<wastedwarzone@gmail.com>
+
+[2025-09-27T08:24:16+02:00] SERVER -> CLIENT: 250 2.0.0 I'll make sure <wastedwarzone@gmail.com> gets this
+
+[2025-09-27T08:24:16+02:00] CLIENT -> SERVER: DATA
+
+[2025-09-27T08:24:16+02:00] SERVER -> CLIENT: 354 Go ahead. End your data with <CR><LF>.<CR><LF>
+
+[2025-09-27T08:24:16+02:00] CLIENT -> SERVER: Date: Sat, 27 Sep 2025 08:24:15 +0200
+
+[2025-09-27T08:24:16+02:00] CLIENT -> SERVER: To: wastedwarzone@gmail.com
+
+[2025-09-27T08:24:16+02:00] CLIENT -> SERVER: From: ShockFy <info.brixpay@gmail.com>
+
+[2025-09-27T08:24:16+02:00] CLIENT -> SERVER: Subject: =?UTF-8?Q?Tu_c=C3=B3digo_de_verificaci=C3=B3n_=E2=80=93_ShockFy?=
+
+[2025-09-27T08:24:16+02:00] CLIENT -> SERVER: Message-ID: <hCSNCwGIGf45MzCBMIjD3nYScYkDwXs1hkucqIANKo@localhost>
+
+[2025-09-27T08:24:16+02:00] CLIENT -> SERVER: X-Mailer: PHPMailer 6.10.0 (https://github.com/PHPMailer/PHPMailer)
+
+[2025-09-27T08:24:16+02:00] CLIENT -> SERVER: MIME-Version: 1.0
+
+[2025-09-27T08:24:16+02:00] CLIENT -> SERVER: Content-Type: text/plain; charset=UTF-8
+
+[2025-09-27T08:24:16+02:00] CLIENT -> SERVER: Content-Transfer-Encoding: 8bit
+
+[2025-09-27T08:24:16+02:00] CLIENT -> SERVER: 
+
+[2025-09-27T08:24:16+02:00] CLIENT -> SERVER: Hola,
+
+[2025-09-27T08:24:16+02:00] CLIENT -> SERVER: 
+
+[2025-09-27T08:24:16+02:00] CLIENT -> SERVER: Tu código de verificación es: 026000
+
+[2025-09-27T08:24:16+02:00] CLIENT -> SERVER: Vence en 15 minutos. Si no solicitaste este email, puedes ignorar este mensaje.
+
+[2025-09-27T08:24:16+02:00] CLIENT -> SERVER: 
+
+[2025-09-27T08:24:16+02:00] CLIENT -> SERVER: ShockFy
+
+[2025-09-27T08:24:16+02:00] CLIENT -> SERVER: 
+
+[2025-09-27T08:24:16+02:00] CLIENT -> SERVER: .
+
+[2025-09-27T08:24:17+02:00] SERVER -> CLIENT: 250 2.0.0 OK: queued as <hCSNCwGIGf45MzCBMIjD3nYScYkDwXs1hkucqIANKo@localhost>
+
+[2025-09-27T08:24:17+02:00] CLIENT -> SERVER: QUIT
+
+[2025-09-27T08:24:17+02:00] SERVER -> CLIENT: 221 2.0.0 Bye
+
+[2025-09-27T08:39:55+02:00] SERVER -> CLIENT: 220 smtp-relay.brevo.com ESMTP Service Ready
+
+[2025-09-27T08:39:55+02:00] CLIENT -> SERVER: EHLO localhost
+
+[2025-09-27T08:39:55+02:00] SERVER -> CLIENT: 250-Hello localhost
+250-PIPELINING
+250-8BITMIME
+250-ENHANCEDSTATUSCODES
+250-CHUNKING
+250-STARTTLS
+250-AUTH CRAM-MD5 PLAIN LOGIN
+250 SIZE 20971520
+
+[2025-09-27T08:39:55+02:00] CLIENT -> SERVER: AUTH CRAM-MD5
+
+[2025-09-27T08:39:55+02:00] SERVER -> CLIENT: 334 PDEuNjE1MTAyOTk3QGxvY2FsaG9zdD4=
+
+[2025-09-27T08:39:55+02:00] CLIENT -> SERVER: [credentials hidden]
+[2025-09-27T08:39:56+02:00] SERVER -> CLIENT: 235 2.0.0 Authentication succeeded
+
+[2025-09-27T08:39:56+02:00] CLIENT -> SERVER: MAIL FROM:<info.brixpay@gmail.com>
+
+[2025-09-27T08:39:56+02:00] SERVER -> CLIENT: 250 2.0.0 Roger, accepting mail from <info.brixpay@gmail.com>
+
+[2025-09-27T08:39:56+02:00] CLIENT -> SERVER: RCPT TO:<wastedwarzone@gmail.com>
+
+[2025-09-27T08:39:56+02:00] SERVER -> CLIENT: 250 2.0.0 I'll make sure <wastedwarzone@gmail.com> gets this
+
+[2025-09-27T08:39:56+02:00] CLIENT -> SERVER: DATA
+
+[2025-09-27T08:39:56+02:00] SERVER -> CLIENT: 354 Go ahead. End your data with <CR><LF>.<CR><LF>
+
+[2025-09-27T08:39:56+02:00] CLIENT -> SERVER: Date: Sat, 27 Sep 2025 08:39:55 +0200
+
+[2025-09-27T08:39:56+02:00] CLIENT -> SERVER: To: wastedwarzone@gmail.com
+
+[2025-09-27T08:39:56+02:00] CLIENT -> SERVER: From: ShockFy <info.brixpay@gmail.com>
+
+[2025-09-27T08:39:56+02:00] CLIENT -> SERVER: Subject: =?UTF-8?Q?Tu_c=C3=B3digo_de_verificaci=C3=B3n_=E2=80=93_ShockFy?=
+
+[2025-09-27T08:39:56+02:00] CLIENT -> SERVER: Message-ID: <Tb37KXXo4VVCipU6EooVDplKQFzhDSoV7qJu819Rs@localhost>
+
+[2025-09-27T08:39:56+02:00] CLIENT -> SERVER: X-Mailer: PHPMailer 6.10.0 (https://github.com/PHPMailer/PHPMailer)
+
+[2025-09-27T08:39:56+02:00] CLIENT -> SERVER: MIME-Version: 1.0
+
+[2025-09-27T08:39:56+02:00] CLIENT -> SERVER: Content-Type: text/plain; charset=UTF-8
+
+[2025-09-27T08:39:56+02:00] CLIENT -> SERVER: Content-Transfer-Encoding: 8bit
+
+[2025-09-27T08:39:56+02:00] CLIENT -> SERVER: 
+
+[2025-09-27T08:39:56+02:00] CLIENT -> SERVER: Hola,
+
+[2025-09-27T08:39:56+02:00] CLIENT -> SERVER: 
+
+[2025-09-27T08:39:56+02:00] CLIENT -> SERVER: Tu código de verificación es: 842699
+
+[2025-09-27T08:39:56+02:00] CLIENT -> SERVER: Vence en 15 minutos. Si no solicitaste este email, puedes ignorar este mensaje.
+
+[2025-09-27T08:39:56+02:00] CLIENT -> SERVER: 
+
+[2025-09-27T08:39:56+02:00] CLIENT -> SERVER: ShockFy
+
+[2025-09-27T08:39:56+02:00] CLIENT -> SERVER: 
+
+[2025-09-27T08:39:56+02:00] CLIENT -> SERVER: .
+
+[2025-09-27T08:39:56+02:00] SERVER -> CLIENT: 250 2.0.0 OK: queued as <Tb37KXXo4VVCipU6EooVDplKQFzhDSoV7qJu819Rs@localhost>
+
+[2025-09-27T08:39:56+02:00] CLIENT -> SERVER: QUIT
+
+[2025-09-27T08:39:56+02:00] SERVER -> CLIENT: 221 2.0.0 Bye
+
+[2025-09-28T06:33:04+02:00] SERVER -> CLIENT: 220 smtp-relay.brevo.com ESMTP Service Ready
+
+[2025-09-28T06:33:04+02:00] CLIENT -> SERVER: EHLO localhost
+
+[2025-09-28T06:33:04+02:00] SERVER -> CLIENT: 250-Hello localhost
+250-PIPELINING
+250-8BITMIME
+250-ENHANCEDSTATUSCODES
+250-CHUNKING
+250-STARTTLS
+250-AUTH PLAIN LOGIN CRAM-MD5
+250 SIZE 20971520
+
+[2025-09-28T06:33:04+02:00] CLIENT -> SERVER: AUTH CRAM-MD5
+
+[2025-09-28T06:33:04+02:00] SERVER -> CLIENT: 334 PDEuOTQ2NDgwNjAyQGxvY2FsaG9zdD4=
+
+[2025-09-28T06:33:04+02:00] CLIENT -> SERVER: [credentials hidden]
+[2025-09-28T06:33:04+02:00] SERVER -> CLIENT: 235 2.0.0 Authentication succeeded
+
+[2025-09-28T06:33:04+02:00] CLIENT -> SERVER: MAIL FROM:<info.brixpay@gmail.com>
+
+[2025-09-28T06:33:04+02:00] SERVER -> CLIENT: 250 2.0.0 Roger, accepting mail from <info.brixpay@gmail.com>
+
+[2025-09-28T06:33:04+02:00] CLIENT -> SERVER: RCPT TO:<wastedwarzone@gmail.com>
+
+[2025-09-28T06:33:04+02:00] SERVER -> CLIENT: 250 2.0.0 I'll make sure <wastedwarzone@gmail.com> gets this
+
+[2025-09-28T06:33:04+02:00] CLIENT -> SERVER: DATA
+
+[2025-09-28T06:33:04+02:00] SERVER -> CLIENT: 354 Go ahead. End your data with <CR><LF>.<CR><LF>
+
+[2025-09-28T06:33:04+02:00] CLIENT -> SERVER: Date: Sun, 28 Sep 2025 06:33:03 +0200
+
+[2025-09-28T06:33:04+02:00] CLIENT -> SERVER: To: wastedwarzone@gmail.com
+
+[2025-09-28T06:33:04+02:00] CLIENT -> SERVER: From: ShockFy <info.brixpay@gmail.com>
+
+[2025-09-28T06:33:04+02:00] CLIENT -> SERVER: Subject: =?UTF-8?Q?Tu_c=C3=B3digo_de_verificaci=C3=B3n_=E2=80=93_ShockFy?=
+
+[2025-09-28T06:33:04+02:00] CLIENT -> SERVER: Message-ID: <4uNdZl9U5wXr7DlnmcqWWPP1LxSjQVoec31zTDQ6u5k@localhost>
+
+[2025-09-28T06:33:04+02:00] CLIENT -> SERVER: X-Mailer: PHPMailer 6.10.0 (https://github.com/PHPMailer/PHPMailer)
+
+[2025-09-28T06:33:04+02:00] CLIENT -> SERVER: MIME-Version: 1.0
+
+[2025-09-28T06:33:04+02:00] CLIENT -> SERVER: Content-Type: text/plain; charset=UTF-8
+
+[2025-09-28T06:33:04+02:00] CLIENT -> SERVER: Content-Transfer-Encoding: 8bit
+
+[2025-09-28T06:33:04+02:00] CLIENT -> SERVER: 
+
+[2025-09-28T06:33:04+02:00] CLIENT -> SERVER: Hola,
+
+[2025-09-28T06:33:04+02:00] CLIENT -> SERVER: 
+
+[2025-09-28T06:33:04+02:00] CLIENT -> SERVER: Tu código de verificación es: 760321
+
+[2025-09-28T06:33:04+02:00] CLIENT -> SERVER: Vence en 15 minutos. Si no solicitaste este email, puedes ignorar este mensaje.
+
+[2025-09-28T06:33:04+02:00] CLIENT -> SERVER: 
+
+[2025-09-28T06:33:04+02:00] CLIENT -> SERVER: ShockFy
+
+[2025-09-28T06:33:04+02:00] CLIENT -> SERVER: 
+
+[2025-09-28T06:33:04+02:00] CLIENT -> SERVER: .
+
+[2025-09-28T06:33:05+02:00] SERVER -> CLIENT: 250 2.0.0 OK: queued as <4uNdZl9U5wXr7DlnmcqWWPP1LxSjQVoec31zTDQ6u5k@localhost>
+
+[2025-09-28T06:33:05+02:00] CLIENT -> SERVER: QUIT
+
+[2025-09-28T06:33:05+02:00] SERVER -> CLIENT: 221 2.0.0 Bye
+
+[2025-09-28T06:36:07+02:00] SERVER -> CLIENT: 220 smtp-relay.brevo.com ESMTP Service Ready
+
+[2025-09-28T06:36:07+02:00] CLIENT -> SERVER: EHLO localhost
+
+[2025-09-28T06:36:07+02:00] SERVER -> CLIENT: 250-Hello localhost
+250-PIPELINING
+250-8BITMIME
+250-ENHANCEDSTATUSCODES
+250-CHUNKING
+250-STARTTLS
+250-AUTH LOGIN CRAM-MD5 PLAIN
+250 SIZE 20971520
+
+[2025-09-28T06:36:07+02:00] CLIENT -> SERVER: AUTH CRAM-MD5
+
+[2025-09-28T06:36:07+02:00] SERVER -> CLIENT: 334 PDEuNDUxMzE4MDc3QGxvY2FsaG9zdD4=
+
+[2025-09-28T06:36:07+02:00] CLIENT -> SERVER: [credentials hidden]
+[2025-09-28T06:36:08+02:00] SERVER -> CLIENT: 235 2.0.0 Authentication succeeded
+
+[2025-09-28T06:36:08+02:00] CLIENT -> SERVER: MAIL FROM:<info.brixpay@gmail.com>
+
+[2025-09-28T06:36:08+02:00] SERVER -> CLIENT: 250 2.0.0 Roger, accepting mail from <info.brixpay@gmail.com>
+
+[2025-09-28T06:36:08+02:00] CLIENT -> SERVER: RCPT TO:<wastedwarzone@gmail.com>
+
+[2025-09-28T06:36:08+02:00] SERVER -> CLIENT: 250 2.0.0 I'll make sure <wastedwarzone@gmail.com> gets this
+
+[2025-09-28T06:36:08+02:00] CLIENT -> SERVER: DATA
+
+[2025-09-28T06:36:08+02:00] SERVER -> CLIENT: 354 Go ahead. End your data with <CR><LF>.<CR><LF>
+
+[2025-09-28T06:36:08+02:00] CLIENT -> SERVER: Date: Sun, 28 Sep 2025 06:36:07 +0200
+
+[2025-09-28T06:36:08+02:00] CLIENT -> SERVER: To: wastedwarzone@gmail.com
+
+[2025-09-28T06:36:08+02:00] CLIENT -> SERVER: From: ShockFy <info.brixpay@gmail.com>
+
+[2025-09-28T06:36:08+02:00] CLIENT -> SERVER: Subject: =?UTF-8?Q?Tu_c=C3=B3digo_de_verificaci=C3=B3n_=E2=80=93_ShockFy?=
+
+[2025-09-28T06:36:08+02:00] CLIENT -> SERVER: Message-ID: <XvqRRxbkhd8m4lMqxldZqC0lAapKbonL66kLIaSZdE@localhost>
+
+[2025-09-28T06:36:08+02:00] CLIENT -> SERVER: X-Mailer: PHPMailer 6.10.0 (https://github.com/PHPMailer/PHPMailer)
+
+[2025-09-28T06:36:08+02:00] CLIENT -> SERVER: MIME-Version: 1.0
+
+[2025-09-28T06:36:08+02:00] CLIENT -> SERVER: Content-Type: text/plain; charset=UTF-8
+
+[2025-09-28T06:36:08+02:00] CLIENT -> SERVER: Content-Transfer-Encoding: 8bit
+
+[2025-09-28T06:36:08+02:00] CLIENT -> SERVER: 
+
+[2025-09-28T06:36:08+02:00] CLIENT -> SERVER: Hola,
+
+[2025-09-28T06:36:08+02:00] CLIENT -> SERVER: 
+
+[2025-09-28T06:36:08+02:00] CLIENT -> SERVER: Tu código de verificación es: 205166
+
+[2025-09-28T06:36:08+02:00] CLIENT -> SERVER: Vence en 15 minutos. Si no solicitaste este email, puedes ignorar este mensaje.
+
+[2025-09-28T06:36:08+02:00] CLIENT -> SERVER: 
+
+[2025-09-28T06:36:08+02:00] CLIENT -> SERVER: ShockFy
+
+[2025-09-28T06:36:08+02:00] CLIENT -> SERVER: 
+
+[2025-09-28T06:36:08+02:00] CLIENT -> SERVER: .
+
+[2025-09-28T06:36:08+02:00] SERVER -> CLIENT: 250 2.0.0 OK: queued as <XvqRRxbkhd8m4lMqxldZqC0lAapKbonL66kLIaSZdE@localhost>
+
+[2025-09-28T06:36:08+02:00] CLIENT -> SERVER: QUIT
+
+[2025-09-28T06:36:08+02:00] SERVER -> CLIENT: 221 2.0.0 Bye
+

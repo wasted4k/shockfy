@@ -1,0 +1,373 @@
+/* ===========================
+   ESTILO GENERAL
+=========================== */
+body {
+  background-color: #dfdfdf;
+  color: #333;
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  transition: background 0.3s, color 0.3s;
+}
+
+.container {
+  background-color: #ececec;
+  padding: 30px;
+  border-radius: 12px;
+  max-width: 1100px;
+  margin: 40px auto;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  transition: background 0.3s, color 0.3s;
+  position: relative;
+}
+
+/* Modo oscuro */
+body.dark {
+  background-color: #1e1e1e;
+  color: #f5f5f5;
+}
+
+body.dark .container {
+  background-color: #2a2a2a;
+}
+
+/* ===========================
+   CABECERA, NAVBAR Y BOTONES
+=========================== */
+.navbar, .menu {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 25px;
+}
+
+.navbar a, .menu a, button, .btn, .btn-small {
+  display: inline-block;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: bold;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.navbar a, .menu a, .btn, .btn-small {
+  background: #3498db;
+  color: #fff;
+}
+
+.navbar a:hover, .menu a:hover, .btn:hover, .btn-small:hover {
+  background: #2d89c9;
+}
+
+button.toggle-dark, #darkToggle {
+  background: #222;
+  color: #fff;
+  border: none;
+}
+
+body.dark .navbar a,
+body.dark .menu a,
+body.dark .btn,
+body.dark .btn-small {
+  background: #555;
+}
+
+body.dark .navbar a:hover,
+body.dark .menu a:hover,
+body.dark .btn:hover,
+body.dark .btn-small:hover {
+  background: #444;
+}
+
+body.dark button.toggle-dark,
+body.dark #darkToggle {
+  background: #222;
+}
+
+/* ===========================
+   HEADER + MENÚ PRINCIPAL
+========================= */
+header {
+  width: 100%;
+  background: #fff;
+  padding: 10px 20px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  position: relative;
+  z-index: 1000;
+  margin-bottom: 20px;
+}
+
+.menu-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.menu-wrapper a {
+  display: inline-block;
+  padding: 10px 18px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: bold;
+  font-size: 15px;
+  color: #fff;
+  background: #3498db;
+  transition: background 0.3s;
+}
+
+.menu-wrapper a:hover {
+  background: #2d89c9;
+}
+
+body.dark .menu-wrapper a {
+  background: #555;
+}
+
+body.dark .menu-wrapper a:hover {
+  background: #444;
+}
+
+/* ===========================
+   FORMULARIOS (add_product, edit_product, sell)
+=========================== */
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+form label {
+  font-weight: bold;
+}
+
+form input,
+form select {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+  width: 100%;
+  transition: background 0.3s, color 0.3s, border 0.3s;
+}
+
+body.dark form input,
+body.dark form select {
+  background: #3a3a3a;
+  color: #f1f1f1;
+  border: 1px solid #666;
+}
+
+.actions {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.btn.cancel {
+  background: #aaa;
+}
+
+.btn.cancel:hover {
+  background: #888;
+}
+
+/* ===========================
+   TABLAS (products, ventas, ranking)
+=========================== */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+th,
+td {
+  padding: 10px;
+  border-bottom: 1px solid #e9ecef;
+  text-align: left;
+}
+
+th {
+  background: #f1f3f5;
+  cursor: pointer;
+}
+
+body.dark th {
+  background: #3a3a3a;
+  color: #fff;
+}
+
+body.dark td {
+  border-bottom: 1px solid #555;
+}
+
+/* ===========================
+   FECHA Y SECCIONES
+=========================== */
+.fecha-actual {
+  position: fixed;
+  top: 100px;
+  right: 20px;
+  font-size: 16px;
+  font-weight: bold;
+  color: #fff;
+  background: #3498db;
+  padding: 8px 14px;
+  border-radius: 12px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+  transition: background 0.3s, color 0.3s;
+  z-index: 9999;
+  cursor: default;
+}
+
+/* ===========================
+   GRAFICOS (Chart.js)
+=========================== */
+canvas {
+  margin-top: 30px;
+  max-width: 100%;
+}
+
+/* ===========================
+   INPUTS DE BUSQUEDA Y SELECTS (products.php)
+=========================== */
+.search-box {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.search-box input {
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+body.dark .search-box input {
+  background: #3a3a3a;
+  border: 1px solid #666;
+  color: #fff;
+}
+
+.order-box select {
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+body.dark .order-box select {
+  background: #3a3a3a;
+  border: 1px solid #666;
+  color: #fff;
+}
+
+/* ===========================
+   BOTONES PEQUEÑOS
+=========================== */
+.btn-small {
+  padding: 6px 12px;
+  font-size: 14px;
+  background: #2ecc71;
+  color: white;
+  text-decoration: none;
+  border-radius: 6px;
+}
+
+.btn-small:hover {
+  background: #27ae60;
+}
+
+/* ===========================
+   ESTILOS PARA SELL.PHP
+=========================== */
+#quantity {
+  width: 80px;
+  text-align: center;
+}
+
+#unit_price {
+  width: 80px;
+  text-align: center;
+}
+
+.suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #fff;
+  z-index: 99;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+body.dark .suggestions {
+  background: #2a2a2a;
+  border: 1px solid #555;
+  color: #fff;
+}
+
+.suggest-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.suggest-item:hover {
+  background: #e6f2ff;
+}
+
+body.dark .suggest-item:hover {
+  background: #3a3a3a;
+}
+
+.suggest-left small {
+  display: block;
+  font-size: 12px;
+  color: #666;
+}
+
+body.dark .suggest-left small {
+  color: #ccc;
+}
+
+.meta {
+  font-size: 13px;
+  text-align: right;
+  color: #333;
+}
+
+body.dark .meta {
+  color: #f1f1f1;
+}
+
+.stock-badge {
+  font-size: 12px;
+  font-weight: bold;
+  color: #e67e22;
+  text-align: right;
+}
+
+/* ====== Ajustar inputs y selects del container ====== */
+.container input[type="number"],
+.container select {
+  width: 60%;
+  max-width: 400px;
+  margin: 8px auto;
+  display: block;
+  text-align: center;
+}
+

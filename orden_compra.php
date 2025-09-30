@@ -1,0 +1,449 @@
+<?php
+
+require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/auth_check.php';
+require_once __DIR__ . '/auth.php';
+
+if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
+$user_id = $_SESSION['user_id'] ?? null;
+if (!$user_id) { header('Location: login.php'); exit; }
+
+// ===== Cargar datos mínimos del usuario =====
+$stmt = $pdo->prepare("SELECT id, full_name, username, email, currency_pref, plan, trial_started_at, trial_ends_at, trial_cancelled_at FROM users WHERE id = :id LIMIT 1");
+$stmt->execute(['id' => $user_id]);
+$user = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+$currencyPref = $user['currency_pref'] ?: 'S/.';
+$currentPlan  = $user['plan'] ?: null;
+
+$now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+$trialEndsAt = $user['trial_ends_at'] ?? null;
+$trialCancelledAt = $user['trial_cancelled_at'] ?? null;
+$trialActive = false; $trialDaysLeft = null;
+if ($trialEndsAt && !$trialCancelledAt) {
+  try { 
+    $trialEnd = new DateTimeImmutable($trialEndsAt, new DateTimeZone('UTC'));
+    if ($now < $trialEnd) { 
+      $trialActive = true; 
+      $diff = $now->diff($trialEnd); 
+      $trialDaysLeft = max(0, (int)$diff->format('%a')); 
+    }
+  } catch (Throwable $e) {}
+}
+function display_plan_name(?string $code): string { 
+  if (!$code) return '—'; 
+  $map=['starter'=>'Premium','free'=>'Free']; 
+  return $map[strtolower($code)]??strtoupper($code); 
+}
+
+// ===== Parámetros de UI =====
+$plan = $_GET['plan'] ?? $_POST['plan'] ?? 'starter';
+$amountUSD = 4.99;
+$description = 'ShockFy Premium';
+$next = $_GET['next'] ?? $_POST['next'] ?? '';
+
+// Link de suscripción PayPal (directo, el que nos diste)
+$PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-8D38183960655060NNDNXHZA';
+?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Otros métodos de pago</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="assets/img/favicon.png" type="image/png">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    :root{
+      --sidebar-w:260px; --bg:#f5f7fb; --card:#ffffff; --text:#0f172a; --muted:#6b7280; --primary:#2563eb; --border:#e5e7eb; --shadow:0 16px 32px rgba(2,6,23,.08); --radius:16px;
+      --bn-yellow:#FCD34D; --bn-yellow-strong:#F59E0B; --bn-text:#111827;
+      --pp-blue:#2563EB; --pp-blue-strong:#1D4ED8;
+      --success:#16a34a; --success-strong:#15803d; --success-shadow: 0 8px 20px rgba(22,163,74,.25);
+    }
+    body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+    .app-shell{ display:flex; min-height:100vh; transition:filter .2s ease; }
+    .content{ flex:1; padding:28px 24px 48px; }
+    .with-fixed-sidebar{ margin-left:var(--sidebar-w); }
+    .container{ max-width:1100px; margin:0 auto; display:flex; flex-direction:column; align-items:center; text-align:center; }
+    .header-wrap{ text-align:center; margin:0 auto 18px; }
+    .page-title{ font-size:30px; font-weight:800; margin:0; }
+    .page-sub{ color:var(--muted); margin-top:6px; font-size:13px; }
+    .grid{ display:grid; gap:18px; grid-template-columns:1fr; width:100%; }
+    .card{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:22px; }
+    .btn{ display:inline-flex; align-items:center; justify-content:center; gap:10px; padding:12px 18px; border-radius:12px; border:1px solid rgba(0,0,0,.04); background:#111827; color:#fff; font-weight:800; text-decoration:none; cursor:pointer; transition:all .2s ease; }
+    .btn.outline{ background:#fff; color:#111827; border:1px solid var(--border); }
+    .muted{ color:var(--muted); font-size:12px; }
+    .row{ display:grid; grid-template-columns:1fr; gap:18px; }
+    @media (min-width:901px){ .row{ grid-template-columns:1.2fr .8fr; } }
+
+    .opt-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; }
+    .opt{ padding:16px; border-radius:12px; border:1px solid var(--border); background:#fff; box-shadow:0 6px 16px rgba(2,6,23,.06); cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px; font-weight:800; color:#111827; transition:all .2s ease; }
+    .opt img.icon{ width:20px; height:20px; display:inline-block; object-fit:contain; transition:filter .2s ease; }
+
+    /* Hover Binance */
+    .opt[data-method="binance"]:hover, .opt[data-method="binance"]:focus-visible{
+      background:var(--bn-yellow); border-color:var(--bn-yellow-strong); box-shadow:0 8px 20px rgba(245,158,11,.25); outline:none;
+    }
+    .opt[data-method="binance"]:hover .icon, .opt[data-method="binance"]:focus-visible .icon{ filter:brightness(0) invert(1); }
+
+    /* Hover PayPal */
+    .opt[data-method="paypal"]:hover, .opt[data-method="paypal"]:focus-visible{
+      background:var(--pp-blue); border-color:var(--pp-blue-strong); box-shadow:0 8px 20px rgba(29,78,216,.25); color:#fff; outline:none;
+    }
+    .opt[data-method="paypal"]:hover .icon, .opt[data-method="paypal"]:focus-visible .icon{ filter:brightness(0) invert(1); }
+
+    #methodDetail{ margin-top:14px; display:none; text-align:center; }
+    #methodDetail .btn{ margin-top:10px; }
+
+    /* Botones de pago del panel */
+    #methodDetail .btn.pay:hover, #methodDetail .btn.pay:focus-visible{
+      background:var(--bn-yellow); border-color:var(--bn-yellow-strong); color:var(--bn-text); box-shadow:0 8px 20px rgba(245,158,11,.25); outline:none;
+    }
+    #methodDetail .btn.pay.pay--paypal:hover, #methodDetail .btn.pay.pay--paypal:focus-visible{
+      background:var(--pp-blue); border-color:var(--pp-blue-strong); color:#fff; box-shadow:0 8px 20px rgba(29,78,216,.25); outline:none;
+    }
+
+    /* utilidades panel Binance */
+    .stack { display:flex; flex-direction:column; align-items:center; gap:12px; }
+    .stack-lg { gap:16px; }
+    .hr { width:100%; height:1px; background:var(--border); margin:8px 0; }
+    .qr-box { display:flex; justify-content:center; }
+    .qr-img { width:220px; max-width:80vw; border-radius:12px; border:1px solid var(--border); box-shadow:0 8px 20px rgba(2,6,23,.08); background:#fff; }
+    .note { font-size:13px; color:var(--text); background:#fff7ed; border:1px solid #fed7aa; padding:10px 12px; border-radius:10px; }
+    .small { font-size:12px; color:var(--muted); }
+    .btn.secondary { background:#fff; color:#111827; border:1px solid var(--border); }
+    .btn.disabled, .btn[disabled] { opacity:.6; cursor:not-allowed; }
+    .checkbox-row { display:flex; align-items:flex-start; gap:10px; text-align:left; }
+
+    /* Modal instrucciones */
+    body.modal-open { overflow:hidden; }
+    body.modal-open .app-shell { filter: blur(6px); }
+    .modal-overlay{ position:fixed; inset:0; background:rgba(15,23,42,.55); display:none; align-items:center; justify-content:center; z-index: 9999; }
+    .modal{ background:#fff; border:1px solid var(--border); border-radius:16px; box-shadow:0 20px 60px rgba(2,6,23,.25); width:min(92vw, 980px); padding:16px; }
+    .modal-header{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+    .modal-title{ font-size:18px; font-weight:900; margin:0; }
+    .modal-close{ background:#fff; border:1px solid var(--border); border-radius:10px; padding:8px 12px; cursor:pointer; font-weight:800; }
+    .video-wrap{ position:relative; width:100%; padding-top:56.25%; border-radius:12px; overflow:hidden; background:#000; }
+    .video-wrap iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; }
+
+    /* Botón "Instrucciones" en verde */
+    #mdBody #bn-instrucciones{
+      background: var(--success);
+      border-color: var(--success-strong);
+      color:#fff;
+    }
+    #mdBody #bn-instrucciones:hover,
+    #mdBody #bn-instrucciones:focus-visible{
+      background: var(--success-strong);
+      border-color: var(--success-strong);
+      box-shadow: var(--success-shadow);
+      outline: none;
+    }
+    .btn.success{
+      background: var(--success);
+      border-color: var(--success-strong);
+      color:#fff;
+    }
+    .btn.success:hover,
+    .btn.success:focus-visible{
+      background: var(--success-strong);
+      border-color: var(--success-strong);
+      box-shadow: var(--success-shadow);
+      outline: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <?php include __DIR__ . '/sidebar.php'; ?>
+    <main class="content with-fixed-sidebar">
+      <div class="container">
+        <div class="header-wrap">
+          <h1 class="page-title">Otros métodos de pago</h1>
+          <div class="page-sub">Activa <strong>Premium</strong> con el método que prefieras.</div>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <div class="row">
+              <div>
+                <h3 style="margin:0 0 6px; font-size:20px; font-weight:800;">Plan seleccionado</h3>
+                <div class="muted">Código interno: <strong><?= htmlspecialchars($plan) ?></strong> — Visible: <strong><?= htmlspecialchars(display_plan_name($plan)) ?></strong></div>
+                <div style="font-size:26px; font-weight:900; margin:10px 0;">$<?= number_format($amountUSD,2) ?>/mes</div>
+
+                <!-- Opciones -->
+                <div class="opt-grid" role="group" aria-label="Opciones de pago">
+                  <button type="button" class="opt" data-method="binance" aria-label="Binance">
+                    <img src="assets/img/binance-logo.svg" alt="" class="icon" aria-hidden="true"> Binance
+                  </button>
+                  <button type="button" class="opt" data-method="paypal" aria-label="PayPal">
+                    <img src="assets/img/paypal-logo.svg" alt="" class="icon" aria-hidden="true"> PayPal
+                  </button>
+                  <button type="button" class="opt" data-method="soles" aria-label="Soles (Perú)">
+                    <img src="assets/img/coin.png" alt="" class="icon" aria-hidden="true"> Soles
+                  </button>
+                  <button type="button" class="opt" data-method="bolivares" aria-label="Bolívares (Venezuela)">
+                    <img src="assets/img/coin.png" alt="" class="icon" aria-hidden="true"> Bolívares
+                  </button>
+                </div>
+
+                <!-- Panel de detalle -->
+                <div id="methodDetail" class="card" aria-live="polite">
+                  <h2 id="mdTitle" style="margin:6px 0 4px; font-size:22px; font-weight:900;"></h2>
+                  <div id="mdSubtitle" style="font-size:18px; font-weight:800; margin-bottom:6px;"></div>
+                  <div id="mdBody" class="muted"></div>
+                </div>
+
+                <script>
+                  (function(){
+                    const grid = document.querySelector('.opt-grid');
+                    const detail = document.getElementById('methodDetail');
+                    const title = document.getElementById('mdTitle');
+                    const subtitle = document.getElementById('mdSubtitle');
+                    const body = document.getElementById('mdBody');
+                    const price = '$<?= number_format($amountUSD,2) ?>';
+                    const PAYPAL_URL = '<?= $PAYPAL_SUBSCRIBE_URL ?>';
+
+                    function setActive(btn){
+                      grid.querySelectorAll('.opt').forEach(b=> b.style.outline = '');
+                      btn.style.outline = '3px solid #93c5fd';
+                    }
+
+                    // Modal video
+                    function openVideoModal(src, titleText = 'Instrucciones'){
+                      const overlay = document.createElement('div');
+                      overlay.className = 'modal-overlay';
+                      overlay.setAttribute('role', 'dialog');
+                      overlay.setAttribute('aria-modal', 'true');
+                      overlay.innerHTML = `
+                        <div class="modal" aria-label="${titleText}">
+                          <div class="modal-header">
+                            <h3 class="modal-title">${titleText}</h3>
+                            <button class="modal-close" type="button" aria-label="Cerrar">Cerrar ✕</button>
+                          </div>
+                          <div class="video-wrap">
+                            <iframe src="${src}" title="${titleText}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+                          </div>
+                        </div>
+                      `;
+                      document.body.appendChild(overlay);
+                      const close = () => {
+                        document.body.classList.remove('modal-open');
+                        overlay.style.display = 'none';
+                        overlay.remove();
+                        document.removeEventListener('keydown', onEsc);
+                      };
+                      const onEsc = (e) => { if (e.key === 'Escape') close(); };
+                      overlay.addEventListener('click', (e)=>{ if (e.target === overlay) close(); });
+                      overlay.querySelector('.modal-close').addEventListener('click', close);
+                      document.addEventListener('keydown', onEsc);
+                      document.body.classList.add('modal-open');
+                      overlay.style.display = 'flex';
+                    }
+
+                    function renderDetail(method){
+                      detail.style.display = 'block';
+
+                      if (method === 'binance'){
+                        title.textContent = 'Pago por Binance Pay';
+                        subtitle.textContent = 'Plan Premium - ' + price;
+
+                        body.innerHTML = `
+                          <div class="stack stack-lg" style="max-width:560px; margin:0 auto; text-align:center;">
+                            <div>Completa tu pago por Binance Pay.</div>
+
+                            <!-- Botones principales -->
+                            <div class="stack" style="gap:10px;">
+                              <a class="btn pay" href="https://s.binance.com/j8dy27VF" target="_blank" rel="noopener noreferrer">Pagar por Pay</a>
+                              <button id="bn-instrucciones" type="button" class="btn secondary">Instrucciones</button>
+                              <div class="small">Se abrirá en una nueva pestaña (pago) / modal (instrucciones).</div>
+                            </div>
+
+                            <div class="hr" role="separator" aria-hidden="true"></div>
+
+                            <!-- QR centrado -->
+                            <div class="qr-box">
+                              <img src="assets/img/qr-binance.png" alt="QR de pago Binance" class="qr-img" />
+                            </div>
+
+                            <!-- ID -->
+                            <div style="font-weight:800; font-size:18px; margin-top:4px;">ID: 319 852 186</div>
+
+                            <!-- Nota importante -->
+                            <div class="note" role="note">
+                              <strong>IMPORTANTE:</strong> Coloca tu correo electrónico en la <em>nota de pago</em>. Esto será necesario para validarlo.
+                            </div>
+
+                            <!-- Adjuntar comprobante -->
+                            <div class="stack" style="gap:8px;">
+                              <input id="bn-file" type="file" accept="image/*,.pdf" style="display:none">
+                              <button id="bn-file-btn" type="button" class="btn secondary">Adjuntar comprobante</button>
+                              <div id="bn-file-name" class="small" aria-live="polite"></div>
+                            </div>
+
+                            <!-- Confirmaciones y finalizar -->
+                            <div id="bn-confirm" class="stack" style="display:none;">
+                              <label class="checkbox-row">
+                                <input id="chk-paid" type="checkbox">
+                                <span>He realizado el pago de <strong>4,99 USDT</strong>.</span>
+                              </label>
+                              <label class="checkbox-row">
+                                <input id="chk-terms" type="checkbox">
+                                <span>Acepto los <a href="terminos.php" target="_blank" rel="noopener noreferrer">términos y condiciones del servicio</a>.</span>
+                              </label>
+                              <button id="bn-done" type="button" class="btn disabled" disabled>Pago realizado</button>
+                              <div class="small">Para habilitar el botón, adjunta el comprobante y marca ambas casillas.</div>
+                            </div>
+                          </div>
+                        `;
+
+                        // Lógica de interacción
+                        const fileInput   = body.querySelector('#bn-file');
+                        const fileBtn     = body.querySelector('#bn-file-btn');
+                        const fileNameEl  = body.querySelector('#bn-file-name');
+                        const confirmBox  = body.querySelector('#bn-confirm');
+                        const chkPaid     = body.querySelector('#chk-paid');
+                        const chkTerms    = body.querySelector('#chk-terms');
+                        const doneBtn     = body.querySelector('#bn-done');
+                        const btnInstr    = body.querySelector('#bn-instrucciones');
+
+                        btnInstr.addEventListener('click', () => {
+                          openVideoModal('https://www.youtube.com/embed/j2DWy4g_iQw', 'Instrucciones de pago por Binance');
+                        });
+
+                        fileBtn.addEventListener('click', () => fileInput.click());
+
+                        fileInput.addEventListener('change', () => {
+                          const file = fileInput.files && fileInput.files[0];
+                          if (!file) return;
+                          fileNameEl.textContent = `Comprobante: ${file.name}`;
+                          confirmBox.style.display = 'flex';
+                          confirmBox.classList.add('stack');
+                          updateDoneState();
+                        });
+
+                        function updateDoneState(){
+                          const ready = chkPaid.checked && chkTerms.checked && (fileInput.files && fileInput.files.length > 0);
+                          doneBtn.disabled = !ready;
+                          doneBtn.classList.toggle('disabled', !ready);
+                        }
+                        chkPaid.addEventListener('change', updateDoneState);
+                        chkTerms.addEventListener('change', updateDoneState);
+
+                        // Handler ROBUSTO: lee texto, intenta JSON y redirige si ok
+                        doneBtn.addEventListener('click', async () => {
+                          if (doneBtn.disabled) return;
+
+                          const fd = new FormData();
+                          if (fileInput.files && fileInput.files[0]) {
+                            fd.append('receipt', fileInput.files[0]);
+                          }
+                          fd.append('paid', '1');
+                          fd.append('terms', '1');
+                          fd.append('amount', '4.99');
+                          fd.append('currency', 'USDT');
+
+                          const prevText = doneBtn.textContent;
+                          doneBtn.textContent = 'Enviando...';
+                          doneBtn.disabled = true;
+
+                          try {
+                            const resp = await fetch('pago_binance.php', { method: 'POST', body: fd });
+                            const raw  = await resp.text();
+                            let data;
+                            try { data = JSON.parse(raw); }
+                            catch { throw new Error('Respuesta no JSON:\n' + raw.slice(0, 300)); }
+
+                            if (resp.ok && data && data.ok) {
+                              window.location.href = 'waiting_confirmation.php';
+                            } else {
+                              alert('No pudimos registrar tu pago. Código: ' + (data?.error || 'ERR'));
+                              doneBtn.textContent = prevText;
+                              doneBtn.disabled = false;
+                            }
+                          } catch (e) {
+                            alert('Error de red: ' + e.message);
+                            doneBtn.textContent = prevText;
+                            doneBtn.disabled = false;
+                          }
+                        });
+
+                        return;
+                      }
+
+                      if (method === 'paypal'){
+                        title.textContent = 'Pago por PayPal (suscripción)';
+                        subtitle.textContent = 'Plan Premium - ' + price;
+                        body.innerHTML =
+                          '<div>Serás redirigido al flujo seguro de PayPal para completar tu suscripción.</div>' +
+                          '<a class="btn pay pay--paypal" href="'+PAYPAL_URL+'" target="_blank" rel="noopener noreferrer">Suscribirse con PayPal</a>' +
+                          '<div class="muted" style="margin-top:8px;">Se abrirá en una nueva pestaña.</div>';
+                        return;
+                      }
+
+                      if (method === 'soles'){
+                        title.textContent = 'Pago manual en Soles (Perú)';
+                        subtitle.textContent = 'Plan Premium - ' + price;
+                        body.innerHTML =
+                          '<div style="font-size:14px; text-align:left; margin:0 auto; max-width:560px;">' +
+                          '<p><strong>Transferencia manual:</strong> requiere <em>verificación humana</em>. La validación puede demorar <strong>entre 5 minutos y 2 horas</strong>.</p>' +
+                          '<ul style="padding-left:18px; margin:10px 0;">' +
+                          '<li><strong>Banco:</strong> XXX</li><li><strong>CCI:</strong> 000-000-000</li><li><strong>Titular:</strong> ShockFy</li>' +
+                          '<li><strong>Monto:</strong> <?= number_format($amountUSD,2) ?> USD (o equivalente en PEN)</li>' +
+                          '</ul><p>Guarda tu comprobante; el equipo lo validará y activará Premium.</p></div>';
+                        return;
+                      }
+
+                      if (method === 'bolivares'){
+                        title.textContent = 'Pago manual en Bolívares (Venezuela)';
+                        subtitle.textContent = 'Plan Premium - ' + price;
+                        body.innerHTML =
+                          '<div style="font-size:14px; text-align:left; margin:0 auto; max-width:560px;">' +
+                          '<p><strong>Transferencia manual:</strong> requiere <em>verificación humana</em>. La validación puede demorar <strong>entre 5 minutos y 2 horas</strong>.</p>' +
+                          '<ul style="padding-left:18px; margin:10px 0;">' +
+                          '<li><strong>Banco:</strong> YYY</li><li><strong>Número de cuenta:</strong> 0000-0000</li><li><strong>Titular:</strong> ShockFy</li>' +
+                          '<li><strong>Monto:</strong> <?= number_format($amountUSD,2) ?> USD (o equivalente en VES)</li>' +
+                          '</ul><p>Guarda tu comprobante; el equipo lo validará y activará Premium.</p></div>';
+                        return;
+                      }
+
+                      // Fallback
+                      title.textContent = method.charAt(0).toUpperCase() + method.slice(1);
+                      subtitle.textContent = 'Plan Premium - ' + price;
+                      body.textContent = 'Próximamente';
+                    }
+
+                    grid.addEventListener('click', (e)=>{
+                      const btn = e.target.closest('.opt');
+                      if (!btn) return;
+                      setActive(btn);
+                      renderDetail(btn.dataset.method);
+                    });
+                  })();
+                </script>
+              </div>
+
+              <!-- Estado de cuenta -->
+              <div class="card" style="background:#f9fafb; border-style:dashed;">
+                <div class="muted">Estado de tu cuenta</div>
+                <ul class="ul" style="padding-left:18px; margin:8px 0 0; text-align:left;">
+                  <li>Plan actual: <strong><?= htmlspecialchars(display_plan_name($currentPlan)) ?></strong></li>
+                  <?php if ($trialActive): ?>
+                    <li>Trial activo — quedan <?= (int)$trialDaysLeft ?> día(s)</li>
+                  <?php else: ?>
+                    <li>Trial finalizado</li>
+                  <?php endif; ?>
+                </ul>
+                <div class="muted" style="margin-top:10px;">El precio es fijo en USD y no depende de tu moneda local.</div>
+                <div style="margin-top:12px;"><a class="btn outline" href="billing.php">Volver a planes</a></div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+</body>
+</html>
