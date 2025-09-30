@@ -2,3 +2,6 @@
 .env
 .env.backup
 .env.production
+/vendor
+mail_stpm.log
+verification_code_user_13.txt
