@@ -9,6 +9,7 @@ $user_id = $_SESSION['user_id']; // el ID del usuario que está logueado
 // Traer todas las categorías
 $categories = $pdo->prepare("SELECT id, name FROM categories WHERE user_id = ? ORDER BY name");
 $categories->execute([$user_id]);
+return $categories;
 $categories = $categories->fetchAll();
 
 // traer moneda para solo mostrar símbolo (no cambia backend)
