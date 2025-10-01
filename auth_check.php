@@ -1,85 +1,135 @@
 <?php
-// auth_check.php — Gate de acceso con prioridad a pending_confirmation
-// Requisitos: session_start() aquí, y $pdo disponible si usas fallback a DB.
+// auth_check.php — exige login + email verificado + estado activo
+// Gate por estado pending_payment y por plan/trial.
+// Premium (starter) válido solo si premium_expires_at > NOW() (UTC).
 
-if (session_status() !== PHP_SESSION_ACTIVE) {
-  session_start();
-}
+if (session_status() === PHP_SESSION_NONE) { session_start(); }
 
-// ---------- Config ----------
-$WHITELIST_FILES = [
-  'waiting_confirmation.php', // la página de espera debe poder cargarse
-  'pago_binance.php',         // endpoint JSON
-  'login.php',
-  'logout.php',
-  // 'orden_compra.php',      // opcional: déjala fuera si quieres que también redirija
-];
+require_once __DIR__ . '/db.php';
 
-$PENDING_STATES  = ['pending_confirmation', 'pending_payment']; // admite ambos por compat
-$WAITING_PAGE    = '/waiting_confirmation.php';
-$DB_FALLBACK     = true; // intenta leer account_state desde DB si la sesión viene vacía
-
-// ---------- Utilidades ----------
-/** Redirige de forma segura; si headers ya fueron enviados, usa JS como fallback. */
-function gate_redirect($url) {
-  if (!headers_sent()) {
-    header('Location: ' . $url, true, 302);
-  } else {
-    // Último recurso si algún include emitió salida accidentalmente
-    echo '<script>window.location.replace(' . json_encode($url) . ');</script>';
-  }
+// ===== 1) Requiere login =====
+$user_id = $_SESSION['user_id'] ?? null;
+if (!$user_id) {
+  header('Location: login.php');
   exit;
 }
 
-// ---------- Ruta actual ----------
-$reqPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
-$base    = strtolower(basename($reqPath));
+// ===== 2) Cargar datos del usuario (incluye campos premium) =====
+$st = $pdo->prepare("
+  SELECT id, username, full_name, status, role,
+         email_verified_at, plan, trial_started_at, trial_ends_at, trial_cancelled_at,
+         account_state,
+         premium_started_at, premium_expires_at
+  FROM users
+  WHERE id = ?
+  LIMIT 1
+");
+$st->execute([$user_id]);
+$currentUser = $st->fetch(PDO::FETCH_ASSOC);
 
-// ---------- Whitelist ----------
-if (in_array($base, $WHITELIST_FILES, true)) {
-  // Esta ruta no debe ser gateada
-  return;
+if (!$currentUser) {
+  // Sesión huérfana
+  session_destroy();
+  header('Location: login.php');
+  exit;
 }
 
-// ---------- Estado desde sesión ----------
-$state = $_SESSION['account_state'] ?? null;
+// ===== 3) Debe estar activo =====
+if ((int)$currentUser['status'] !== 1) {
+  // Usuario desactivado por admin
+  header('Location: logout.php');
+  exit;
+}
 
-// ---------- Fallback a DB (si sesión vacía) ----------
-if ($DB_FALLBACK && ($state === null || $state === '') && isset($_SESSION['user_id'])) {
+// ===== 4) Debe tener email verificado (ajusta si tu flujo no lo requiere) =====
+if (empty($currentUser['email_verified_at'])) {
+  header('Location: welcome.php?step=3');
+  exit;
+}
+
+// ===== 4.1) Gate por estado de cuenta: pending_payment =====
+$currentScript = basename($_SERVER['SCRIPT_NAME'] ?? '');
+$accountState  = $currentUser['account_state'] ?? 'active';
+
+if ($accountState === 'pending_payment') {
+  // Solo permitir estas páginas mientras esté pendiente:
+  $allowed_when_pending = [
+    'waiting_confirmation.php',
+    'logout.php',
+  ];
+  if (!in_array($currentScript, $allowed_when_pending, true)) {
+    header('Location: waiting_confirmation.php');
+    exit;
+  }
+  // Importante: no seguimos con otros gates (trial/plan) en este estado.
+  // Simplemente dejamos continuar la ejecución del script actual permitido.
+}
+
+// ====================================================================
+// 5) Gate de acceso por plan/trial (EXCEPTO en páginas de billing/pagos)
+// ====================================================================
+
+// Páginas que SIEMPRE deben poder verse aunque el trial esté vencido
+// (manteniendo login + verificación + usuario activo):
+$GATE_EXCEPTIONS = [
+  'billing.php',
+  'pago_tarjeta.php',
+  'orden_compra.php',
+  'checkout_create.php',
+  'billing_success.php',
+  'billing_cancel.php',
+  'trial_expired.php',
+  'waiting_confirmation.php', // clave para no chocar con pending_payment
+  'logout.php',
+  'login.php',
+  'send_verification.php',
+  'verify.php',
+  'welcome.php',
+];
+
+$isGateExempt = in_array($currentScript, $GATE_EXCEPTIONS, true);
+
+// ===== Calcular trial activo (UTC) =====
+$now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+$trialActive = false;
+if (!empty($currentUser['trial_ends_at']) && empty($currentUser['trial_cancelled_at'])) {
   try {
-    // Usa $pdo si ya está definido por db.php
-    if (isset($pdo) && $pdo instanceof PDO) {
-      $st = $pdo->prepare('SELECT account_state FROM users WHERE id = ? LIMIT 1');
-      $st->execute([$_SESSION['user_id']]);
-      $stateDb = $st->fetchColumn();
-      if (is_string($stateDb) && $stateDb !== '') {
-        $_SESSION['account_state'] = $stateDb; // cachear en sesión
-        $state = $stateDb;
-        // No hacemos session_write_close() aquí para no interferir con el flujo de la página
-      }
-    }
-  } catch (Throwable $e) {
-    // Silencioso: no bloquea el request si el fallback falla
-    // error_log('[AUTH_CHECK][DB_FALLBACK] ' . $e->getMessage());
+    $trialEnd = new DateTimeImmutable($currentUser['trial_ends_at'], new DateTimeZone('UTC'));
+    $trialActive = ($now < $trialEnd);
+  } catch (Throwable $e) { /* ignorar parseo */ }
+}
+
+// ===== Calcular premium vigente (30 días) =====
+$premiumActive = false;
+if (!empty($currentUser['premium_expires_at'])) {
+  try {
+    $premiumUntil = new DateTimeImmutable($currentUser['premium_expires_at'], new DateTimeZone('UTC'));
+    $premiumActive = ($now < $premiumUntil);
+  } catch (Throwable $e) { /* ignorar parseo */ }
+}
+
+$plan = strtolower($currentUser['plan'] ?? 'free');
+// Premium SOLO si el plan es starter y no está vencido
+$hasPremium = ($plan === 'starter' && $premiumActive);
+
+/*
+ // (Opcional) Auto-downgrade cuando esté vencido:
+ if ($plan === 'starter' && !$premiumActive) {
+   $pdo->prepare("UPDATE users SET plan='free' WHERE id=?")->execute([$currentUser['id']]);
+   $currentUser['plan'] = 'free';
+   $plan = 'free';
+ }
+*/
+
+// ===== Gate principal =====
+if (!$isGateExempt) {
+  if (!$hasPremium && !$trialActive) {
+    // Trial vencido y sin premium vigente => bloquear
+    $next = urlencode($_SERVER['REQUEST_URI'] ?? 'index.php');
+    header("Location: trial_expired.php?next={$next}");
+    exit;
   }
 }
 
-// ---------- Prioridad: pending_* -> waiting_confirmation ----------
-if (in_array($state, $PENDING_STATES, true)) {
-  // Evitar loop si ya estamos en waiting
-  if ($base !== strtolower(basename($WAITING_PAGE))) {
-    // Diagnóstico opcional si ya se enviaron headers
-    if (headers_sent($file, $line)) {
-      error_log("GATE headers already sent en $file:$line; base=$base; state=$state");
-    }
-    gate_redirect($WAITING_PAGE);
-  }
-  // Si ya estamos en waiting, continuar (render normal)
-  return;
-}
-
-// ---------- Aquí abajo va tu lógica normal de plan/trial/roles ----------
-// Ejemplo:
-// if (!($_SESSION['user_id'] ?? null)) { gate_redirect('/login.php'); }
-// if ($necesitaPlan && $planActual === 'free') { gate_redirect('/billing.php'); }
-// ...
+// Si llegaste aquí, la página pasa todos los checks.
+// $currentUser queda disponible para el resto del script.
