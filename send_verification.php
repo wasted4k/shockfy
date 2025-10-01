@@ -13,9 +13,9 @@ use PHPMailer\PHPMailer\Exception;
 require __DIR__ . '/bootstrap.php';
 
 // 1) Cargar PHPMailer (tu estructura sin Composer)
-require __DIR__ . '/vendor/phpmailer/src/PHPMailer.php';
-require __DIR__ . '/vendor/phpmailer/src/SMTP.php';
-require __DIR__ . '/vendor/phpmailer/src/Exception.php';
+require '/vendor/phpmailer/src/PHPMailer.php';
+require '/vendor/phpmailer/src/SMTP.php';
+require '/vendor/phpmailer/src/Exception.php';
 
 // 2) Conexión a BD (asume que $pdo queda disponible)
 require_once __DIR__ . '/db.php';
