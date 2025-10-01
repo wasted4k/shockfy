@@ -1,51 +1,24 @@
 <?php
 // pago_binance.php — Recibe el comprobante, crea la solicitud y deja la cuenta en 'pending_confirmation'
-// Versión: hosting-safe (CSRF, proxy HTTPS, fileinfo fallback, permisos, transacción, JSON-only)
+// Versión hosting-safe: JSON-only, CSRF, transacción, compatibilidad de campos, manejo de carpeta/permiso
 
 declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
-ini_set('display_errors', '0');
 
-// Convierte warnings/notices en excepciones controlables (para responder JSON limpio)
+// Nunca imprimir warnings en la respuesta (rompen JSON)
+ini_set('display_errors', '0');
 set_error_handler(function($sev, $msg, $file, $line) {
-  if (error_reporting() & $sev) throw new ErrorException($msg, 0, $sev, $file, $line);
+  if (error_reporting() & $sev) { throw new ErrorException($msg, 0, $sev, $file, $line); }
 });
 
 try {
-  // ==========
-  // SESIÓN
-  // ==========
-  $proto   = $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ($_SERVER['HTTP_X_FORWARDED_SCHEME'] ?? '');
-  $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-          || (($_SERVER['SERVER_PORT'] ?? '') == 443)
-          || (strtolower($proto) === 'https')
-          || (($_SERVER['HTTP_X_FORWARDED_SSL'] ?? '') === 'on');
-
-  session_name('shockfy_sess');
-  session_set_cookie_params([
-    'lifetime' => 0,
-    'path'     => '/',
-    'domain'   => '',
-    'secure'   => $isHttps,
-    'httponly' => true,
-    'samesite' => 'Lax',
-  ]);
-  if (session_status() !== PHP_SESSION_ACTIVE) session_start();
+  // Sesión ANTES de cualquier uso de $_SESSION
+  if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
 
   require_once __DIR__ . '/db.php';
-  // No se incluye auth_check.php para evitar HTML/redirects en AJAX
+  // No incluimos auth_check.php para evitar redirecciones HTML en AJAX
 
-  // ==========
-  // CONFIG (usar define() dentro del bloque)
-  // ==========
-  if (!defined('MAX_UPLOAD_BYTES')) define('MAX_UPLOAD_BYTES', 10 * 1024 * 1024); // 10 MB
-  if (!defined('RECEIPTS_DIR'))     define('RECEIPTS_DIR', 'uploads/receipts');
-  if (!defined('PR_STATUS'))        define('PR_STATUS', 'pending');              // Ajusta si tu ENUM usa otro valor
-  if (!defined('NEXT_STATE'))       define('NEXT_STATE', 'pending_confirmation'); // Gate esperado por tu auth
-
-  // ==========
-  // AUTENTICACIÓN
-  // ==========
+  // ====== Autenticación mínima ======
   $user_id = $_SESSION['user_id'] ?? null;
   if (!$user_id) {
     http_response_code(401);
@@ -53,83 +26,68 @@ try {
     return;
   }
 
-  // ==========
-  // MÉTODO
-  // ==========
+  // ====== Método HTTP ======
   if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
     http_response_code(405);
     echo json_encode(['ok'=>false, 'error'=>'METHOD_NOT_ALLOWED']);
     return;
   }
 
-  // ==========
-  // CSRF
-  // ==========
-  $csrfBody   = $_POST['csrf'] ?? '';
-  $csrfHeader = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-  $csrfClient = $csrfBody ?: $csrfHeader;
+  // ====== CSRF ======
+  $csrfClient = $_POST['csrf'] ?? '';
   $csrfServer = $_SESSION['csrf'] ?? '';
-
   if (!$csrfClient || !$csrfServer || !hash_equals($csrfServer, $csrfClient)) {
     http_response_code(419);
     echo json_encode(['ok'=>false, 'error'=>'CSRF_FAIL']);
     return;
   }
 
-  // ==========
-  // CAMPOS
-  // ==========
-  $method    = trim($_POST['method'] ?? '') ?: 'binance_manual';
-  $notes     = trim($_POST['notes'] ?? '');
-  $currency  = trim($_POST['currency'] ?? 'USDT');
+  // ====== Campos (aceptamos ambos esquemas para compatibilidad) ======
+  // Front nuevo:
+  $method     = trim($_POST['method'] ?? '') ?: 'binance_manual';
+  $amountUsd  = isset($_POST['amount_usd']) ? (float)$_POST['amount_usd'] : null;
+  $currency   = trim($_POST['currency'] ?? 'USDT');
+  $notes      = trim($_POST['notes'] ?? '');
 
-  // Permitir amount_usd (nuevo) o amount (legacy)
-  $amountUsd = null;
-  if (isset($_POST['amount_usd'])) $amountUsd = (float)$_POST['amount_usd'];
-  elseif (isset($_POST['amount'])) $amountUsd = (float)$_POST['amount'];
-  if ($amountUsd === null || $amountUsd <= 0) $amountUsd = 4.99;
+  // Front antiguo (por si quedó en alguna cache/cliente):
+  if ($amountUsd === null && isset($_POST['amount'])) {
+    $amountUsd = (float)$_POST['amount'];
+  }
 
-  $allowedCurrencies = ['USDT','USD','USDC','PEN','VES'];
-  if (!in_array($currency, $allowedCurrencies, true)) {
+  // Validaciones
+  if ($amountUsd === null || $amountUsd <= 0) {
     http_response_code(400);
-    echo json_encode(['ok'=>false,'error'=>'INVALID_CURRENCY']);
+    echo json_encode(['ok'=>false, 'error'=>'INVALID_AMOUNT']);
+    return;
+  }
+  if (!in_array($currency, ['USDT','USD','USDC','VES','PEN'], true)) {
+    http_response_code(400);
+    echo json_encode(['ok'=>false, 'error'=>'INVALID_CURRENCY']);
     return;
   }
 
-  // ==========
-  // ARCHIVO (opcional pero recomendado)
-  // ==========
+  // ====== Archivo (comprobante) ======
   $receiptPath = null;
   if (!empty($_FILES['receipt']) && is_array($_FILES['receipt'])) {
     $file = $_FILES['receipt'];
 
-    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+    if ($file['error'] !== UPLOAD_ERR_OK) {
       http_response_code(400);
-      echo json_encode(['ok'=>false,'error'=>'UPLOAD_ERROR','code'=>$file['error']]);
+      echo json_encode(['ok'=>false, 'error'=>'UPLOAD_ERROR', 'code'=>$file['error']]);
       return;
     }
 
-    if (($file['size'] ?? 0) > MAX_UPLOAD_BYTES) {
+    // Límite recomendado (ajústalo a lo que tengas en PHP/Nginx)
+    $maxBytes = 10 * 1024 * 1024; // 10 MB
+    if (($file['size'] ?? 0) > $maxBytes) {
       http_response_code(400);
-      echo json_encode(['ok'=>false,'error'=>'FILE_TOO_LARGE']);
+      echo json_encode(['ok'=>false, 'error'=>'FILE_TOO_LARGE']);
       return;
     }
 
-    // MIME real (con fallback si fileinfo no existe)
-    $mime = null;
-    if (class_exists('finfo')) {
-      $finfo = new finfo(FILEINFO_MIME_TYPE);
-      $mime  = $finfo->file($file['tmp_name']);
-    } else {
-      $extGuess = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-      $map = [
-        'jpg'=>'image/jpeg','jpeg'=>'image/jpeg',
-        'png'=>'image/png','webp'=>'image/webp',
-        'pdf'=>'application/pdf'
-      ];
-      $mime = $map[$extGuess] ?? 'application/octet-stream';
-    }
-
+    // Validar MIME real (no solo por extensión)
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $mime  = $finfo->file($file['tmp_name']);
     $allowed = [
       'image/jpeg'      => 'jpg',
       'image/png'       => 'png',
@@ -138,50 +96,43 @@ try {
     ];
     if (!isset($allowed[$mime])) {
       http_response_code(400);
-      echo json_encode(['ok'=>false,'error'=>'INVALID_FILE_TYPE','mime'=>$mime]);
+      echo json_encode(['ok'=>false, 'error'=>'INVALID_FILE_TYPE']);
       return;
     }
 
-    // Asegurar carpeta
-    $absDir = __DIR__ . '/' . RECEIPTS_DIR;
-    if (!is_dir($absDir)) {
-      if (!mkdir($absDir, 0775, true) && !is_dir($absDir)) {
-        http_response_code(500);
-        echo json_encode(['ok'=>false,'error'=>'MKDIR_FAILED']);
-        return;
+    // Carpeta destino
+    $dir = __DIR__ . '/uploads/receipts';
+    if (!is_dir($dir)) {
+      if (!mkdir($dir, 0775, true) && !is_dir($dir)) {
+        throw new RuntimeException('No se pudo crear la carpeta de recibos.');
       }
     }
-    if (!is_writable($absDir)) {
-      http_response_code(500);
-      echo json_encode(['ok'=>false,'error'=>'NOT_WRITABLE']);
-      return;
+    if (!is_writable($dir)) {
+      throw new RuntimeException('La carpeta de recibos no es escribible.');
     }
 
-    // Generar nombre seguro
+    // Nombre seguro
     $ext   = $allowed[$mime];
     $fname = sprintf('rcpt_%d_%s.%s', (int)$user_id, bin2hex(random_bytes(8)), $ext);
-    $dest  = $absDir . '/' . $fname;
+    $dest  = $dir . '/' . $fname;
 
     if (!move_uploaded_file($file['tmp_name'], $dest)) {
-      http_response_code(500);
-      echo json_encode(['ok'=>false,'error'=>'MOVE_FAILED']);
-      return;
+      throw new RuntimeException('MOVE_FAILED');
     }
 
-    // Ruta relativa pública
-    $receiptPath = RECEIPTS_DIR . '/' . $fname;
+    // Ruta pública/relativa para guardar en DB
+    $receiptPath = 'uploads/receipts/' . $fname;
   }
 
-  // ==========
-  // DB (transacción)
-  // ==========
+  // ====== Transacción: crear request + marcar cuenta pendiente ======
   $pdo->beginTransaction();
 
+  // NOTA: si tu tabla payment_requests tiene created_at/updated_at NOT NULL, setéalos aquí
   $sql = "
     INSERT INTO payment_requests
       (user_id, method, amount_usd, currency, notes, receipt_path, status, created_at, updated_at)
     VALUES
-      (:uid, :method, :amount, :currency, :notes, :receipt, :status, UTC_TIMESTAMP(), UTC_TIMESTAMP())
+      (:uid, :method, :amount, :currency, :notes, :receipt, 'pending', UTC_TIMESTAMP(), UTC_TIMESTAMP())
   ";
   $stmt = $pdo->prepare($sql);
   $stmt->execute([
@@ -191,29 +142,23 @@ try {
     ':currency'=> $currency,
     ':notes'   => $notes,
     ':receipt' => $receiptPath,
-    ':status'  => PR_STATUS,
   ]);
 
-  // Marcar cuenta en pending_confirmation (coincide con tu gate)
-  $stmt2 = $pdo->prepare("UPDATE users SET account_state = :state WHERE id = :id");
-  $stmt2->execute([
-    ':state' => NEXT_STATE,
-    ':id'    => $user_id,
-  ]);
+  // Estado de cuenta: pending_confirmation (coincide con tu gate)
+  $pdo->prepare("UPDATE users SET account_state = 'pending_confirmation' WHERE id = :id")
+      ->execute([':id' => $user_id]);
 
   $pdo->commit();
 
   echo json_encode(['ok'=>true]);
-} catch (PDOException $e) {
-  if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) $pdo->rollBack();
-  error_log('[PAGO_BINANCE][SQL] '.$e->getMessage());
-  http_response_code(400);
-  echo json_encode(['ok'=>false,'error'=>'SQL_ERROR','msg'=>$e->getMessage()]);
 } catch (Throwable $e) {
-  if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) $pdo->rollBack();
-  error_log('[PAGO_BINANCE][UNEXPECTED] '.$e->getMessage());
+  if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+    $pdo->rollBack();
+  }
+  // Log para inspección en hosting
+  error_log('[PAGO_BINANCE] ' . $e->getMessage());
   http_response_code(400);
-  echo json_encode(['ok'=>false,'error'=>'UNEXPECTED','msg'=>$e->getMessage()]);
+  echo json_encode(['ok'=>false, 'error'=>'SERVER', 'msg'=>$e->getMessage()]);
 } finally {
   restore_error_handler();
 }
