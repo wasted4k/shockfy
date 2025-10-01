@@ -1,49 +1,95 @@
 <?php
+/******************************************************
+ * orden_compra.php — Flujo de pago manual (Binance)  *
+ * Versión: hosting-safe (sesión/CSRF/JSON robusto)   *
+ ******************************************************/
 
+// ==========================
+// 1) INICIO DE SESIÓN SEGURO
+// ==========================
+if (session_status() !== PHP_SESSION_ACTIVE) {
+  $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['SERVER_PORT'] ?? '') == 443);
+  session_name('shockfy_sess');
+  session_set_cookie_params([
+    'lifetime' => 0,
+    'path'     => '/',
+    'domain'   => '',          // dejar vacío salvo que compartas entre subdominios
+    'secure'   => $isHttps,    // true si el sitio sirve por HTTPS
+    'httponly' => true,
+    'samesite' => 'Lax',       // Lax funciona bien en mismo dominio
+  ]);
+  session_start();
+}
+
+// ==================================
+// 2) INCLUDES Y AUTENTICACIÓN BÁSICA
+// ==================================
 require_once __DIR__ . '/db.php';
-require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/auth.php';
+// IMPORTANTE: auth_check.php lee $_SESSION → debe ir tras session_start()
+require_once __DIR__ . '/auth_check.php';
 
-if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
+// Requiere usuario logueado
 $user_id = $_SESSION['user_id'] ?? null;
 if (!$user_id) { header('Location: login.php'); exit; }
 
-// ===== Cargar datos mínimos del usuario =====
-$stmt = $pdo->prepare("SELECT id, full_name, username, email, currency_pref, plan, trial_started_at, trial_ends_at, trial_cancelled_at FROM users WHERE id = :id LIMIT 1");
-$stmt->execute(['id' => $user_id]);
+// CSRF para el POST
+if (empty($_SESSION['csrf'])) { $_SESSION['csrf'] = bin2hex(random_bytes(16)); }
+$CSRF = $_SESSION['csrf'];
+
+// =======================================
+// 3) CARGA DE DATOS DEL USUARIO (para UI)
+// =======================================
+$stmt = $pdo->prepare("
+  SELECT id, full_name, username, email, currency_pref, plan,
+         trial_started_at, trial_ends_at, trial_cancelled_at
+  FROM users
+  WHERE id = :id
+  LIMIT 1
+");
+$stmt->execute([':id' => $user_id]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
 $currencyPref = $user['currency_pref'] ?: 'S/.';
 $currentPlan  = $user['plan'] ?: null;
 
+// cálculo simple de trial (si usas esta info en el lateral)
 $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
 $trialEndsAt = $user['trial_ends_at'] ?? null;
 $trialCancelledAt = $user['trial_cancelled_at'] ?? null;
 $trialActive = false; $trialDaysLeft = null;
 if ($trialEndsAt && !$trialCancelledAt) {
-  try { 
+  try {
     $trialEnd = new DateTimeImmutable($trialEndsAt, new DateTimeZone('UTC'));
-    if ($now < $trialEnd) { 
-      $trialActive = true; 
-      $diff = $now->diff($trialEnd); 
-      $trialDaysLeft = max(0, (int)$diff->format('%a')); 
+    if ($now < $trialEnd) {
+      $trialActive = true;
+      $diff = $now->diff($trialEnd);
+      $trialDaysLeft = max(0, (int)$diff->format('%a'));
     }
   } catch (Throwable $e) {}
 }
-function display_plan_name(?string $code): string { 
-  if (!$code) return '—'; 
-  $map=['starter'=>'Premium','free'=>'Free']; 
-  return $map[strtolower($code)]??strtoupper($code); 
+
+// helper de UI
+function display_plan_name(?string $code): string {
+  if (!$code) return '—';
+  $map=['starter'=>'Premium','free'=>'Free'];
+  return $map[strtolower($code)] ?? strtoupper($code);
 }
 
-// ===== Parámetros de UI =====
-$plan = $_GET['plan'] ?? $_POST['plan'] ?? 'starter';
-$amountUSD = 4.99;
-$description = 'ShockFy Premium';
-$next = $_GET['next'] ?? $_POST['next'] ?? '';
+// =======================================
+// 4) PARÁMETROS / CONSTANTES DE LA PÁGINA
+// =======================================
+$plan         = $_GET['plan'] ?? $_POST['plan'] ?? 'starter';
+$amountUSD    = 4.99;                                 // <-- AJUSTA EL MONTO AQUÍ
+$description  = 'ShockFy Premium';
+$BINANCE_URL  = 'https://s.binance.com/j8dy27VF';     // <-- Link “Pagar por Pay”
+$BINANCE_ID   = '319 852 186';                        // <-- ID visible
+$CURRENCY     = 'USDT';                               // <-- Moneda a registrar
+$ENDPOINT_URL = 'pago_binance.php';                   // <-- Si usas otro endpoint, cámbialo aquí
 
-// Link de suscripción PayPal (directo, el que nos diste)
+// (Opcional) PayPal si lo sigues mostrando:
 $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-8D38183960655060NNDNXHZA';
+
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -60,6 +106,7 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
       --pp-blue:#2563EB; --pp-blue-strong:#1D4ED8;
       --success:#16a34a; --success-strong:#15803d; --success-shadow: 0 8px 20px rgba(22,163,74,.25);
     }
+    *{box-sizing:border-box}
     body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
     .app-shell{ display:flex; min-height:100vh; transition:filter .2s ease; }
     .content{ flex:1; padding:28px 24px 48px; }
@@ -95,7 +142,6 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
     #methodDetail{ margin-top:14px; display:none; text-align:center; }
     #methodDetail .btn{ margin-top:10px; }
 
-    /* Botones de pago del panel */
     #methodDetail .btn.pay:hover, #methodDetail .btn.pay:focus-visible{
       background:var(--bn-yellow); border-color:var(--bn-yellow-strong); color:var(--bn-text); box-shadow:0 8px 20px rgba(245,158,11,.25); outline:none;
     }
@@ -103,7 +149,6 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
       background:var(--pp-blue); border-color:var(--pp-blue-strong); color:#fff; box-shadow:0 8px 20px rgba(29,78,216,.25); outline:none;
     }
 
-    /* utilidades panel Binance */
     .stack { display:flex; flex-direction:column; align-items:center; gap:12px; }
     .stack-lg { gap:16px; }
     .hr { width:100%; height:1px; background:var(--border); margin:8px 0; }
@@ -254,7 +299,7 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
 
                             <!-- Botones principales -->
                             <div class="stack" style="gap:10px;">
-                              <a class="btn pay" href="https://s.binance.com/j8dy27VF" target="_blank" rel="noopener noreferrer">Pagar por Pay</a>
+                              <a class="btn pay" href="<?= htmlspecialchars($BINANCE_URL) ?>" target="_blank" rel="noopener noreferrer">Pagar por Pay</a>
                               <button id="bn-instrucciones" type="button" class="btn secondary">Instrucciones</button>
                               <div class="small">Se abrirá en una nueva pestaña (pago) / modal (instrucciones).</div>
                             </div>
@@ -267,7 +312,7 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
                             </div>
 
                             <!-- ID -->
-                            <div style="font-weight:800; font-size:18px; margin-top:4px;">ID: 319 852 186</div>
+                            <div style="font-weight:800; font-size:18px; margin-top:4px;">ID: <?= htmlspecialchars($BINANCE_ID) ?></div>
 
                             <!-- Nota importante -->
                             <div class="note" role="note">
@@ -285,7 +330,7 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
                             <div id="bn-confirm" class="stack" style="display:none;">
                               <label class="checkbox-row">
                                 <input id="chk-paid" type="checkbox">
-                                <span>He realizado el pago de <strong>4,99 USDT</strong>.</span>
+                                <span>He realizado el pago de <strong><?= number_format($amountUSD,2) ?> USDT</strong>.</span>
                               </label>
                               <label class="checkbox-row">
                                 <input id="chk-terms" type="checkbox">
@@ -330,7 +375,7 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
                         chkPaid.addEventListener('change', updateDoneState);
                         chkTerms.addEventListener('change', updateDoneState);
 
-                        // Handler ROBUSTO: lee texto, intenta JSON y redirige si ok
+                        // ENVÍO — nombres de campos CORRECTOS para el endpoint (hosting-safe)
                         doneBtn.addEventListener('click', async () => {
                           if (doneBtn.disabled) return;
 
@@ -338,17 +383,18 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
                           if (fileInput.files && fileInput.files[0]) {
                             fd.append('receipt', fileInput.files[0]);
                           }
-                          fd.append('paid', '1');
-                          fd.append('terms', '1');
-                          fd.append('amount', '4.99');
-                          fd.append('currency', 'USDT');
+                          fd.append('method', 'binance_manual');
+                          fd.append('amount_usd', '<?= htmlspecialchars(number_format($amountUSD,2,'.','')) ?>');
+                          fd.append('currency', '<?= htmlspecialchars($CURRENCY) ?>');
+                          fd.append('notes', '');
+                          fd.append('csrf', '<?= htmlspecialchars($CSRF) ?>');
 
                           const prevText = doneBtn.textContent;
                           doneBtn.textContent = 'Enviando...';
                           doneBtn.disabled = true;
 
                           try {
-                            const resp = await fetch('pago_binance.php', { method: 'POST', body: fd });
+                            const resp = await fetch('<?= $ENDPOINT_URL ?>', { method: 'POST', body: fd, headers: { 'Accept': 'application/json' } });
                             const raw  = await resp.text();
                             let data;
                             try { data = JSON.parse(raw); }
@@ -357,12 +403,12 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
                             if (resp.ok && data && data.ok) {
                               window.location.href = 'waiting_confirmation.php';
                             } else {
-                              alert('No pudimos registrar tu pago. Código: ' + (data?.error || 'ERR'));
+                              alert('No pudimos registrar tu pago. ' + (data?.error ? ('Detalle: ' + data.error) : 'Inténtalo más tarde.'));
                               doneBtn.textContent = prevText;
                               doneBtn.disabled = false;
                             }
                           } catch (e) {
-                            alert('Error de red: ' + e.message);
+                            alert('Error de red/servidor: ' + e.message);
                             doneBtn.textContent = prevText;
                             doneBtn.disabled = false;
                           }
@@ -445,5 +491,39 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
       </div>
     </main>
   </div>
+
+  <!-- Modal de instrucciones base (para accesibilidad; el de renderDetail crea otro dinámico si prefieres) -->
+  <div id="overlay" class="modal-overlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-label="Instrucciones de pago">
+      <div class="modal-header">
+        <h3 class="modal-title">Instrucciones de pago por Binance</h3>
+        <button id="btnCloseModal" class="modal-close" type="button">Cerrar ✕</button>
+      </div>
+      <div class="video-wrap">
+        <iframe src="https://www.youtube.com/embed/j2DWy4g_iQw?rel=0&modestbranding=1"
+                title="Instrucciones de pago por Binance"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                referrerpolicy="strict-origin-when-cross-origin"
+                allowfullscreen></iframe>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  // Este modal base es opcional; el panel Binance crea otro modal dinámico.
+  const overlay   = document.getElementById('overlay');
+  const btnClose  = document.getElementById('btnCloseModal');
+  // Si quisieras abrir este modal con un botón independiente:
+  // document.getElementById('btnInstr')?.addEventListener('click', ()=>{ overlay.style.display='flex'; document.body.classList.add('modal-open'); });
+  if (btnClose) {
+    btnClose.addEventListener('click', ()=>{
+      overlay.style.display='none';
+      document.body.classList.remove('modal-open');
+    });
+    overlay.addEventListener('click', (e)=>{ if (e.target === overlay) { btnClose.click(); } });
+  }
+})();
+</script>
 </body>
 </html>
