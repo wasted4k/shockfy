@@ -6,16 +6,18 @@ if (empty($_SESSION['logged_in']) || empty($_SESSION['user_id'])) {
   header('Location: login.php'); exit;
 }
 
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
+
 
 // 0) Bootstrap: lee variables de entorno (.env o panel del hosting)
 require __DIR__ . '/bootstrap.php';
 
 // 1) Cargar PHPMailer (tu estructura sin Composer)
-require '/vendor/phpmailer/src/PHPMailer.php';
-require '/vendor/phpmailer/src/SMTP.php';
-require '/vendor/phpmailer/src/Exception.php';
+require 'vendor/phpmailer/src/PHPMailer.php';
+require 'vendor/phpmailer/src/SMTP.php';
+require 'vendor/phpmailer/src/Exception.php';
+
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
 
 // 2) Conexión a BD (asume que $pdo queda disponible)
 require_once __DIR__ . '/db.php';
