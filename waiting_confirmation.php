@@ -8,13 +8,13 @@ if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
 $user_id = $_SESSION['user_id'] ?? null;
 if (!$user_id) { header('Location: login.php'); exit; }
 
-// Leer estado de cuenta y, si no es pending_payment, redirigir a billing
+// Leer estado de cuenta y, si no es pending_confirmation, redirigir a billing
 $stmt = $pdo->prepare("SELECT id, full_name, email, account_state FROM users WHERE id = :id LIMIT 1");
 $stmt->execute(['id' => $user_id]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$user) { header('Location: login.php'); exit; }
-if (($user['account_state'] ?? 'active') !== 'pending_payment') {
+if (($user['account_state'] ?? 'active') !== 'pending_confirmation') {
   header('Location: billing.php');
   exit;
 }

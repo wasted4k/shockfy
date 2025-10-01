@@ -51,7 +51,7 @@ if (empty($currentUser['email_verified_at'])) {
 $currentScript = basename($_SERVER['SCRIPT_NAME'] ?? '');
 $accountState  = $currentUser['account_state'] ?? 'active';
 
-if ($accountState === 'pending_payment') {
+if ($accountState === 'pending_confirmation') {
   // Solo permitir estas páginas mientras esté pendiente:
   $allowed_when_pending = [
     'waiting_confirmation.php',

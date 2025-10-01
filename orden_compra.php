@@ -8,6 +8,7 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/auth.php';
 
+
 $user_id = $_SESSION['user_id'] ?? null;
 if (!$user_id) { header('Location: login.php'); exit; }
 
@@ -16,11 +17,11 @@ if (empty($_SESSION['csrf'])) { $_SESSION['csrf'] = bin2hex(random_bytes(16)); }
 $__CSRF = $_SESSION['csrf'];
 
 // ===== Cargar datos mínimos del usuario =====
-$stmt = $pdo->prepare("SELECT id, full_name, username, email, currency_pref, plan, trial_started_at, trial_ends_at, trial_cancelled_at FROM users WHERE id = :id LIMIT 1");
+$stmt = $pdo->prepare("SELECT id, full_name, username, email, currency_pref, plan, trial_started_at, trial_ends_at, trial_cancelled_at, account_state FROM users WHERE id = :id LIMIT 1");
 $stmt->execute(['id' => $user_id]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
-$currencyPref = $user['currency_pref'] ?: 'S/.';
+
 $currentPlan  = $user['plan'] ?: null;
 
 $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
