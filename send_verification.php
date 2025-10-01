@@ -2,27 +2,23 @@
 // send_verification.php — Genera y envía código por email (Brevo SMTP con PHPMailer)
 session_start();
 
-require 'vendor/autoload.php';
-
 if (empty($_SESSION['logged_in']) || empty($_SESSION['user_id'])) {
   header('Location: login.php'); exit;
 }
 
-
+// 2) Conexión a BD (asume que $pdo queda disponible)
+require_once __DIR__ . '/db.php';
 
 // 0) Bootstrap: lee variables de entorno (.env o panel del hosting)
 require __DIR__ . '/bootstrap.php';
 
 // 1) Cargar PHPMailer (tu estructura sin Composer)
-require 'vendor/phpmailer/src/PHPMailer.php';
-require 'vendor/phpmailer/src/SMTP.php';
-require 'vendor/phpmailer/src/Exception.php';
-
 use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\SMTP;
 use PHPMailer\PHPMailer\Exception;
 
-// 2) Conexión a BD (asume que $pdo queda disponible)
-require_once __DIR__ . '/db.php';
+require 'vendor/autoload.php';
+
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $pdo->exec("SET NAMES utf8mb4");
 
