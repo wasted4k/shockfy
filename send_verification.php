@@ -12,7 +12,7 @@ require_once __DIR__ . '/db.php';
 // 0) Bootstrap: lee variables de entorno (.env o panel del hosting)
 require __DIR__ . '/bootstrap.php';
 
-// 1) Cargar PHPMailer (tu estructura sin Composer)
+// 1) Cargar PHPMailer
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
 use PHPMailer\PHPMailer\Exception;
