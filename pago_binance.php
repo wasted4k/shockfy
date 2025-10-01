@@ -21,7 +21,6 @@ try {
           || (strtolower($proto) === 'https')
           || (($_SERVER['HTTP_X_FORWARDED_SSL'] ?? '') === 'on');
 
-  // Ajusta la cookie de sesión de forma segura
   session_name('shockfy_sess');
   session_set_cookie_params([
     'lifetime' => 0,
@@ -29,7 +28,7 @@ try {
     'domain'   => '',
     'secure'   => $isHttps,
     'httponly' => true,
-    'samesite' => 'Lax', // same-site POST
+    'samesite' => 'Lax',
   ]);
   if (session_status() !== PHP_SESSION_ACTIVE) session_start();
 
@@ -37,12 +36,12 @@ try {
   // No se incluye auth_check.php para evitar HTML/redirects en AJAX
 
   // ==========
-  // CONFIG
+  // CONFIG (usar define() dentro del bloque)
   // ==========
-  const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
-  const RECEIPTS_DIR     = 'uploads/receipts';
-  const PR_STATUS        = 'pending';              // Ajusta si tu ENUM usa otro valor
-  const NEXT_STATE       = 'pending_confirmation'; // Gate esperado por tu auth
+  if (!defined('MAX_UPLOAD_BYTES')) define('MAX_UPLOAD_BYTES', 10 * 1024 * 1024); // 10 MB
+  if (!defined('RECEIPTS_DIR'))     define('RECEIPTS_DIR', 'uploads/receipts');
+  if (!defined('PR_STATUS'))        define('PR_STATUS', 'pending');              // Ajusta si tu ENUM usa otro valor
+  if (!defined('NEXT_STATE'))       define('NEXT_STATE', 'pending_confirmation'); // Gate esperado por tu auth
 
   // ==========
   // AUTENTICACIÓN
@@ -68,7 +67,7 @@ try {
   // ==========
   $csrfBody   = $_POST['csrf'] ?? '';
   $csrfHeader = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-  $csrfClient = $csrfBody ?: $csrfHeader;      // acepta body o header
+  $csrfClient = $csrfBody ?: $csrfHeader;
   $csrfServer = $_SESSION['csrf'] ?? '';
 
   if (!$csrfClient || !$csrfServer || !hash_equals($csrfServer, $csrfClient)) {
@@ -88,9 +87,8 @@ try {
   $amountUsd = null;
   if (isset($_POST['amount_usd'])) $amountUsd = (float)$_POST['amount_usd'];
   elseif (isset($_POST['amount'])) $amountUsd = (float)$_POST['amount'];
-  if ($amountUsd === null || $amountUsd <= 0) $amountUsd = 4.99; // valor por defecto
+  if ($amountUsd === null || $amountUsd <= 0) $amountUsd = 4.99;
 
-  // Validaciones simples
   $allowedCurrencies = ['USDT','USD','USDC','PEN','VES'];
   if (!in_array($currency, $allowedCurrencies, true)) {
     http_response_code(400);
@@ -179,7 +177,6 @@ try {
   // ==========
   $pdo->beginTransaction();
 
-  // Inserta solicitud
   $sql = "
     INSERT INTO payment_requests
       (user_id, method, amount_usd, currency, notes, receipt_path, status, created_at, updated_at)
