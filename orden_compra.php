@@ -1,12 +1,19 @@
 <?php
+// --- INICIAR SESIÓN ANTES DE CUALQUIER INCLUDE QUE LEA $_SESSION ---
+if (session_status() !== PHP_SESSION_ACTIVE) {
+  session_start();
+}
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/auth.php';
 
-if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
 $user_id = $_SESSION['user_id'] ?? null;
 if (!$user_id) { header('Location: login.php'); exit; }
+
+// ===== CSRF =====
+if (empty($_SESSION['csrf'])) { $_SESSION['csrf'] = bin2hex(random_bytes(16)); }
+$__CSRF = $_SESSION['csrf'];
 
 // ===== Cargar datos mínimos del usuario =====
 $stmt = $pdo->prepare("SELECT id, full_name, username, email, currency_pref, plan, trial_started_at, trial_ends_at, trial_cancelled_at FROM users WHERE id = :id LIMIT 1");
@@ -53,6 +60,8 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="assets/img/favicon.png" type="image/png">
   <link rel="stylesheet" href="style.css">
+  <!-- CSRF meta para leerlo desde JS sin alterar tu UI -->
+  <meta name="csrf-token" content="<?= htmlspecialchars($__CSRF) ?>">
   <style>
     :root{
       --sidebar-w:260px; --bg:#f5f7fb; --card:#ffffff; --text:#0f172a; --muted:#6b7280; --primary:#2563eb; --border:#e5e7eb; --shadow:0 16px 32px rgba(2,6,23,.08); --radius:16px;
@@ -330,7 +339,7 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
                         chkPaid.addEventListener('change', updateDoneState);
                         chkTerms.addEventListener('change', updateDoneState);
 
-                        // Handler ROBUSTO: lee texto, intenta JSON y redirige si ok
+                        // Handler: mismo diseño/flujo, pero añadimos CSRF + campos backend moderno
                         doneBtn.addEventListener('click', async () => {
                           if (doneBtn.disabled) return;
 
@@ -338,17 +347,24 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
                           if (fileInput.files && fileInput.files[0]) {
                             fd.append('receipt', fileInput.files[0]);
                           }
+                          // --- Tus campos originales (compatibilidad) ---
                           fd.append('paid', '1');
                           fd.append('terms', '1');
-                          fd.append('amount', '4.99');
+                          fd.append('amount', '<?= htmlspecialchars(number_format($amountUSD,2,'.','')) ?>');
                           fd.append('currency', 'USDT');
+                          // --- Nuevos campos para backend robusto ---
+                          const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+                          fd.append('csrf', csrf);
+                          fd.append('method', 'binance_manual');
+                          fd.append('amount_usd', '<?= htmlspecialchars(number_format($amountUSD,2,'.','')) ?>');
+                          fd.append('notes', '');
 
                           const prevText = doneBtn.textContent;
                           doneBtn.textContent = 'Enviando...';
                           doneBtn.disabled = true;
 
                           try {
-                            const resp = await fetch('pago_binance.php', { method: 'POST', body: fd });
+                            const resp = await fetch('pago_binance.php', { method: 'POST', body: fd, headers: { 'Accept':'application/json' } });
                             const raw  = await resp.text();
                             let data;
                             try { data = JSON.parse(raw); }
