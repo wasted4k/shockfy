@@ -22,7 +22,7 @@ try {
           || (isset($_SERVER['HTTP_X_FORWARDED_SSL']) && $_SERVER['HTTP_X_FORWARDED_SSL'] === 'on');
 
   // Cookie de sesión segura según esquema real
-  session_name('shockfy_sess');
+  
   session_set_cookie_params(0, '/', '', $isHttps ? true : false, true); // lifetime, path, domain, secure, httponly
   if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
 
