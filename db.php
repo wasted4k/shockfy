@@ -1,9 +1,13 @@
 <?php
 // db.php
-$host = env('DB_HOST', 'projects_shockfy_db');
-$db   = env('DB_DATABASE', 'shockfy_db');
-$user = env('DB_USERNAME', 'shockfy');
-$pass = env('DB_PASSWORD', 'de2bc37d2748ee654a16'); // si tienes contraseña en root, ponla aquí
+require __DIR__ . './vendor/autoload.php';
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+$dotenv->load();
+
+$host = getenv('DB_HOST');
+$db   = getenv('DB_DATABASE');
+$user = getenv('DB_USERNAME');
+$pass = getenv('DB_PASSWORD'); // si tienes contraseña en root, ponla aquí
 $charset = 'utf8mb4';
 
 $dsn = "mysql:host=$host;dbname=$db;charset=$charset";
