@@ -1,9 +1,9 @@
 <?php
 // db.php
-$host = '127.0.0.1';
-$db   = 'brixventas_db';
-$user = 'root';
-$pass = ''; // si tienes contraseña en root, ponla aquí
+$host = env('DB_HOST');
+$db   = env('DB_DATABASE');
+$user = env('DB_USERNAME');
+$pass = env('DB_PASSWORD'); // si tienes contraseña en root, ponla aquí
 $charset = 'utf8mb4';
 
 $dsn = "mysql:host=$host;dbname=$db;charset=$charset";
