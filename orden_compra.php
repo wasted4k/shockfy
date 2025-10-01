@@ -28,19 +28,19 @@ $trialEndsAt = $user['trial_ends_at'] ?? null;
 $trialCancelledAt = $user['trial_cancelled_at'] ?? null;
 $trialActive = false; $trialDaysLeft = null;
 if ($trialEndsAt && !$trialCancelledAt) {
-  try { 
+  try {
     $trialEnd = new DateTimeImmutable($trialEndsAt, new DateTimeZone('UTC'));
-    if ($now < $trialEnd) { 
-      $trialActive = true; 
-      $diff = $now->diff($trialEnd); 
-      $trialDaysLeft = max(0, (int)$diff->format('%a')); 
+    if ($now < $trialEnd) {
+      $trialActive = true;
+      $diff = $now->diff($trialEnd);
+      $trialDaysLeft = max(0, (int)$diff->format('%a'));
     }
   } catch (Throwable $e) {}
 }
-function display_plan_name(?string $code): string { 
-  if (!$code) return '—'; 
-  $map=['starter'=>'Premium','free'=>'Free']; 
-  return $map[strtolower($code)]??strtoupper($code); 
+function display_plan_name(?string $code): string {
+  if (!$code) return '—';
+  $map=['starter'=>'Premium','free'=>'Free'];
+  return $map[strtolower($code)]??strtoupper($code);
 }
 
 // ===== Parámetros de UI =====
@@ -339,7 +339,7 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
                         chkPaid.addEventListener('change', updateDoneState);
                         chkTerms.addEventListener('change', updateDoneState);
 
-                        // Handler: mismo diseño/flujo, pero añadimos CSRF + campos backend moderno
+                        // Handler: mismo diseño/flujo, con CSRF + headers + redirect del backend
                         doneBtn.addEventListener('click', async () => {
                           if (doneBtn.disabled) return;
 
@@ -347,12 +347,13 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
                           if (fileInput.files && fileInput.files[0]) {
                             fd.append('receipt', fileInput.files[0]);
                           }
-                          // --- Tus campos originales (compatibilidad) ---
+                          // Compatibilidad con tu backend anterior
                           fd.append('paid', '1');
                           fd.append('terms', '1');
                           fd.append('amount', '<?= htmlspecialchars(number_format($amountUSD,2,'.','')) ?>');
                           fd.append('currency', 'USDT');
-                          // --- Nuevos campos para backend robusto ---
+
+                          // Campos modernos + CSRF
                           const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
                           fd.append('csrf', csrf);
                           fd.append('method', 'binance_manual');
@@ -364,16 +365,26 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
                           doneBtn.disabled = true;
 
                           try {
-                            const resp = await fetch('pago_binance.php', { method: 'POST', body: fd, headers: { 'Accept':'application/json' } });
+                            const resp = await fetch('pago_binance.php', {
+                              method: 'POST',
+                              body: fd,
+                              headers: {
+                                'Accept': 'application/json',
+                                'X-CSRF-Token': csrf
+                              }
+                            });
                             const raw  = await resp.text();
                             let data;
                             try { data = JSON.parse(raw); }
                             catch { throw new Error('Respuesta no JSON:\n' + raw.slice(0, 300)); }
 
                             if (resp.ok && data && data.ok) {
-                              window.location.href = 'waiting_confirmation.php';
+                              const to = data.redirect || 'waiting_confirmation.php';
+                              window.location.replace(to); // evita volver con "Atrás"
                             } else {
-                              alert('No pudimos registrar tu pago. Código: ' + (data?.error || 'ERR'));
+                              const code = data?.error || 'ERR';
+                              const detail = data?.msg ? ' — ' + data.msg : '';
+                              alert('No pudimos registrar tu pago. Código: ' + code + detail);
                               doneBtn.textContent = prevText;
                               doneBtn.disabled = false;
                             }
