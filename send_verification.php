@@ -2,6 +2,8 @@
 // send_verification.php — Genera y envía código por email (Brevo SMTP con PHPMailer)
 session_start();
 
+require 'vendor/autoload.php';
+
 if (empty($_SESSION['logged_in']) || empty($_SESSION['user_id'])) {
   header('Location: login.php'); exit;
 }
