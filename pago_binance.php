@@ -21,7 +21,7 @@ try {
           || (strtolower($proto) === 'https')
           || (($_SERVER['HTTP_X_FORWARDED_SSL'] ?? '') === 'on');
 
-  session_name('shockfy_sess');
+  
   session_set_cookie_params([
     'lifetime' => 0,
     'path'     => '/',
