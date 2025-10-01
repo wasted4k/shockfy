@@ -7,7 +7,7 @@ $dotenv->load();
 $host = $_ENV['DB_HOST'];
 $db   = $_ENV['DB_DATABASE'];
 $user = $_ENV['DB_USERNAME'];
-$pass = $_ENV['DB_PASSWORD']; // si tienes contraseña en root, ponla aquí
+$pass = $_ENV['DB_PASSWORD']; //  contraseña en root
 $charset = 'utf8mb4';
 
 $dsn = "mysql:host=$host;dbname=$db;charset=$charset";
