@@ -1,32 +1,17 @@
 <?php
 // auth_check.php — exige login + email verificado + estado activo
-// Gate por estado pending_* y por plan/trial.
+// Gate por estado pending_payment y por plan/trial.
 // Premium (starter) válido solo si premium_expires_at > NOW() (UTC).
 
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 
 require_once __DIR__ . '/db.php';
 
-/** Util: basename robusto (REQUEST_URI -> PATH -> basename) */
-function _current_script_base(): string {
-  $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
-  return basename($path);
-}
-
-/** Util: redirect seguro con fallback a JS si headers ya se enviaron */
-function _safe_redirect(string $url): void {
-  if (!headers_sent()) {
-    header('Location: ' . $url, true, 302);
-  } else {
-    echo '<script>window.location.replace(' . json_encode($url) . ');</script>';
-  }
-  exit;
-}
-
 // ===== 1) Requiere login =====
 $user_id = $_SESSION['user_id'] ?? null;
 if (!$user_id) {
-  _safe_redirect('login.php');
+  header('Location: login.php');
+  exit;
 }
 
 // ===== 2) Cargar datos del usuario (incluye campos premium) =====
@@ -45,44 +30,36 @@ $currentUser = $st->fetch(PDO::FETCH_ASSOC);
 if (!$currentUser) {
   // Sesión huérfana
   session_destroy();
-  _safe_redirect('login.php');
+  header('Location: login.php');
+  exit;
 }
 
 // ===== 3) Debe estar activo =====
 if ((int)$currentUser['status'] !== 1) {
   // Usuario desactivado por admin
-  _safe_redirect('logout.php');
+  header('Location: logout.php');
+  exit;
 }
 
 // ===== 4) Debe tener email verificado (ajusta si tu flujo no lo requiere) =====
 if (empty($currentUser['email_verified_at'])) {
-  _safe_redirect('welcome.php?step=3');
+  header('Location: welcome.php?step=3');
+  exit;
 }
 
-// ===== 4.0) Sincronizar sesión con estado actual de DB (ayuda al gate en otras páginas) =====
-if (!empty($currentUser['account_state'])) {
-  $_SESSION['account_state'] = $currentUser['account_state'];
-}
-
-// ===== 4.1) Gate por estado de cuenta: pending_* (compat: confirmation / payment) =====
-$currentScript = _current_script_base();
+// ===== 4.1) Gate por estado de cuenta: pending_payment =====
+$currentScript = basename($_SERVER['SCRIPT_NAME'] ?? '');
 $accountState  = $currentUser['account_state'] ?? 'active';
 
-// Acepta ambos estados para compatibilidad entre entornos
-$PENDING_STATES = ['pending_confirmation', 'pending_payment'];
-
-// Restricciones cuando está en estado pendiente
-if (in_array($accountState, $PENDING_STATES, true)) {
+if ($accountState === 'pending_payment') {
   // Solo permitir estas páginas mientras esté pendiente:
   $allowed_when_pending = [
     'waiting_confirmation.php',
     'logout.php',
-    'login.php', // por si el usuario abre login en otra pestaña
   ];
-
   if (!in_array($currentScript, $allowed_when_pending, true)) {
-    // Redirigir siempre a la waiting
-    _safe_redirect('waiting_confirmation.php');
+    header('Location: waiting_confirmation.php');
+    exit;
   }
   // Importante: no seguimos con otros gates (trial/plan) en este estado.
   // Simplemente dejamos continuar la ejecución del script actual permitido.
@@ -102,7 +79,7 @@ $GATE_EXCEPTIONS = [
   'billing_success.php',
   'billing_cancel.php',
   'trial_expired.php',
-  'waiting_confirmation.php', // clave para no chocar con pending_*
+  'waiting_confirmation.php', // clave para no chocar con pending_payment
   'logout.php',
   'login.php',
   'send_verification.php',
@@ -149,7 +126,8 @@ if (!$isGateExempt) {
   if (!$hasPremium && !$trialActive) {
     // Trial vencido y sin premium vigente => bloquear
     $next = urlencode($_SERVER['REQUEST_URI'] ?? 'index.php');
-    _safe_redirect("trial_expired.php?next={$next}");
+    header("Location: trial_expired.php?next={$next}");
+    exit;
   }
 }
 

@@ -22,6 +22,7 @@ try {
           || (isset($_SERVER['HTTP_X_FORWARDED_SSL']) && $_SERVER['HTTP_X_FORWARDED_SSL'] === 'on');
 
   // Cookie de sesión segura según esquema real
+  
   session_set_cookie_params(0, '/', '', $isHttps ? true : false, true); // lifetime, path, domain, secure, httponly
   if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
 
@@ -33,8 +34,8 @@ try {
   // =========================
   if (!defined('MAX_UPLOAD_BYTES')) define('MAX_UPLOAD_BYTES', 10 * 1024 * 1024); // 10 MB
   if (!defined('RECEIPTS_DIR'))     define('RECEIPTS_DIR', 'uploads/receipts');
-  if (!defined('PR_STATUS'))        define('PR_STATUS', 'pending');                // status de payment_requests
-  if (!defined('NEXT_STATE'))       define('NEXT_STATE', 'pending_confirmation');  // <-- ESTADO CANÓNICO
+  if (!defined('PR_STATUS'))        define('PR_STATUS', 'pending');                // ajusta si tu ENUM usa otro valor
+  if (!defined('NEXT_STATE'))       define('NEXT_STATE', 'pending_confirmation');  // coincide con tu gate
 
   // =========================
   // AUTENTICACIÓN
@@ -95,10 +96,6 @@ try {
   // ARCHIVO (opcional)
   // =========================
   $receiptPath = null;
-  $receiptName = null;
-  $receiptMime = null;
-  $receiptSize = null;
-
   if (isset($_FILES['receipt']) && is_array($_FILES['receipt']) && !empty($_FILES['receipt']['name'])) {
     $file = $_FILES['receipt'];
 
@@ -157,14 +154,8 @@ try {
     }
 
     // Generar nombre seguro
-    if (!function_exists('openssl_random_pseudo_bytes')) {
-      // fallback simple si la función no está disponible
-      $rand = bin2hex(strrev(uniqid('', true)));
-    } else {
-      $rand = bin2hex(openssl_random_pseudo_bytes(8));
-    }
     $ext   = $allowed[$mime];
-    $fname = 'rcpt_' . intval($user_id) . '_' . $rand . '.' . $ext;
+    $fname = 'rcpt_' . intval($user_id) . '_' . bin2hex(openssl_random_pseudo_bytes(8)) . '.' . $ext;
     $dest  = $absDir . '/' . $fname;
 
     if (!move_uploaded_file($file['tmp_name'], $dest)) {
@@ -173,11 +164,8 @@ try {
       return;
     }
 
-    // Datos del archivo para la DB
+    // Ruta relativa pública
     $receiptPath = RECEIPTS_DIR . '/' . $fname;
-    $receiptName = $file['name'];
-    $receiptMime = $mime;
-    $receiptSize = isset($file['size']) ? (int)$file['size'] : null;
   }
 
   // =========================
@@ -187,42 +175,31 @@ try {
 
   $sql = "
     INSERT INTO payment_requests
-      (user_id, method, amount_usd, currency, notes, receipt_path, receipt_name, mime_type, size, status, created_at, updated_at)
+      (user_id, method, amount_usd, currency, notes, receipt_path, status, created_at, updated_at)
     VALUES
-      (:uid, :method, :amount, :currency, :notes, :receipt_path, :receipt_name, :mime, :size, :status, UTC_TIMESTAMP(), UTC_TIMESTAMP())
+      (:uid, :method, :amount, :currency, :notes, :receipt, :status, UTC_TIMESTAMP(), UTC_TIMESTAMP())
   ";
   $stmt = $pdo->prepare($sql);
   $stmt->execute(array(
-    ':uid'          => $user_id,
-    ':method'       => $method,
-    ':amount'       => $amountUsd,
-    ':currency'     => $currency,
-    ':notes'        => $notes,
-    ':receipt_path' => $receiptPath,
-    ':receipt_name' => $receiptName,
-    ':mime'         => $receiptMime,
-    ':size'         => $receiptSize,
-    ':status'       => PR_STATUS
+    ':uid'     => $user_id,
+    ':method'  => $method,
+    ':amount'  => $amountUsd,
+    ':currency'=> $currency,
+    ':notes'   => $notes,
+    ':receipt' => $receiptPath,
+    ':status'  => PR_STATUS
   ));
 
   // Marcar cuenta como pendiente de confirmación
   $stmt2 = $pdo->prepare("UPDATE users SET account_state = :state WHERE id = :id");
   $stmt2->execute(array(
-    ':state' => NEXT_STATE, // 'pending_confirmation'
+    ':state' => NEXT_STATE,
     ':id'    => $user_id
   ));
-  if ($stmt2->rowCount() < 1) {
-    // Si no afectó filas, abortamos para evitar inconsistencias
-    throw new RuntimeException('UPDATE_USERS_STATE_FAILED');
-  }
-
-  // Sincronizar sesión ANTES de responder
-  $_SESSION['account_state'] = NEXT_STATE; // 'pending_confirmation'
-  session_write_close();
 
   $pdo->commit();
 
-  echo json_encode(array('ok'=>true, 'redirect'=>'waiting_confirmation.php'));
+  echo json_encode(array('ok'=>true));
 } catch (PDOException $e) {
   if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) $pdo->rollBack();
   error_log('[PAGO_BINANCE][SQL] '.$e->getMessage());
