@@ -12,16 +12,15 @@ set_error_handler(function($sev, $msg, $file, $line) {
 });
 
 try {
-  // ==========
-  // SESIÓN
-  // ==========
+  // ========== SESIÓN ==========
   $proto   = $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ($_SERVER['HTTP_X_FORWARDED_SCHEME'] ?? '');
   $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
           || (($_SERVER['SERVER_PORT'] ?? '') == 443)
           || (strtolower($proto) === 'https')
           || (($_SERVER['HTTP_X_FORWARDED_SSL'] ?? '') === 'on');
 
-  
+  // Usa el mismo nombre/cookies que en tus páginas
+  // (si tus páginas usan el default, no cambies session_name aquí)
   session_set_cookie_params([
     'lifetime' => 0,
     'path'     => '/',
@@ -35,17 +34,13 @@ try {
   require_once __DIR__ . '/db.php';
   // No se incluye auth_check.php para evitar HTML/redirects en AJAX
 
-  // ==========
-  // CONFIG (usar define() dentro del bloque)
-  // ==========
+  // ========== CONFIG ==========
   if (!defined('MAX_UPLOAD_BYTES')) define('MAX_UPLOAD_BYTES', 10 * 1024 * 1024); // 10 MB
   if (!defined('RECEIPTS_DIR'))     define('RECEIPTS_DIR', 'uploads/receipts');
   if (!defined('PR_STATUS'))        define('PR_STATUS', 'pending');              // Ajusta si tu ENUM usa otro valor
   if (!defined('NEXT_STATE'))       define('NEXT_STATE', 'pending_confirmation'); // Gate esperado por tu auth
 
-  // ==========
-  // AUTENTICACIÓN
-  // ==========
+  // ========== AUTENTICACIÓN ==========
   $user_id = $_SESSION['user_id'] ?? null;
   if (!$user_id) {
     http_response_code(401);
@@ -53,18 +48,14 @@ try {
     return;
   }
 
-  // ==========
-  // MÉTODO
-  // ==========
+  // ========== MÉTODO ==========
   if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
     http_response_code(405);
     echo json_encode(['ok'=>false, 'error'=>'METHOD_NOT_ALLOWED']);
     return;
   }
 
-  // ==========
-  // CSRF
-  // ==========
+  // ========== CSRF ==========
   $csrfBody   = $_POST['csrf'] ?? '';
   $csrfHeader = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
   $csrfClient = $csrfBody ?: $csrfHeader;
@@ -76,9 +67,7 @@ try {
     return;
   }
 
-  // ==========
-  // CAMPOS
-  // ==========
+  // ========== CAMPOS ==========
   $method    = trim($_POST['method'] ?? '') ?: 'binance_manual';
   $notes     = trim($_POST['notes'] ?? '');
   $currency  = trim($_POST['currency'] ?? 'USDT');
@@ -96,9 +85,7 @@ try {
     return;
   }
 
-  // ==========
-  // ARCHIVO (opcional pero recomendado)
-  // ==========
+  // ========== ARCHIVO (opcional pero recomendado) ==========
   $receiptPath = null;
   if (!empty($_FILES['receipt']) && is_array($_FILES['receipt'])) {
     $file = $_FILES['receipt'];
@@ -152,9 +139,12 @@ try {
       }
     }
     if (!is_writable($absDir)) {
-      http_response_code(500);
-      echo json_encode(['ok'=>false,'error'=>'NOT_WRITABLE']);
-      return;
+      @chmod($absDir, 0775); // intento de corrección
+      if (!is_writable($absDir)) {
+        http_response_code(500);
+        echo json_encode(['ok'=>false,'error'=>'NOT_WRITABLE']);
+        return;
+      }
     }
 
     // Generar nombre seguro
@@ -172,9 +162,7 @@ try {
     $receiptPath = RECEIPTS_DIR . '/' . $fname;
   }
 
-  // ==========
-  // DB (transacción)
-  // ==========
+  // ========== DB (transacción) ==========
   $pdo->beginTransaction();
 
   $sql = "
@@ -201,9 +189,20 @@ try {
     ':id'    => $user_id,
   ]);
 
+  // Verifica que el UPDATE afectó 1+ filas
+  if ($stmt2->rowCount() < 1) {
+    throw new RuntimeException('UPDATE_USER_STATE_FAILED');
+  }
+
+  // Sincroniza la sesión para que el gate lea el nuevo estado inmediatamente
+  $_SESSION['account_state'] = NEXT_STATE;
+
   $pdo->commit();
 
-  echo json_encode(['ok'=>true]);
+  // Indica explícitamente adónde redirigir
+  echo json_encode(['ok'=>true, 'redirect' => 'waiting_confirmation.php']);
+  return;
+
 } catch (PDOException $e) {
   if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) $pdo->rollBack();
   error_log('[PAGO_BINANCE][SQL] '.$e->getMessage());
