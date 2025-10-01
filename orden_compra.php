@@ -1,8 +1,22 @@
 <?php
-// --- INICIAR SESIÓN ANTES DE CUALQUIER INCLUDE QUE LEA $_SESSION ---
-if (session_status() !== PHP_SESSION_ACTIVE) {
-  session_start();
-}
+// Sesión robusta y nombre consistente con pago_binance.php
+$proto   = $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ($_SERVER['HTTP_X_FORWARDED_SCHEME'] ?? '');
+$isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (($_SERVER['SERVER_PORT'] ?? '') == 443)
+        || (strtolower($proto) === 'https')
+        || (($_SERVER['HTTP_X_FORWARDED_SSL'] ?? '') === 'on');
+
+session_name('shockfy_sess'); // <-- MISMO nombre que en pago_binance.php
+session_set_cookie_params([
+  'lifetime' => 0,
+  'path'     => '/',
+  'domain'   => '',
+  'secure'   => $isHttps,
+  'httponly' => true,
+  'samesite' => 'Lax',
+]);
+
+if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth_check.php';
