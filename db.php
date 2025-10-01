@@ -1,9 +1,9 @@
 <?php
 // db.php
-$host = env('DB_HOST');
-$db   = env('DB_DATABASE');
-$user = env('DB_USERNAME');
-$pass = env('DB_PASSWORD'); // si tienes contraseña en root, ponla aquí
+$host = env('DB_HOST', 'projects_shockfy_db');
+$db   = env('DB_DATABASE', 'shockfy_db');
+$user = env('DB_USERNAME', 'shockfy');
+$pass = env('DB_PASSWORD', 'de2bc37d2748ee654a16'); // si tienes contraseña en root, ponla aquí
 $charset = 'utf8mb4';
 
 $dsn = "mysql:host=$host;dbname=$db;charset=$charset";
