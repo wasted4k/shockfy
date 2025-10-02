@@ -385,8 +385,8 @@ $displayName = $_SESSION['full_name'] ?? $_SESSION['username'] ?? $_SESSION['ema
     <p class="sec-sub">La herramienta justa: ni más ni menos. Enfocada en que vendas mejor, sin burocracia de software.</p>
     <div class="grid-3">
       <div class="benefit">
-        <h4>Onboarding en minutos</h4>
-        <p>Carga tus productos desde Excel/CSV y empieza a vender hoy mismo.</p>
+        <h4>Sistema simple</h4>
+        <p>Nuestro sistema es simple y completo. No tengas problemas de configuración</p>
       </div>
       <div class="benefit">
         <h4>Interfaz ultra rápida</h4>
@@ -427,7 +427,7 @@ $displayName = $_SESSION['full_name'] ?? $_SESSION['username'] ?? $_SESSION['ema
               <div class="t-rol">Tienda de ropa</div>
             </div>
           </div>
-          <p>“Pasé de cuadernos a ShockFy y fue un antes y después: cierro caja en minutos y sé qué reponer.”</p>
+          <p>“Pasé de anotar todo en cuadernos a solamente vender con un click. Shockfy me ahorró mucho tiempo.”</p>
         </div>
         <div class="tcard">
           <div class="t-top">
@@ -437,7 +437,7 @@ $displayName = $_SESSION['full_name'] ?? $_SESSION['username'] ?? $_SESSION['ema
               <div class="t-rol">Distribuidora</div>
             </div>
           </div>
-          <p>“El carrito multiproducto es una locura. Vendo más rápido y sin errores, mi equipo lo ama.”</p>
+          <p>“Mis empleados tienen mucha mas facilidad para saber si tenemos productos en stock y los que estan por agotarse.”</p>
         </div>
         <div class="tcard">
           <div class="t-top">
@@ -447,7 +447,7 @@ $displayName = $_SESSION['full_name'] ?? $_SESSION['username'] ?? $_SESSION['ema
               <div class="t-rol">Accesorios</div>
             </div>
           </div>
-          <p>“Me convenció el soporte. Migraron mis datos y quedé funcionando el mismo día.”</p>
+          <p>“El soporte es realmente atento y amable. Me encantó eso de ShockFy.”</p>
         </div>
       </div>
     </div>
@@ -457,11 +457,11 @@ $displayName = $_SESSION['full_name'] ?? $_SESSION['username'] ?? $_SESSION['ema
   <section class="section" id="precios">
     <div class="features">
       <h2 class="sec-title">Un solo plan. Todo incluido.</h2>
-      <p class="sec-sub">Empieza gratis por 15 días. Luego puedes continuar con el plan estándar sin límites esenciales.</p>
+      <p class="sec-sub">Empieza gratis por 15 días. Luego puedes continuar activar nuestro plan premium económico.</p>
       <div class="pricing">
         <div class="plan">
           <div style="font-weight:800;letter-spacing:.2px">Plan Estándar</div>
-          <div class="price">$9.99 <small>/ mes</small></div>
+          <div class="price">$4.99 <small>/ mes</small></div>
           <div class="plist">
             <div class="row">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
@@ -474,6 +474,14 @@ $displayName = $_SESSION['full_name'] ?? $_SESSION['username'] ?? $_SESSION['ema
             <div class="row">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
               Soporte humano prioritario
+            </div>
+             <div class="row">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+              Reporte de ventas y ganancias
+            </div>
+            <div class="row">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+              Alertas de Stock Bajo
             </div>
           </div>
           <a class="cta" href="signup.php" style="display:inline-block;padding:12px 16px;border-radius:12px;">Comenzar prueba gratis</a>
@@ -501,16 +509,16 @@ $displayName = $_SESSION['full_name'] ?? $_SESSION['username'] ?? $_SESSION['ema
           <p>Claro. Exporta inventario y ventas a CSV/Excel cuando lo necesites.</p>
         </div>
         <div class="qa">
-          <h4 onclick="toggleQA(this)">¿El sistema es multiusuario?
+          <h4 onclick="toggleQA(this)">¿No hay cargos sorpresas despues de pagar los $4.99?
             <svg class="caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0b1220" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
           </h4>
-          <p>Sí. Puedes crear cuentas para tu equipo con permisos básicos (vista/venta).</p>
+          <p>No, $4,99 es el único monto que pagarás mensualmente.</p>
         </div>
         <div class="qa">
           <h4 onclick="toggleQA(this)">¿Qué pasa si necesito ayuda?
             <svg class="caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0b1220" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
           </h4>
-          <p>Te acompañamos en el onboarding y resolvemos dudas por chat o correo.</p>
+          <p>Te guiamos si tienes alguna duda mediante nuestro canal de soporte.</p>
         </div>
       </div>
     </div>
