@@ -246,7 +246,7 @@ unset($_SESSION['flash']);
         <!-- Términos -->
         <div class="tos">
           <input id="tos" type="checkbox" required>
-          <label for="tos">Acepto los <a href="#" onclick="return false;">Términos</a> y la <a href="#" onclick="return false;">Política de Privacidad</a>.</label>
+          <label for="tos">Acepto los <a href="terminos.php"; >Términos</a> y la <a href="#" onclick="return false;">Política de Privacidad</a>.</label>
         </div>
 
         <div class="actions">
