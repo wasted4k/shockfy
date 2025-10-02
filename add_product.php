@@ -1,22 +1,28 @@
 <?php
-// add_product.php
+// add_product.php (versión robusta para hosting EasyPanel)
+
+// --- Seguridad de salida/errores (no romper header()) ---
+ini_set('display_errors', '0');                 // evita warnings en pantalla
+ini_set('log_errors', '1');                     // registra errores en log del hosting
+ini_set('error_log', __DIR__ . '/php-error.log'); // log local (opcional)
+
 require 'db.php';
-require_once __DIR__ . '/auth_check.php'; // proteger el login y mandarlo a welcome si la persona no ha verificado su email
-$user_id = $_SESSION['user_id']; // el ID del usuario que está logueado
+require_once __DIR__ . '/auth_check.php'; // proteger el login (mantén tu lógica)
+$user_id = $_SESSION['user_id'];           // ID del usuario logueado
 
-
-
-// Traer todas las categorías
+// --- Traer categorías del usuario ---
 $categories = $pdo->prepare("SELECT id, name FROM categories WHERE user_id = ? ORDER BY name");
 $categories->execute([$user_id]);
 $categories = $categories->fetchAll();
 
-// traer moneda para solo mostrar símbolo (no cambia backend)
+// --- Moneda preferida (solo display) ---
 $currencyStmt = $pdo->prepare('SELECT currency_pref FROM users WHERE id = ?');
 $currencyStmt->execute([$_SESSION['user_id']]);
 $currency = $currencyStmt->fetchColumn() ?: 'S/.';
 
+// --- Procesamiento del formulario ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Campos base
     $code  = trim($_POST['code'] ?? '');
     $name  = trim($_POST['name'] ?? '');
     $size  = trim($_POST['size'] ?? '');
@@ -26,50 +32,103 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stock = intval($_POST['stock'] ?? 0);
     $category_id = intval($_POST['category_id'] ?? 0);
 
+    // Validaciones mínimas
     if ($name === '') {
-        header('Location: add_product.php?error=El nombre es obligatorio');
+        header('Location: add_product.php?error=' . urlencode('El nombre es obligatorio'));
         exit;
     }
     if ($category_id === 0) {
-        header('Location: add_product.php?error=Debe seleccionar una categoría');
+        header('Location: add_product.php?error=' . urlencode('Debe seleccionar una categoría'));
+        exit;
+    }
+    if ($cost < 0 || $sale < 0 || $stock < 0) {
+        header('Location: add_product.php?error=' . urlencode('Precios y stock no pueden ser negativos'));
         exit;
     }
 
-    // Procesar imagen si se sube
-    $imagePath = null;
-    if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
-        $tmpName = $_FILES['image']['tmp_name'];
-        $originalName = basename($_FILES['image']['name']);
-        $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+    // --- Subida de imagen (opcional) ---
+    $imagePathDb = null; // lo que se guarda en la BD (ruta pública relativa)
+    if (isset($_FILES['image']) && $_FILES['image']['error'] !== UPLOAD_ERR_NO_FILE) {
 
-        $allowed = ['jpg','jpeg','png','gif'];
-        if (!in_array($ext, $allowed)) {
-            header('Location: add_product.php?error=Formato de imagen no permitido');
+        if ($_FILES['image']['error'] !== UPLOAD_ERR_OK) {
+            header('Location: add_product.php?error=' . urlencode('Error al cargar la imagen (código '.$_FILES['image']['error'].')'));
             exit;
         }
 
-        $uploadDir = 'uploads/';
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0777, true);
+        // 1) Directorio de destino (ABSOLUTO en disco)
+        //    Si montas un volumen o usas otra ruta, define UPLOADS_DIR en el panel
+        $uploadDirFs     = rtrim(getenv('UPLOADS_DIR') ?: (__DIR__ . '/uploads'), '/');
+        $uploadDirPublic = 'uploads'; // ruta pública que usarás en HTML (sirviendo desde el docroot)
+
+        // 2) Crear carpeta y verificar permisos (sin romper header())
+        if (!is_dir($uploadDirFs) && !@mkdir($uploadDirFs, 0755, true)) {
+            error_log("No se pudo crear carpeta de subidas: $uploadDirFs");
+            header('Location: add_product.php?error=' . urlencode('No se pudo preparar la carpeta de imágenes.'));
+            exit;
+        }
+        if (!is_writable($uploadDirFs)) {
+            error_log("$uploadDirFs no es escribible (FS solo lectura o permisos insuficientes)");
+            header('Location: add_product.php?error=' . urlencode('La carpeta de imágenes no es escribible en el hosting.'));
+            exit;
         }
 
-        $newName = uniqid('prod_', true) . '.' . $ext;
-        $imagePath = $uploadDir . $newName;
+        // 3) Validar MIME real y tamaño
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime  = finfo_file($finfo, $_FILES['image']['tmp_name']);
+        finfo_close($finfo);
 
-        move_uploaded_file($tmpName, $imagePath);
+        $allowed = [
+            'image/jpeg' => 'jpg',
+            'image/png'  => 'png',
+            'image/gif'  => 'gif',
+            'image/webp' => 'webp',
+        ];
+        if (!isset($allowed[$mime])) {
+            header('Location: add_product.php?error=' . urlencode('Formato de imagen no permitido (usa JPG/PNG/GIF/WEBP)'));
+            exit;
+        }
+
+        // (Opcional) límite de tamaño 10MB
+        $maxBytes = 10 * 1024 * 1024;
+        if (($_FILES['image']['size'] ?? 0) > $maxBytes) {
+            header('Location: add_product.php?error=' . urlencode('La imagen supera 10 MB'));
+            exit;
+        }
+
+        // 4) Nombre seguro y rutas
+        $ext      = $allowed[$mime];
+        $newName  = uniqid('prod_', true) . '.' . $ext;
+        $targetFs = $uploadDirFs . '/' . $newName;           // ABSOLUTO (para mover)
+        $imagePathDb = $uploadDirPublic . '/' . $newName;    // PÚBLICO (para BD/HTML)
+
+        // 5) Mover de forma segura
+        if (!is_uploaded_file($_FILES['image']['tmp_name'])) {
+            error_log('is_uploaded_file false');
+            header('Location: add_product.php?error=' . urlencode('Archivo inválido'));
+            exit;
+        }
+        if (!@move_uploaded_file($_FILES['image']['tmp_name'], $targetFs)) {
+            $err = error_get_last()['message'] ?? 'desconocido';
+            error_log("move_uploaded_file falló: $err");
+            header('Location: add_product.php?error=' . urlencode('No se pudo guardar la imagen en el servidor.'));
+            exit;
+        }
     }
 
-    // INSERT del producto incluyendo la imagen y el usuario logueado
+    // --- INSERT del producto ---
     $sql = 'INSERT INTO products (code, name, size, color, cost_price, sale_price, stock, category_id, image, user_id)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
     $stmt = $pdo->prepare($sql);
 
     try {
-        $stmt->execute([$code ?: null, $name, $size, $color, $cost, $sale, $stock, $category_id, $imagePath, $user_id]);
-        header('Location: index.php?msg=Producto agregado correctamente');
+        $stmt->execute([
+            $code ?: null, $name, $size, $color, $cost, $sale, $stock, $category_id, $imagePathDb, $user_id
+        ]);
+        header('Location: index.php?msg=' . urlencode('Producto agregado correctamente'));
         exit;
     } catch (Exception $e) {
-        header('Location: add_product.php?error=' . urlencode($e->getMessage()));
+        error_log('DB insert error: ' . $e->getMessage());
+        header('Location: add_product.php?error=' . urlencode('Error en base de datos'));
         exit;
     }
 }
@@ -102,13 +161,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         *{box-sizing:border-box}
         body{margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text);}
-
         .page{ padding:24px 18px 64px; }
         .container{ max-width:1000px; margin:0 auto; }
-
-        .header{
-            display:flex; align-items:center; justify-content:space-between; gap:16px; margin:8px 0 18px;
-        }
+        .header{ display:flex; align-items:center; justify-content:space-between; gap:16px; margin:8px 0 18px; }
         .title{ display:flex; align-items:center; gap:14px; }
         .title .icon{
             width:48px;height:48px;border-radius:12px;
@@ -117,7 +172,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         .title h1{ margin:0; font-size:26px; font-weight:800; color:#0b1220; }
         .subtitle{ font-size:13px; color:var(--muted); margin-top:4px; }
-
         .card{
             background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
             box-shadow:var(--shadow); overflow:hidden;
@@ -128,12 +182,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         .card-title{ font-size:14px; font-weight:800; }
         .card-body{ padding:16px; }
-
-        .form-grid{
-            display:grid; grid-template-columns:1fr 1fr; gap:14px;
-        }
+        .form-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
         .form-col-span-2{ grid-column: span 2; }
-
         label{font-weight:600; font-size:13px; color:#0f172a;}
         .field{
             margin-top:6px; display:flex; align-items:center; gap:8px;
@@ -143,23 +193,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .field input[type="number"],
         .field input[type="file"],
         .field select{
-            border:none; outline:none; background:transparent; width:100%; color:var(--text); font-size:14px;
+            border:none; outline:none; background:transparent; width:100%; color:#0f172a; font-size:14px;
         }
         .prefix{
             font-size:12px; color:#475569; background:var(--panel-2); padding:4px 8px; border-radius:8px; border:1px solid var(--border);
         }
         .hint{ font-size:12px; color:var(--muted); margin-top:6px; }
-
-        .image-uploader{
-            display:flex; align-items:flex-start; gap:14px; flex-wrap:wrap;
-        }
+        .image-uploader{ display:flex; align-items:flex-start; gap:14px; flex-wrap:wrap; }
         .image-preview{
             width:140px; height:140px; border-radius:14px; background:#f1f5f9; border:1px solid var(--border);
             display:grid; place-items:center; overflow:hidden;
         }
         .image-preview img{ width:100%; height:100%; object-fit:cover; }
         .image-actions{ display:flex; gap:8px; flex-wrap:wrap; }
-
         .btn{
             padding:10px 14px; border-radius:12px; border:1px solid var(--border);
             background:#fff; font-weight:800; cursor:pointer; box-shadow:var(--shadow);
@@ -168,35 +214,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .btn:hover{ transform: translateY(-1px); background:#f5f7fb; }
         .btn.primary{ background:linear-gradient(135deg,var(--primary),var(--primary-2)); color:#fff; border:none; }
         .btn.primary:hover{ filter:brightness(.98); }
-       /* --- Mejora de contraste para botones "ghost" (Cancelar / Quitar imagen) --- */
-.btn.ghost{
-  background: var(--panel-2);        /* antes: #fff */
-  border-color: #cfd7e3;              /* borde más visible */
-  color: var(--text);                 /* texto oscuro */
-}
-.btn.ghost:hover{
-  background: #e8edf4;                /* hover con más contraste */
-  border-color: #b8c3d4;
-}
-
-/* Dark mode se mantiene legible */
-body.dark .btn.ghost{
-  background:#0e1630;
-  border-color:#1f2a4a;
-  color:#e5e7eb;
-}
-body.dark .btn.ghost:hover{
-  background:#132146;
-  border-color:#33416b;
-}
-
+        .btn.ghost{ background: var(--panel-2); border-color: #cfd7e3; color:var(--text); }
+        .btn.ghost:hover{ background:#e8edf4; border-color:#b8c3d4; }
         .btn.danger{ background:linear-gradient(135deg,#ef4444,#f87171); color:#fff; border:none; }
-
-        .actions{
-            display:flex; align-items:center; gap:10px; justify-content:flex-end; margin-top:8px;
-        }
-
-        /* Toast */
+        .actions{ display:flex; align-items:center; gap:10px; justify-content:flex-end; margin-top:8px; }
         #toast{
             position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
             background:#ecfdf5; border:1px solid #d1fae5; color:#065f46;
@@ -204,14 +225,10 @@ body.dark .btn.ghost:hover{
             font-weight:800; opacity:0; pointer-events:none; transition:opacity .25s ease; z-index:2000;
         }
         #toast.show{ opacity:1; pointer-events:auto; }
-
-        /* Responsive */
         @media (max-width: 900px){
             .form-grid{ grid-template-columns:1fr; }
             .form-col-span-2{ grid-column: auto; }
         }
-
-        /* Modo oscuro si tu toggle global lo aplica */
         body.dark{ background:#0c1326; color:#e5e7eb; }
         body.dark .card, body.dark .field{ background:#0b1220; border-color:#1f2a4a; }
         body.dark .card-header{ background:#0e1630; }
@@ -228,7 +245,7 @@ body.dark .btn.ghost:hover{
         <div class="header">
             <div class="title">
                 <div class="icon">
-                    <!-- SVG etiqueta/producto -->
+                    <!-- SVG -->
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
                       <path d="M3 7v10a2 2 0 0 0 2 2h11l4-4V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2Z" stroke="#2563eb" stroke-width="2" />
                       <path d="M16 19v-4h4" stroke="#60a5fa" stroke-width="2" />
@@ -257,11 +274,8 @@ body.dark .btn.ghost:hover{
                     </div>
                 <?php endif; ?>
 
-                <!-- IMPORTANTE: no cambiar names ni método/enctype -->
                 <form method="post" enctype="multipart/form-data" id="productForm" novalidate>
-
                     <div class="form-grid">
-                        <!-- Código -->
                         <div>
                             <label for="code">Código (opcional)</label>
                             <div class="field">
@@ -269,7 +283,6 @@ body.dark .btn.ghost:hover{
                             </div>
                         </div>
 
-                        <!-- Nombre -->
                         <div>
                             <label for="name">Nombre de la prenda *</label>
                             <div class="field">
@@ -278,7 +291,6 @@ body.dark .btn.ghost:hover{
                             <div class="hint">Requerido.</div>
                         </div>
 
-                        <!-- Talla -->
                         <div>
                             <label for="size">Talla</label>
                             <div class="field">
@@ -286,7 +298,6 @@ body.dark .btn.ghost:hover{
                             </div>
                         </div>
 
-                        <!-- Color -->
                         <div>
                             <label for="color">Color</label>
                             <div class="field">
@@ -294,7 +305,6 @@ body.dark .btn.ghost:hover{
                             </div>
                         </div>
 
-                        <!-- Costo -->
                         <div>
                             <label for="cost_price">Precio de costo *</label>
                             <div class="field">
@@ -303,7 +313,6 @@ body.dark .btn.ghost:hover{
                             </div>
                         </div>
 
-                        <!-- Venta -->
                         <div>
                             <label for="sale_price">Precio de venta *</label>
                             <div class="field">
@@ -312,7 +321,6 @@ body.dark .btn.ghost:hover{
                             </div>
                         </div>
 
-                        <!-- Stock -->
                         <div>
                             <label for="stock">Stock inicial *</label>
                             <div class="field">
@@ -320,7 +328,6 @@ body.dark .btn.ghost:hover{
                             </div>
                         </div>
 
-                        <!-- Categoría -->
                         <div>
                             <label for="category_id">Categoría *</label>
                             <div class="field">
@@ -333,12 +340,10 @@ body.dark .btn.ghost:hover{
                             </div>
                         </div>
 
-                        <!-- Imagen -->
                         <div class="form-col-span-2">
                             <label for="image">Imagen del producto (opcional)</label>
                             <div class="image-uploader">
                                 <div class="image-preview" id="imagePreview">
-                                    <!-- Placeholder SVG -->
                                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
                                         <rect x="3" y="3" width="18" height="14" rx="3" stroke="#94a3b8" stroke-width="2"/>
                                         <path d="M3 14l4-4 4 4 3-3 4 3" stroke="#94a3b8" stroke-width="2" fill="none"/>
@@ -351,7 +356,7 @@ body.dark .btn.ghost:hover{
                                     </div>
                                     <div class="image-actions">
                                         <button type="button" class="btn ghost" id="btnRemoveImage" style="display:none;">Quitar imagen</button>
-                                        <div class="hint">Formatos permitidos: JPG, PNG, GIF. Tamaño razonable recomendado.</div>
+                                        <div class="hint">Formatos permitidos: JPG, PNG, GIF, WEBP. Máx. 10 MB.</div>
                                     </div>
                                 </div>
                             </div>
@@ -371,14 +376,12 @@ body.dark .btn.ghost:hover{
     <div id="toast" role="status" aria-live="polite"></div>
 
     <script>
-      // Prefiere la apariencia dark si ya está en localStorage (coherente con tu app)
       window.addEventListener('load', () => {
         if(localStorage.getItem('darkMode') === 'true'){
             document.body.classList.add('dark');
         }
       });
 
-      // Toast helper
       function showToast(msg){
         const el = document.getElementById('toast');
         el.textContent = msg;
@@ -386,7 +389,6 @@ body.dark .btn.ghost:hover{
         setTimeout(() => el.classList.remove('show'), 2500);
       }
 
-      // Previsualización de imagen
       const inputImage = document.getElementById('image');
       const preview = document.getElementById('imagePreview');
       const btnRemove = document.getElementById('btnRemoveImage');
@@ -421,7 +423,6 @@ body.dark .btn.ghost:hover{
         btnRemove.style.display = 'none';
       }
 
-      // Validación rápida de requeridos en cliente (no sustituye backend)
       const form = document.getElementById('productForm');
       form.addEventListener('submit', (e) => {
         const name = document.getElementById('name').value.trim();
