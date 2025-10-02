@@ -10,7 +10,7 @@ require_once __DIR__ . '/db.php';
 // ===== 1) Requiere login =====
 $user_id = $_SESSION['user_id'] ?? null;
 if (!$user_id) {
-  header('Location: login.php');
+  header('Location: home.php');
   exit;
 }
 
