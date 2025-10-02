@@ -48,7 +48,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
-        $uploadDir = 'uploads/';
+       $uploadDir = __DIR__ . '/uploads/';
+
         if (!is_dir($uploadDir)) {
             mkdir($uploadDir, 0777, true);
         }
