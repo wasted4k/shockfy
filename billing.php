@@ -226,6 +226,14 @@ unset($_SESSION['billing_ok'], $_SESSION['billing_err']);
     }
     .opt:hover{ transform: translateY(-1px); background:#f8fafc; box-shadow: 0 10px 22px rgba(2,6,23,.08); }
     .modal .note{ color:var(--muted); font-size:12px; text-align:center; }
+
+    .btnx[disabled]{
+  opacity:.6;
+  cursor:not-allowed;   /* muestra el 🚫 */
+  pointer-events:none;  /* evita clics */
+  filter:grayscale(.1);
+}
+
   </style>
 </head>
 <body>
@@ -333,7 +341,9 @@ unset($_SESSION['billing_ok'], $_SESSION['billing_err']);
 
       <div class="grid">
         <div class="choice" role="group" aria-label="Grupo de métodos">
-          <button class="btnx" type="button" onclick="choosePayGroup('card')">Tarjeta de Débito/Crédito</button>
+          <button class="btnx" type="button" onclick="choosePayGroup('card')" disabled>
+  Tarjeta de Débito/Crédito
+</button>
           <button class="btnx" type="button" onclick="choosePayGroup('others')">Otros métodos de pago</button>
         </div>
 

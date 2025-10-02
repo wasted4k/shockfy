@@ -1,3 +1,27 @@
+<?php
+if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
+
+// ¿Hay usuario logueado?
+$isLogged = !empty($_SESSION['user_id']);
+
+// De dónde sacar el nombre para mostrar
+$displayName = $_SESSION['full_name'] ?? $_SESSION['username'] ?? $_SESSION['email'] ?? 'Mi cuenta';
+
+/* 
+// (Opcional) Si tu login no guarda fullname/username/email en la sesión, 
+// puedes cargarlo desde la BD descomentando esto:
+// require_once __DIR__ . '/db.php';
+// if ($isLogged) {
+//   $stmt = $pdo->prepare("SELECT full_name, username, email FROM users WHERE id = :id LIMIT 1");
+//   $stmt->execute(['id' => $_SESSION['user_id']]);
+//   if ($u = $stmt->fetch(PDO::FETCH_ASSOC)) {
+//     $displayName = $u['full_name'] ?: ($u['username'] ?: ($u['email'] ?: 'Mi cuenta'));
+//   }
+// }
+*/
+?>
+
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -151,25 +175,44 @@
     .links{display:flex;gap:12px}
     .links a{text-decoration:none;color:var(--muted)}
     .links a:hover{text-decoration:underline}
+
+     .nav-user{
+  padding:10px 12px;
+  border-radius:10px;
+  background:#fff;
+  border:1px solid var(--border);
+  font-weight:700;
+}
+
   </style>
 </head>
 <body>
 
   <!-- NAV -->
   <nav>
-    <div class="nav-wrap">
-      <div class="brand">
-        <img src="assets/img/icono_menu.png" alt="ShockFy Logo">
-        ShockFy
-      </div>
-      <div class="nav-links">
-        <a href="#features">Características</a>
-        <a href="#beneficios">Beneficios</a>
-        <a href="#precios">Precio</a>
+    <nav>
+  <div class="nav-wrap">
+    <div class="brand">
+      <img src="assets/img/icono_menu.png" alt="ShockFy Logo">
+      ShockFy
+    </div>
+
+    <div class="nav-links">
+      <a href="#features">Características</a>
+      <a href="#beneficios">Beneficios</a>
+      <a href="#precios">Precio</a>
+
+      <?php if ($isLogged): ?>
+        <span class="nav-user">👋 <?= htmlspecialchars($displayName) ?></span>
+        <a class="cta" href="index.php">Mi cuenta</a>
+      <?php else: ?>
         <a class="cta" href="signup.php">Pruébalo gratis</a>
         <a class="login" href="login.php">Iniciar sesión</a>
-      </div>
+      <?php endif; ?>
     </div>
+  </div>
+</nav>
+
   </nav>
 
   <!-- HERO -->
