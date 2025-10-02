@@ -178,7 +178,7 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
             <div class="row">
               <div>
                 <h3 style="margin:0 0 6px; font-size:20px; font-weight:800;">Plan seleccionado</h3>
-                <div class="muted">Código interno: <strong><?= htmlspecialchars($plan) ?></strong> — Visible: <strong><?= htmlspecialchars(display_plan_name($plan)) ?></strong></div>
+                <h5> Plan Premium</h5>
                 <div style="font-size:26px; font-weight:900; margin:10px 0;">$<?= number_format($amountUSD,2) ?>/mes</div>
 
                 <!-- Opciones -->
@@ -306,7 +306,7 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
                             </div>
                           </div>
                         `;
-
+                        
                         // Lógica de interacción
                         const fileInput   = body.querySelector('#bn-file');
                         const fileBtn     = body.querySelector('#bn-file-btn');
@@ -388,41 +388,426 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
                         return;
                       }
 
-                      if (method === 'paypal'){
-                        title.textContent = 'Pago por PayPal (suscripción)';
-                        subtitle.textContent = 'Plan Premium - ' + price;
-                        body.innerHTML =
-                          '<div>Serás redirigido al flujo seguro de PayPal para completar tu suscripción.</div>' +
-                          '<a class="btn pay pay--paypal" href="'+PAYPAL_URL+'" target="_blank" rel="noopener noreferrer">Suscribirse con PayPal</a>' +
-                          '<div class="muted" style="margin-top:8px;">Se abrirá en una nueva pestaña.</div>';
-                        return;
-                      }
+                     if (method === 'paypal'){
+  title.textContent = 'Pago por PayPal (suscripción)';
+  subtitle.textContent = 'Plan Premium - ' + price;
+
+  body.innerHTML = `
+    <div class="stack stack-lg" style="max-width:560px; margin:0 auto; text-align:center;">
+      <div>Serás redirigido al flujo seguro de PayPal para completar tu suscripción, o puedes adjuntar un comprobante si realizaste un pago manual.</div>
+
+      <!-- Botón PayPal oficial -->
+      <a class="btn pay pay--paypal" href="${PAYPAL_URL}" target="_blank" rel="noopener noreferrer">Suscribirse con PayPal</a>
+      <div class="small">Se abrirá en una nueva pestaña.</div>
+      <button id="bn-instrucciones" type="button" class="btn secondary">Instrucciones</button>
+                              <div class="small">Se abrirá en una nueva pestaña (pago) / modal (instrucciones).</div>
+                            </div>
+
+      <div class="hr" role="separator" aria-hidden="true"></div>
+
+      <!-- Adjuntar comprobante (flujo manual como Binance) -->
+      <div class="stack" style="gap:8px;">
+        <input id="pp-file" type="file" accept="image/*,.pdf" style="display:none">
+        <button id="pp-file-btn" type="button" class="btn secondary">Adjuntar comprobante</button>
+        <div id="pp-file-name" class="small" aria-live="polite"></div>
+      </div>
+
+      <!-- Confirmaciones y finalizar -->
+      <div id="pp-confirm" class="stack" style="display:none;">
+        <label class="checkbox-row">
+          <input id="pp-chk-paid" type="checkbox">
+          <span>He realizado el pago de <strong>$<?= htmlspecialchars(number_format($amountUSD,2,'.','')) ?> USD</strong> por PayPal.</span>
+        </label>
+        <label class="checkbox-row">
+          <input id="pp-chk-terms" type="checkbox">
+          <span>Acepto los <a href="terminos.php" target="_blank" rel="noopener noreferrer">términos y condiciones del servicio</a>.</span>
+        </label>
+        <button id="pp-done" type="button" class="btn disabled" disabled>Pago realizado</button>
+        <div class="small">Para habilitar el botón, adjunta el comprobante y marca ambas casillas.</div>
+      </div>
+
+      <!-- Nota -->
+      <div class="note" role="note" style="margin-top:8px;">
+        <strong>IMPORTANTE: </strong>Debes subir el comprobante o correo de <strong>PayPal</strong> de tu pago. Debes aceptar los términos y condiciones del servicio para continuar.
+      </div>
+    </div>
+
+
+    
+  `;
+
+  // Lógica de interacción (idéntica a Binance, pero con IDs pp-*)
+  const fileInput   = body.querySelector('#pp-file');
+  const fileBtn     = body.querySelector('#pp-file-btn');
+  const fileNameEl  = body.querySelector('#pp-file-name');
+  const confirmBox  = body.querySelector('#pp-confirm');
+  const chkPaid     = body.querySelector('#pp-chk-paid');
+  const chkTerms    = body.querySelector('#pp-chk-terms');
+  const doneBtn     = body.querySelector('#pp-done');
+   const btnInstr    = body.querySelector('#bn-instrucciones');
+
+                        btnInstr.addEventListener('click', () => {
+                          openVideoModal('https://www.youtube.com/embed/qNx22A7pJ3c?list=PLFo_FFi1lfVi1n6UfGHBTH4-XKwNvSFYv', 'Instrucciones de pago por PayPal');
+                        });
+
+  
+  
+  
+
+  fileBtn.addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    fileNameEl.textContent = `Comprobante: ${file.name}`;
+    confirmBox.style.display = 'flex';
+    confirmBox.classList.add('stack');
+    updateDoneState();
+  });
+
+  function updateDoneState(){
+    const ready = chkPaid.checked && chkTerms.checked && (fileInput.files && fileInput.files.length > 0);
+    doneBtn.disabled = !ready;
+    doneBtn.classList.toggle('disabled', !ready);
+  }
+  chkPaid.addEventListener('change', updateDoneState);
+  chkTerms.addEventListener('change', updateDoneState);
+
+  // Handler: mismo backend y formato; sólo cambia 'method' a 'paypal_manual'
+  doneBtn.addEventListener('click', async () => {
+    if (doneBtn.disabled) return;
+
+    const fd = new FormData();
+    if (fileInput.files && fileInput.files[0]) {
+      fd.append('receipt', fileInput.files[0]);
+    }
+    // --- Compat (igual que Binance) ---
+    fd.append('paid', '1');
+    fd.append('terms', '1');
+    fd.append('amount', '<?= htmlspecialchars(number_format($amountUSD,2,'.','')) ?>');
+    fd.append('currency', 'USD');
+    // --- Campos robustos ---
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    fd.append('csrf', csrf);
+    fd.append('method', 'paypal_manual'); // ⬅️ distinguir PayPal manual en backend
+    fd.append('amount_usd', '<?= htmlspecialchars(number_format($amountUSD,2,'.','')) ?>');
+    fd.append('notes', '');
+
+    const prevText = doneBtn.textContent;
+    doneBtn.textContent = 'Enviando...';
+    doneBtn.disabled = true;
+
+    try {
+      const resp = await fetch('pago_binance.php', { method: 'POST', body: fd, headers: { 'Accept':'application/json' } });
+      const raw  = await resp.text();
+      let data;
+      try { data = JSON.parse(raw); }
+      catch { throw new Error('Respuesta no JSON:\\n' + raw.slice(0, 300)); }
+
+      if (resp.ok && data && data.ok) {
+        // Tu auth_check ya redirige por estado, pero navegamos directo por UX:
+        window.location.href = 'waiting_confirmation.php';
+      } else {
+        alert('No pudimos registrar tu pago. Código: ' + (data?.error || 'ERR'));
+        doneBtn.textContent = prevText;
+        doneBtn.disabled = false;
+      }
+    } catch (e) {
+      alert('Error de red: ' + e.message);
+      doneBtn.textContent = prevText;
+      doneBtn.disabled = false;
+    }
+  });
+
+  return;
+}
+
 
                       if (method === 'soles'){
-                        title.textContent = 'Pago manual en Soles (Perú)';
-                        subtitle.textContent = 'Plan Premium - ' + price;
-                        body.innerHTML =
-                          '<div style="font-size:14px; text-align:left; margin:0 auto; max-width:560px;">' +
-                          '<p><strong>Transferencia manual:</strong> requiere <em>verificación humana</em>. La validación puede demorar <strong>entre 5 minutos y 2 horas</strong>.</p>' +
-                          '<ul style="padding-left:18px; margin:10px 0;">' +
-                          '<li><strong>Banco:</strong> XXX</li><li><strong>CCI:</strong> 000-000-000</li><li><strong>Titular:</strong> ShockFy</li>' +
-                          '<li><strong>Monto:</strong> <?= number_format($amountUSD,2) ?> USD (o equivalente en PEN)</li>' +
-                          '</ul><p>Guarda tu comprobante; el equipo lo validará y activará Premium.</p></div>';
-                        return;
-                      }
+  title.textContent = 'Pago manual en Soles (Perú)';
+  subtitle.textContent = 'Plan Premium - ' + price;
 
-                      if (method === 'bolivares'){
-                        title.textContent = 'Pago manual en Bolívares (Venezuela)';
-                        subtitle.textContent = 'Plan Premium - ' + price;
-                        body.innerHTML =
-                          '<div style="font-size:14px; text-align:left; margin:0 auto; max-width:560px;">' +
-                          '<p><strong>Transferencia manual:</strong> requiere <em>verificación humana</em>. La validación puede demorar <strong>entre 5 minutos y 2 horas</strong>.</p>' +
-                          '<ul style="padding-left:18px; margin:10px 0;">' +
-                          '<li><strong>Banco:</strong> YYY</li><li><strong>Número de cuenta:</strong> 0000-0000</li><li><strong>Titular:</strong> ShockFy</li>' +
-                          '<li><strong>Monto:</strong> <?= number_format($amountUSD,2) ?> USD (o equivalente en VES)</li>' +
-                          '</ul><p>Guarda tu comprobante; el equipo lo validará y activará Premium.</p></div>';
-                        return;
-                      }
+  body.innerHTML = `
+    <div style="font-size:14px; text-align:left; margin:0 auto; max-width:560px;">
+      <p><strong>Transferencia manual:</strong> requiere <em>verificación humana</em>. La validación puede demorar <strong>entre 5 minutos y 2 horas</strong>.</p>
+      <ul style="padding-left:18px; margin:10px 0;">
+        <li><strong>Banco:</strong> BCP - Banco de Credito del Perú</li>
+        <li><strong>Numero de cuenta:</strong> 570-954-8915-8047</li>
+        <li><strong>Yape:</strong> 925 578 960</li>
+        <li><strong>Titular:</strong> Freibel Villalobos Villalobos</li>
+        <li><strong>Monto:</strong> S/. 18.00 </li>
+      </ul>
+      <p>Guarda tu comprobante; el equipo lo validará y activará tu plan.</p>
+    </div>
+    <button id="bn-instrucciones" type="button" class="btn secondary">Instrucciones</button>
+                              <div class="small">Si tienes dudas, puedes ver el video de instrucciones.</div>
+                            </div>
+
+
+
+             <!-- QR del yape centrado -->
+                            <div class="qr-box">
+                              <img src="assets/img/qr-yape.jpeg" alt="QR de pago Binance" class="qr-img" />
+                            </div>
+                  
+
+    <div class="hr" role="separator" aria-hidden="true"></div>
+
+    <!-- Adjuntar comprobante -->
+    <div class="stack" style="gap:8px; text-align:center;">
+      <input id="pe-file" type="file" accept="image/*,.pdf" style="display:none">
+      <button id="pe-file-btn" type="button" class="btn secondary">Adjuntar comprobante</button>
+      <div id="pe-file-name" class="small" aria-live="polite"></div>
+    </div>
+
+    <!-- Confirmaciones y finalizar -->
+    <div id="pe-confirm" class="stack" style="display:none; text-align:left; max-width:560px; margin:10px auto 0;">
+      <label class="checkbox-row">
+        <input id="pe-chk-paid" type="checkbox">
+        <span>He realizado la transferencia por el equivalente a <strong>$<?= htmlspecialchars(number_format($amountUSD,2,'.','')) ?> USD</strong> en <strong>PEN</strong>.</span>
+      </label>
+      <label class="checkbox-row">
+        <input id="pe-chk-terms" type="checkbox">
+        <span>Acepto los <a href="terminos.php" target="_blank" rel="noopener noreferrer">términos y condiciones del servicio</a>.</span>
+      </label>
+      <button id="pe-done" type="button" class="btn disabled" disabled>Pago realizado</button>
+      <div class="small">Para habilitar el botón, adjunta el comprobante y marca ambas casillas.</div>
+    </div>
+
+     <div class="note" role="note" style="margin-top:8px; text-align:center;">
+      <strong>IMPORTANTE:</strong> Para acelerar el proceso de verificacion, coloca el correo con el que te has registrado en ShockFy en la descripcion del pago.
+    </div>
+  `;
+
+  // Interacción
+  const fileInput   = body.querySelector('#pe-file');
+  const fileBtn     = body.querySelector('#pe-file-btn');
+  const fileNameEl  = body.querySelector('#pe-file-name');
+  const confirmBox  = body.querySelector('#pe-confirm');
+  const chkPaid     = body.querySelector('#pe-chk-paid');
+  const chkTerms    = body.querySelector('#pe-chk-terms');
+  const doneBtn     = body.querySelector('#pe-done');
+  const btnInstr    = body.querySelector('#bn-instrucciones');
+
+                        btnInstr.addEventListener('click', () => {
+                          openVideoModal('https://www.youtube.com/embed/qNx22A7pJ3c?list=PLFo_FFi1lfVi1n6UfGHBTH4-XKwNvSFYv', 'Instrucciones de pago por Soles');
+                        });
+
+  fileBtn.addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    fileNameEl.textContent = `Comprobante: ${file.name}`;
+    confirmBox.style.display = 'flex';
+    confirmBox.classList.add('stack');
+    updateDoneState();
+  });
+
+  function updateDoneState(){
+    const ready = chkPaid.checked && chkTerms.checked && (fileInput.files && fileInput.files.length > 0);
+    doneBtn.disabled = !ready;
+    doneBtn.classList.toggle('disabled', !ready);
+  }
+  chkPaid.addEventListener('change', updateDoneState);
+  chkTerms.addEventListener('change', updateDoneState);
+
+  // Envío: igual que Binance/PayPal, pero con method = 'soles_manual'
+  doneBtn.addEventListener('click', async () => {
+    if (doneBtn.disabled) return;
+
+    const fd = new FormData();
+    if (fileInput.files && fileInput.files[0]) {
+      fd.append('receipt', fileInput.files[0]);
+    }
+    // Compat
+    fd.append('paid', '1');
+    fd.append('terms', '1');
+    fd.append('amount', '<?= htmlspecialchars(number_format($amountUSD,2,'.','')) ?>');
+    fd.append('currency', 'PEN');
+    // Robusto
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    fd.append('csrf', csrf);
+    fd.append('method', 'soles_manual'); // ← distinguir en backend
+    fd.append('amount_usd', '<?= htmlspecialchars(number_format($amountUSD,2,'.','')) ?>');
+    fd.append('notes', '');
+
+    const prevText = doneBtn.textContent;
+    doneBtn.textContent = 'Enviando...';
+    doneBtn.disabled = true;
+
+    try {
+      const resp = await fetch('pago_binance.php', { method: 'POST', body: fd, headers: { 'Accept':'application/json' } });
+      const raw  = await resp.text();
+      let data;
+      try { data = JSON.parse(raw); }
+      catch { throw new Error('Respuesta no JSON:\n' + raw.slice(0, 300)); }
+
+      if (resp.ok && data && data.ok) {
+        window.location.href = data.redirect || 'waiting_confirmation.php';
+      } else {
+        alert('No pudimos registrar tu pago. Código: ' + (data?.error || 'ERR'));
+        doneBtn.textContent = prevText;
+        doneBtn.disabled = false;
+      }
+    } catch (e) {
+      alert('Error de red: ' + e.message);
+      doneBtn.textContent = prevText;
+      doneBtn.disabled = false;
+    }
+  });
+
+  return;
+}
+
+
+                      if (method === 'bolivares') {
+  title.textContent = 'Pago en Bolívares (Venezuela) - 1,500 VES';
+  subtitle.textContent = 'Plan Premium - ' + price; 
+
+  body.innerHTML = `
+    <div style="font-size:14px; text-align:left; margin:0 auto; max-width:560px;">
+      <p><strong>Transferencia manual:</strong> requiere <em>verificación humana</em>. La validación puede demorar <strong>entre 5 minutos y 2 horas</strong>.</p>
+      <ul style="padding-left:18px; margin:10px 0;">
+        <li><strong>Banco:</strong> Banesco</li>
+        <li><strong>Número de cuenta:</strong> 01340002440021044691</li>
+        <li><strong>Titular:</strong> Freibel Villalobos Villalobos</li>
+        <li><strong>Monto:</strong> 1,500 VES </li>
+         <div class="hr" role="separator" aria-hidden="true"></div>
+         <li><strong>Datos Pago Movil:</strong></li>
+         <li><strong>Numero:</strong> 0426-9636029</li>
+         <li><strong>Cédula:</strong> V-29977239</li>
+         <li><strong>Banco:</strong> Banesco
+      </ul>
+      <p>Guarda tu comprobante; el equipo lo validará y activará tu plan.</p>
+    </div>
+
+    <button id="ve-instrucciones" type="button" class="btn success">Instrucciones</button>
+    <div class="small">Se abrirá un modal con instrucciones.</div>
+
+    <div class="hr" role="separator" aria-hidden="true"></div>
+
+    <div class="stack" style="gap:8px; text-align:center;">
+      <input id="ve-file" type="file" accept="image/*,.pdf" style="display:none">
+      <button id="ve-file-btn" type="button" class="btn secondary">Adjuntar comprobante</button>
+      <div id="ve-file-name" class="small" aria-live="polite"></div>
+    </div>
+
+    <div id="ve-confirm" class="stack" style="display:none; text-align:left; max-width:560px; margin:10px auto 0;">
+      <label class="checkbox-row">
+        <input id="ve-chk-paid" type="checkbox">
+        <span>He realizado la transferencia por el equivalente a <strong>$<?= htmlspecialchars(number_format($amountUSD,2,'.','')) ?> USD</strong> en <strong>VES</strong>.</span>
+      </label>
+      <label class="checkbox-row">
+        <input id="ve-chk-terms" type="checkbox">
+        <span>Acepto los <a href="terminos.php" target="_blank" rel="noopener noreferrer">términos y condiciones del servicio</a>.</span>
+      </label>
+      <button id="ve-done" type="button" class="btn disabled" disabled>Pago realizado</button>
+      <div class="small">Para habilitar el botón, adjunta el comprobante y marca ambas casillas.</div>
+    </div>
+
+    <div class="note" role="note" style="margin-top:8px; text-align:center;">
+      <strong>IMPORTANTE:</strong> Para acelerar el proceso de verificacion, coloca el correo con el que te has registrado en ShockFy en la descripcion del pago.
+    </div>
+  `;
+
+  // === Interacción ===
+  const btnInstr   = body.querySelector('#ve-instrucciones');
+  const fileInput  = body.querySelector('#ve-file');
+  const fileBtn    = body.querySelector('#ve-file-btn');
+  const fileNameEl = body.querySelector('#ve-file-name');
+  const confirmBox = body.querySelector('#ve-confirm');
+  const chkPaid    = body.querySelector('#ve-chk-paid');
+  const chkTerms   = body.querySelector('#ve-chk-terms');
+  const doneBtn    = body.querySelector('#ve-done');
+
+  // Instrucciones (mismo video/modal que usas en otros)
+  btnInstr.addEventListener('click', () => {
+    openVideoModal(
+      'https://www.youtube.com/embed/qNx22A7pJ3c?list=PLFo_FFi1lfVi1n6UfGHBTH4-XKwNvSFYv',
+      'Instrucciones de pago en Bolívares'
+    );
+  });
+
+  fileBtn.addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    fileNameEl.textContent = `Comprobante: ${file.name}`;
+    confirmBox.style.display = 'flex';
+    confirmBox.classList.add('stack');
+    updateDoneState();
+  });
+
+  function updateDoneState() {
+    const ready = chkPaid.checked && chkTerms.checked && (fileInput.files && fileInput.files.length > 0);
+    doneBtn.disabled = !ready;
+    doneBtn.classList.toggle('disabled', !ready);
+  }
+  chkPaid.addEventListener('change', updateDoneState);
+  chkTerms.addEventListener('change', updateDoneState);
+
+  // Envío — mismo endpoint que ya te funciona: pago_binance.php
+  doneBtn.addEventListener('click', async () => {
+    if (doneBtn.disabled) return;
+
+    const fd = new FormData();
+    if (fileInput.files && fileInput.files[0]) {
+      fd.append('receipt', fileInput.files[0]);
+    }
+    // Compat
+    fd.append('paid', '1');
+    fd.append('terms', '1');
+    fd.append('amount', '<?= htmlspecialchars(number_format($amountUSD,2,'.','')) ?>');
+    fd.append('currency', 'VES');
+    // Robusto
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    fd.append('csrf', csrf);
+    fd.append('method', 'bolivares_manual'); // ← distinguir en backend
+    fd.append('amount_usd', '<?= htmlspecialchars(number_format($amountUSD,2,'.','')) ?>');
+    fd.append('notes', '');
+
+    const prevText = doneBtn.textContent;
+    doneBtn.textContent = 'Enviando...';
+    doneBtn.disabled = true;
+
+    try {
+      const resp = await fetch('pago_binance.php', {
+        method: 'POST',
+        body: fd,
+        headers: { 'Accept': 'application/json' },
+        credentials: 'same-origin'
+      });
+
+      const ct = resp.headers.get('content-type') || '';
+      let data = null;
+
+      if (ct.includes('application/json')) {
+        data = await resp.json();
+      } else {
+        const raw = await resp.text();
+        throw new Error('Respuesta no JSON:\n' + raw.slice(0, 300));
+      }
+
+      if (resp.ok && data && data.ok) {
+        window.location.href = data.redirect || 'waiting_confirmation.php';
+      } else {
+        const err = (data && (data.error || data.code)) || (resp.status + ' ' + resp.statusText) || 'ERR';
+        throw new Error('No pudimos registrar tu pago. Código: ' + err);
+      }
+    } catch (e) {
+      alert(e.message || 'Error de red');
+    } finally {
+      doneBtn.textContent = prevText;
+      doneBtn.disabled = false;
+      doneBtn.classList.add('disabled');
+    }
+  });
+
+  return;
+}
+
 
                       // Fallback
                       title.textContent = method.charAt(0).toUpperCase() + method.slice(1);

@@ -299,8 +299,7 @@ $totalMes = $stmt->fetchColumn();
 
 <body class="home">
   <?php include 'sidebar.php'; ?>
-  <button id="darkToggle">🌙</button>
-
+  
   <div class="page">
     <div class="container">
       <!-- Hero -->
@@ -539,16 +538,7 @@ $totalMes = $stmt->fetchColumn();
   <div id="notification" role="status" aria-live="polite"></div>
 
   <script>
-    // Toggle oscuro
-    const btn = document.getElementById('darkToggle');
-    const body = document.body;
-    if (localStorage.getItem('darkMode') === 'true') { body.classList.add('dark'); btn.textContent = '☀️'; }
-    btn.addEventListener('click', () => {
-      body.classList.toggle('dark');
-      const dark = body.classList.contains('dark');
-      btn.textContent = dark ? '☀️' : '🌙';
-      localStorage.setItem('darkMode', dark);
-    });
+   
 
     function showNotification(message, duration = 3000) {
       const notif = document.getElementById('notification');
