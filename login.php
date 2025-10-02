@@ -208,7 +208,7 @@ a.cta {
     <div class="nav-container">
       <div class="logo">
         <img src="assets/img/icono_menu.png" alt="ShockFy">
-        ShockFy
+        <h3>ShockFy</h3>
       </div>
       <div class="nav-links">
         <a href="home.php#features">Características</a>
