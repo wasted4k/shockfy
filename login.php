@@ -3,7 +3,7 @@ session_start();
 
 // Si el usuario ya está logueado, redirigirlo
 if (!empty($_SESSION['logged_in'])) {
-    header('Location: home.php');
+    header('Location: index.php');
     exit;
 }
 
