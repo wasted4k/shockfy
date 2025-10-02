@@ -318,7 +318,7 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
                         const btnInstr    = body.querySelector('#bn-instrucciones');
 
                         btnInstr.addEventListener('click', () => {
-                          openVideoModal('https://www.youtube.com/embed/j2DWy4g_iQw', 'Instrucciones de pago por Binance');
+                          openVideoModal('https://www.youtube.com/embed/MhyXPLt8UNM', 'Instrucciones de pago por Binance');
                         });
 
                         fileBtn.addEventListener('click', () => fileInput.click());
