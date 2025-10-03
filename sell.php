@@ -1,5 +1,5 @@
 <?php
-// sell.php — UI premium + carrito multiproducto (UN SOLO botón "Vender") + TOAST
+// sell.php — 
 require 'db.php';
 require_once __DIR__ . '/auth_check.php'; // proteger: exige login y email verificado
 require 'auth.php';
@@ -529,7 +529,7 @@ function applyFilters(){
 searchInput.addEventListener('input', applyFilters);
 categoryFilter.addEventListener('change', applyFilters);
 
-/* ====== vender (intacto) ====== */
+/* ====== vender  ====== */
 function validateForm(){
   if(cart.length === 0){ showToast('Agrega al menos un producto al carrito.'); return false; }
   for(var i=0;i<cart.length;i++){
