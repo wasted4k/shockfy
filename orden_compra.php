@@ -590,7 +590,7 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
   const btnInstr    = body.querySelector('#bn-instrucciones');
 
                         btnInstr.addEventListener('click', () => {
-                          openVideoModal('https://www.youtube.com/embed/qNx22A7pJ3c?list=PLFo_FFi1lfVi1n6UfGHBTH4-XKwNvSFYv', 'Instrucciones de pago por Soles');
+                          openVideoModal('https://www.youtube.com/embed/4bGPgFMGUGw', 'Instrucciones de pago por Soles');
                         });
 
   fileBtn.addEventListener('click', () => fileInput.click());
