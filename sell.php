@@ -70,7 +70,7 @@ if (!$categories) {
   <title>Registrar venta</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- Favicon (dentro de <head>) -->
+  <!-- Favicon -->
   <link rel="icon" href="assets/img/favicon.png" type="image/png">
   <link rel="shortcut icon" href="assets/img/favicon.png" type="image/png">
 
@@ -243,7 +243,7 @@ if (!$categories) {
             <p class="error"><?= htmlspecialchars($_GET['error']) ?></p>
           <?php endif; ?>
 
-          <!-- FORM ORIGINAL (INTACTO) -->
+          <!-- FORM ORIGINAL -->
           <form id="saleForm" action="process_sale.php" method="post" onsubmit="return validateForm()">
             <input type="hidden" id="selected_product_id" name="product_id">
             <input type="hidden" id="unit_price" name="unit_price" step="0.01" min="0" />
@@ -271,6 +271,7 @@ if (!$categories) {
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script>
+/* ====== Datos desde PHP ====== */
 const products = <?= json_encode($products, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT); ?>;
 const CURRENCY = <?= json_encode($currencySymbol) ?>;
 
@@ -300,23 +301,24 @@ let cart = [];
 const LS_KEY_QUEUE = 'batchQueue';
 const LS_KEY_FLAG  = 'batchInProgress';
 function saveQueue(q){ localStorage.setItem(LS_KEY_QUEUE, JSON.stringify(q)); }
-function loadQueue(){ try{ return JSON.parse(localStorage.getItem(LS_KEY_QUEUE)||'[]'); }catch{ return []; } }
+function loadQueue(){ try{ return JSON.parse(localStorage.getItem(LS_KEY_QUEUE)||'[]'); }catch(e){ return []; } }
 function setBatchFlag(v){ localStorage.setItem(LS_KEY_FLAG, v ? '1':''); }
 function getBatchFlag(){ return localStorage.getItem(LS_KEY_FLAG)==='1'; }
 
 /* ====== utils ====== */
 function fmt(n){ return (CURRENCY ? (CURRENCY + ' ') : '') + Number(n || 0).toFixed(2); }
 function escapeHtml(str){ return str ? String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;') : ''; }
-function getParam(name){ const url = new URL(window.location.href); return url.searchParams.get(name); }
-function clearParam(name){ const url = new URL(window.location.href); url.searchParams.delete(name); history.replaceState({}, '', url.pathname + (url.search ? '?' + url.searchParams.toString() : '')); }
 function showToast(message, ms=2500){ if(!message) return; toastEl.textContent = message; toastEl.classList.add('show'); setTimeout(()=> toastEl.classList.remove('show'), ms); }
 
 /* ====== totals ====== */
 function recomputeTotals(){
-  let subtotal = 0;
-  for(const it of cart){ subtotal += Number(it.unit_price||0)*Number(it.quantity||0); }
-  const disc = Number(discountInput.value)||0;
-  const total = Math.max(subtotal - disc, 0);
+  var subtotal = 0;
+  for(var i=0;i<cart.length;i++){
+    var it = cart[i];
+    subtotal += Number(it.unit_price||0) * Number(it.quantity||0);
+  }
+  var disc = Number(discountInput.value)||0;
+  var total = Math.max(subtotal - disc, 0);
   subtotalText.textContent = fmt(subtotal);
   totalText.textContent    = fmt(total);
   totalsBox.style.display = cart.length ? 'block' : 'none';
@@ -337,55 +339,59 @@ function renderCart(){
   emptyMsg.style.display = 'none';
   cartCount.textContent = cart.length + (cart.length===1 ? ' item' : ' items');
 
-  let subtotal = 0;
-  cart.forEach((it, idx)=>{
+  var subtotal = 0;
+  for(var idx=0; idx<cart.length; idx++){
+    var it = cart[idx];
     subtotal += it.unit_price * it.quantity;
-    const row = document.createElement('div');
-    row.className = 'cart-item';
-    row.innerHTML = `
-      <img class="thumb" src="${escapeHtml(it.image||'')}" alt="">
-      <div class="meta">
-        <div class="t">${escapeHtml(it.name)}</div>
-        <div class="s">${escapeHtml((it.size? it.size : ''))}${it.size && it.color ? ' · ' : ''}${escapeHtml((it.color? it.color : ''))}</div>
-        <div class="q">
-          Cant:
-          <button type="button" class="qty-btn" data-dec="${idx}" aria-label="Disminuir cantidad">−</button>
-          <strong>${it.quantity}</strong>
-          <button type="button" class="qty-btn" data-inc="${idx}" aria-label="Aumentar cantidad">+</button>
-          ·
-          <span class="price-edit-wrap">
-            <span class="price-prefix">${CURRENCY}</span>
-            <input type="number" step="0.01" min="0" class="price-edit" data-price="${idx}" value="${Number(it.unit_price).toFixed(2)}">
-          </span>
-          · Subtotal: <strong class="line-subtotal" data-sub="${idx}">${fmt(it.unit_price*it.quantity)}</strong>
-        </div>
-      </div>
-      <div><button type="button" class="mini warn" data-remove="${idx}" aria-label="Quitar del carrito">❌ Quitar</button></div>
-    `;
-    cartList.appendChild(row);
-  });
 
-  const disc = Number(discountInput.value)||0;
-  const total = Math.max(subtotal - disc, 0);
+    var row = document.createElement('div');
+    row.className = 'cart-item';
+    row.innerHTML =
+      '<img class="thumb" src="'+escapeHtml(it.image||'')+'" alt="">' +
+      '<div class="meta">' +
+        '<div class="t">'+escapeHtml(it.name)+'</div>' +
+        '<div class="s">'+escapeHtml(it.size? it.size : '')+(it.size && it.color ? ' · ' : '')+escapeHtml(it.color? it.color : '')+'</div>' +
+        '<div class="q">' +
+          'Cant: ' +
+          '<button type="button" class="qty-btn" data-dec="'+idx+'" aria-label="Disminuir cantidad">−</button>' +
+          '<strong class="qty-val" data-qty="'+idx+'">'+it.quantity+'</strong>' +
+          '<button type="button" class="qty-btn" data-inc="'+idx+'" aria-label="Aumentar cantidad">+</button>' +
+          ' · ' +
+          '<span class="price-edit-wrap">' +
+            '<span class="price-prefix">'+CURRENCY+'</span>' +
+            '<input type="number" step="0.01" min="0" class="price-edit" data-price="'+idx+'" value="'+Number(it.unit_price).toFixed(2)+'">' +
+          '</span>' +
+          ' · Subtotal: <strong class="line-subtotal" data-sub="'+idx+'">'+fmt(it.unit_price*it.quantity)+'</strong>' +
+        '</div>' +
+      '</div>' +
+      '<div><button type="button" class="mini warn" data-remove="'+idx+'" aria-label="Quitar del carrito">❌ Quitar</button></div>';
+
+    cartList.appendChild(row);
+  }
+
+  var disc = Number(discountInput.value)||0;
+  var total = Math.max(subtotal - disc, 0);
   subtotalText.textContent = fmt(subtotal);
   totalText.textContent = fmt(total);
   totalsBox.style.display = 'block';
 }
 
 /* ====== add to cart ====== */
-productsGrid.addEventListener('click', (e)=>{
-  const btn = e.target.closest('button[data-add]');
+productsGrid.addEventListener('click', function(e){
+  var btn = e.target.closest ? e.target.closest('button[data-add]') : null;
   if(!btn) return;
 
-  const id = btn.getAttribute('data-add');
-  const p = products.find(x => String(x.id) === String(id));
+  var id = btn.getAttribute('data-add');
+  var p = null;
+  for (var i=0;i<products.length;i++){ if (String(products[i].id) === String(id)) { p = products[i]; break; } }
   if(!p) return;
 
-  const existing = cart.find(x => String(x.id) === String(p.id));
-  const stock = Number(p.stock)||0;
+  var existing = null;
+  for (var j=0;j<cart.length;j++){ if (String(cart[j].id) === String(p.id)) { existing = cart[j]; break; } }
+  var stock = Number(p.stock)||0;
 
   if(existing){
-    if(existing.quantity + 1 > stock){ showToast(`Stock insuficiente. Disponibles: ${stock}`); return; }
+    if(existing.quantity + 1 > stock){ showToast('Stock insuficiente. Disponibles: '+stock); return; }
     existing.quantity += 1;
   } else {
     if(stock <= 0){ showToast('Sin stock.'); return; }
@@ -398,14 +404,16 @@ productsGrid.addEventListener('click', (e)=>{
 });
 
 /* ====== cart actions (NO SUBMIT) ====== */
-cartList.addEventListener('click', (e)=>{
-  // Evita que cualquier botón dentro del carrito envíe el form
-  const btn = e.target.closest('button');
-  if (btn) e.preventDefault();
+cartList.addEventListener('click', function(e){
+  // Si no se clickeó un botón dentro del carrito, no hacemos nada
+  var targetBtn = e.target.closest ? e.target.closest('button') : null;
+  if (!targetBtn) return;
 
-  const rem = e.target.getAttribute('data-remove');
-  const inc = e.target.getAttribute('data-inc');
-  const dec = e.target.getAttribute('data-dec');
+  e.preventDefault(); // evita submits
+
+  var rem = targetBtn.getAttribute('data-remove');
+  var inc = targetBtn.getAttribute('data-inc');
+  var dec = targetBtn.getAttribute('data-dec');
 
   if(rem !== null){
     cart.splice(Number(rem),1);
@@ -413,48 +421,62 @@ cartList.addEventListener('click', (e)=>{
     return;
   }
   if(inc !== null){
-    const i = Number(inc);
-    const stock = Number(cart[i].stock)||0;
-    if(cart[i].quantity + 1 > stock){ showToast(`Stock insuficiente. Disponibles: ${stock}`); return; }
+    var i = Number(inc);
+    var stock = Number(cart[i].stock)||0;
+    if(cart[i].quantity + 1 > stock){ showToast('Stock insuficiente. Disponibles: '+stock); return; }
     cart[i].quantity += 1;
-    const line = cartList.querySelector(`.line-subtotal[data-sub="${i}"]`);
-    if(line) line.textContent = fmt(cart[i].unit_price * cart[i].quantity);
+
+    // Actualiza cantidad visible
+    var qtyEl = cartList.querySelector('.qty-val[data-qty="'+i+'"]');
+    if (qtyEl) qtyEl.textContent = String(cart[i].quantity);
+
+    // Actualiza subtotal de la línea
+    var line = cartList.querySelector('.line-subtotal[data-sub="'+i+'"]');
+    if (line) line.textContent = fmt(cart[i].unit_price * cart[i].quantity);
+
     recomputeTotals();
     return;
   }
   if(dec !== null){
-    const i = Number(dec);
-    cart[i].quantity = Math.max(1, cart[i].quantity - 1);
-    const line = cartList.querySelector(`.line-subtotal[data-sub="${i}"]`);
-    if(line) line.textContent = fmt(cart[i].unit_price * cart[i].quantity);
+    var i2 = Number(dec);
+    cart[i2].quantity = Math.max(1, cart[i2].quantity - 1);
+
+    // Actualiza cantidad visible
+    var qtyEl2 = cartList.querySelector('.qty-val[data-qty="'+i2+'"]');
+    if (qtyEl2) qtyEl2.textContent = String(cart[i2].quantity);
+
+    // Actualiza subtotal de la línea
+    var line2 = cartList.querySelector('.line-subtotal[data-sub="'+i2+'"]');
+    if (line2) line2.textContent = fmt(cart[i2].unit_price * cart[i2].quantity);
+
     recomputeTotals();
     return;
   }
 });
 
 /* ====== price edit (no re-render) ====== */
-cartList.addEventListener('input', (e)=>{
-  const iAttr = e.target.getAttribute('data-price');
+cartList.addEventListener('input', function(e){
+  var iAttr = e.target.getAttribute ? e.target.getAttribute('data-price') : null;
   if(iAttr === null) return;
-  const i = Number(iAttr);
-  let v = parseFloat(e.target.value);
+  var i = Number(iAttr);
+  var v = parseFloat(e.target.value);
   if (isNaN(v) || v < 0) v = 0;
   cart[i].unit_price = v;
-  const row = e.target.closest('.cart-item');
-  const line = row ? row.querySelector(`.line-subtotal[data-sub="${i}"]`) : null;
+  var row = e.target.closest ? e.target.closest('.cart-item') : null;
+  var line = row ? row.querySelector('.line-subtotal[data-sub="'+i+'"]') : null;
   if(line) line.textContent = fmt(v * (cart[i].quantity||0));
   recomputeTotals();
 });
-cartList.addEventListener('blur', (e)=>{
-  const iAttr = e.target.getAttribute('data-price');
+cartList.addEventListener('blur', function(e){
+  var iAttr = e.target.getAttribute ? e.target.getAttribute('data-price') : null;
   if(iAttr === null) return;
-  const i = Number(iAttr);
+  var i = Number(iAttr);
   e.target.value = Number(cart[i].unit_price||0).toFixed(2);
 }, true);
 
 /* Bloquear Enter en el input de precio (evita submit accidental) */
-cartList.addEventListener('keydown', (e)=>{
-  if (e.key === 'Enter' && e.target.matches('input.price-edit')) {
+cartList.addEventListener('keydown', function(e){
+  if (e.key === 'Enter' && e.target && e.target.matches && e.target.matches('input.price-edit')) {
     e.preventDefault();
     e.target.blur();
   }
@@ -464,28 +486,32 @@ cartList.addEventListener('keydown', (e)=>{
 discountInput.addEventListener('input', recomputeTotals);
 
 /* ====== vaciar ====== */
-clearCartBtn.addEventListener('click', ()=>{ cart = []; renderCart(); });
+clearCartBtn.addEventListener('click', function(){ cart = []; renderCart(); });
 
 /* ====== Búsqueda + Filtro por categoría (ID/código O nombre) ====== */
 function applyFilters(){
-  const term = (searchInput.value || '').trim().toLowerCase();
+  var term = (searchInput.value || '').trim().toLowerCase();
 
-  const sel = categoryFilter.options[categoryFilter.selectedIndex];
-  const kind = sel?.dataset?.kind || '';
-  const rawVal = (categoryFilter.value || '').trim();                // value = categories.category_id (código)
-  const optDbId = sel?.getAttribute('data-cat-id') || '';            // data-cat-id = categories.id (PK)
-  const optionName = (sel ? sel.textContent : '').trim().toLowerCase();
+  var sel = categoryFilter.options[categoryFilter.selectedIndex] || null;
+  var kind = sel ? (sel.getAttribute('data-kind') || '') : '';
+  var rawVal = (categoryFilter.value || '').trim();                // value = categories.category_id (código)
+  var optDbId = sel ? (sel.getAttribute('data-cat-id') || '') : ''; // data-cat-id = categories.id (PK)
+  var optionName = sel ? (sel.textContent || '').replace(/\s+/g,' ').trim().toLowerCase() : '';
 
-  document.querySelectorAll('#productsGrid .card').forEach(card=>{
-    const id = card.getAttribute('data-id');
-    const p  = products.find(x => String(x.id) === String(id)) || {};
-    const txt = ((p.name||'')+' '+(p.size||'')+' '+(p.color||'')).toLowerCase();
-    const matchesText = term === '' ? true : txt.includes(term);
+  var cards = document.querySelectorAll('#productsGrid .card');
+  for (var k=0; k<cards.length; k++){
+    var card = cards[k];
+    var id = card.getAttribute('data-id');
+    var p = null;
+    for (var z=0; z<products.length; z++){ if (String(products[z].id) === String(id)) { p = products[z]; break; } }
+    p = p || {};
+    var txt = ((p.name||'')+' '+(p.size||'')+' '+(p.color||'')).toLowerCase();
+    var matchesText = term === '' ? true : (txt.indexOf(term) !== -1);
 
-    let matchesCat = true;
+    var matchesCat = true;
     if (rawVal !== '' || optDbId !== '') {
-      const cid   = (card.getAttribute('data-category-id') || '').trim();     // products.category_id (puede ser code o PK)
-      const cname = (card.getAttribute('data-category-name') || '').trim().toLowerCase();
+      var cid   = (card.getAttribute('data-category-id') || '').trim();     // products.category_id (puede ser code o PK)
+      var cname = (card.getAttribute('data-category-name') || '').trim().toLowerCase();
 
       if (kind === 'id') {
         matchesCat = (cid !== '' && (String(cid) === String(rawVal) || String(cid) === String(optDbId)));
@@ -498,7 +524,7 @@ function applyFilters(){
     }
 
     card.style.display = (matchesText && matchesCat) ? '' : 'none';
-  });
+  }
 }
 searchInput.addEventListener('input', applyFilters);
 categoryFilter.addEventListener('change', applyFilters);
@@ -506,34 +532,38 @@ categoryFilter.addEventListener('change', applyFilters);
 /* ====== vender (intacto) ====== */
 function validateForm(){
   if(cart.length === 0){ showToast('Agrega al menos un producto al carrito.'); return false; }
-  for(const it of cart){
-    const st = Number(it.stock)||0;
-    if(it.quantity > st){ showToast(`Stock insuficiente para "${it.name}". Disponibles: ${st}`); return false; }
+  for(var i=0;i<cart.length;i++){
+    var it = cart[i];
+    var st = Number(it.stock)||0;
+    if(it.quantity > st){ showToast('Stock insuficiente para "'+it.name+'". Disponibles: '+st); return false; }
   }
-  const queue = cart.map(it => ({ id: it.id, unit_price: Number(it.unit_price), quantity: Number(it.quantity) }));
+  var queue = [];
+  for (var j=0;j<cart.length;j++){
+    queue.push({ id: cart[j].id, unit_price: Number(cart[j].unit_price), quantity: Number(cart[j].quantity) });
+  }
   saveQueue(queue);
   setBatchFlag(true);
 
-  const first = queue[0];
+  var first = queue[0];
   selectedProductId.value = first.id;
   unitPriceInput.value    = Number(first.unit_price).toFixed(2);
   quantityInput.value     = first.quantity;
 
-  const qty = Number(quantityInput.value); if(!(qty>0)){ showToast('Cantidad inválida'); return false; }
-  const up  = Number(unitPriceInput.value); if(isNaN(up) || up<0){ showToast('Precio inválido'); return false; }
+  var qty = Number(quantityInput.value); if(!(qty>0)){ showToast('Cantidad inválida'); return false; }
+  var up  = Number(unitPriceInput.value); if(isNaN(up) || up<0){ showToast('Precio inválido'); return false; }
   unitPriceInput.value = up.toFixed(2);
 
   return true;
 }
 
 /* ====== continuar batch después de process_sale.php ====== */
-window.addEventListener('load', ()=>{
-  const url = new URL(window.location.href);
-  const urlMsg = url.searchParams.get('msg');
+window.addEventListener('load', function(){
+  var url = new URL(window.location.href);
+  var urlMsg = url.searchParams.get('msg');
 
   if (getBatchFlag()) {
     if (urlMsg) { url.searchParams.delete('msg'); history.replaceState({}, '', url.pathname + (url.searchParams.toString()? '?'+url.searchParams.toString() : '')); }
-    let queue = loadQueue();
+    var queue = loadQueue();
     if (queue.length === 0) {
       setBatchFlag(false); localStorage.removeItem('batchQueue');
       cart = []; renderCart(); showToast('Venta completada.'); return;
@@ -544,11 +574,11 @@ window.addEventListener('load', ()=>{
       cart = []; renderCart(); showToast('Venta completada.'); return;
     }
     saveQueue(queue);
-    const next = queue[0];
+    var next = queue[0];
     selectedProductId.value = next.id;
     unitPriceInput.value    = Number(next.unit_price).toFixed(2);
     quantityInput.value     = next.quantity;
-    setTimeout(()=>{ saleForm.submit(); }, 120);
+    setTimeout(function(){ saleForm.submit(); }, 120);
     return;
   }
 
@@ -561,13 +591,6 @@ window.addEventListener('load', ()=>{
 
 /* init */
 renderCart();
-
-/* Mantener modo oscuro si ya estaba activado */
-window.onload = function(){
-  if(localStorage.getItem('darkMode')==='true'){
-    document.body.classList.add('dark');
-  }
-};
 </script>
 </body>
 </html>
