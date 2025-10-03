@@ -307,7 +307,7 @@ a.cta {
         <button class="btn" type="submit">Ingresar</button>
 
         <div class="helpers">
-          <a class="forgot" href="home.php#faq">¿Olvidaste tu contraseña?</a>
+          <a class="forgot" href="forgot_password.php">¿Olvidaste tu contraseña?</a>
         </div>
       </form>
     </div>
