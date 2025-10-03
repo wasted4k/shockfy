@@ -54,27 +54,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $flash = 'Las contraseñas no coinciden.';
         } else {
             // Actualizar contraseña y marcar token como usado (transacción)
-            try {
-                $pdo->beginTransaction();
+           try {
+    $pdo->beginTransaction();
 
-                $hashPwd = password_hash($password, PASSWORD_DEFAULT);
+    $hashPwd = password_hash($password, PASSWORD_DEFAULT);
 
-                // Actualiza ambos campos por compatibilidad con tu login actual
-                $u = $pdo->prepare("UPDATE users SET password = :p, password_hash = :p WHERE email = :e");
-                $u->execute([':p' => $hashPwd, ':e' => $email]);
+    // 1) Actualiza ambos campos con backticks
+    $u = $pdo->prepare("UPDATE `users` SET `password` = :p, `password_hash` = :p WHERE `email` = :e LIMIT 1");
+    $u->execute([':p' => $hashPwd, ':e' => $email]);
 
-                $tHash = hash('sha256', $token);
-                $x = $pdo->prepare("UPDATE password_resets SET used = 1 WHERE token_hash = :th");
-                $x->execute([':th' => $tHash]);
+    if ($u->rowCount() < 1) {
+        // No encontró el usuario por email (raro si venías del token)
+        throw new RuntimeException("No se actualizó ningún usuario (email no coincide). Email={$email}");
+    }
 
-                $pdo->commit();
-                $stage = 'success';
-            } catch (Throwable $ex) {
-                if ($pdo->inTransaction()) $pdo->rollBack();
-                $stage = 'error';
-                $error = 'Ocurrió un problema al actualizar tu contraseña. Intenta nuevamente.';
-                // error_log($ex->getMessage());
-            }
+    // 2) Marca token como usado
+    $tHash = hash('sha256', $token);
+    $x = $pdo->prepare("UPDATE `password_resets` SET `used` = 1 WHERE `token_hash` = :th LIMIT 1");
+    $x->execute([':th' => $tHash]);
+
+    if ($x->rowCount() < 1) {
+        throw new RuntimeException("No se pudo marcar el token como usado.");
+    }
+
+    $pdo->commit();
+    $stage = 'success';
+} catch (Throwable $ex) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
+    $stage = 'error';
+    $error = 'Ocurrió un problema al actualizar tu contraseña. Intenta nuevamente.';
+
+    // Si DEV_MODE=1, mostramos pista del error
+    if ((int)env('DEV_MODE', 0) === 1) {
+        $error .= ' [DEV] ' . $ex->getMessage();
+    }
+}
+
         }
     }
 }
