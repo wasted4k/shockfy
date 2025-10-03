@@ -12,7 +12,9 @@ $flash = '';
 $error = '';
 
 function findEmailByToken(PDO $pdo, string $token): ?string {
-    if ($token === '') return null;
+    if ($token === '') {
+        return null;
+    }
     $hash = hash('sha256', $token);
     $now  = (new DateTimeImmutable('now'))->format('Y-m-d H:i:s');
 
@@ -26,8 +28,8 @@ function findEmailByToken(PDO $pdo, string $token): ?string {
     return $email ?: null;
 }
 
+// --- GET: mostrar formulario si token válido ---
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    // Validar token
     $email = findEmailByToken($pdo, $token);
     if (!$email) {
         $stage = 'error';
@@ -35,17 +37,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     }
 }
 
+// --- POST: procesar cambio de contraseña ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password  = (string)($_POST['password'] ?? '');
     $password2 = (string)($_POST['password2'] ?? '');
 
-    // Revalidar token en POST
     $email = findEmailByToken($pdo, $token);
     if (!$email) {
         $stage = 'error';
         $error = 'El enlace es inválido o ha expirado. Solicita uno nuevo desde "¿Olvidaste tu contraseña?".';
     } else {
-        // Validaciones mínimas de contraseña
+        // Validaciones mínimas
         if (strlen($password) < 8) {
             $stage = 'form';
             $flash = 'La contraseña debe tener al menos 8 caracteres.';
@@ -53,47 +55,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stage = 'form';
             $flash = 'Las contraseñas no coinciden.';
         } else {
-            // Actualizar contraseña y marcar token como usado (transacción)
-           try {
-    $pdo->beginTransaction();
+            try {
+                $pdo->beginTransaction();
 
-    $hashPwd = password_hash($password, PASSWORD_DEFAULT);
+                $hashPwd = password_hash($password, PASSWORD_DEFAULT);
 
-    // 1) Actualiza ambos campos con backticks
-    $u = $pdo->prepare("UPDATE `users` SET `password` = :p, `password_hash` = :p WHERE `email` = :e LIMIT 1");
-    $u->execute([':p' => $hashPwd, ':e' => $email]);
+                // Parámetros distintos para evitar HY093
+                $u = $pdo->prepare("UPDATE `users` 
+                                    SET `password` = :p1, `password_hash` = :p2 
+                                    WHERE `email` = :e 
+                                    LIMIT 1");
+                $u->execute([
+                    ':p1' => $hashPwd,
+                    ':p2' => $hashPwd,
+                    ':e'  => $email
+                ]);
 
-    if ($u->rowCount() < 1) {
-        // No encontró el usuario por email (raro si venías del token)
-        throw new RuntimeException("No se actualizó ningún usuario (email no coincide). Email={$email}");
-    }
+                $tHash = hash('sha256', $token);
+                $x = $pdo->prepare("UPDATE `password_resets` 
+                                    SET `used` = 1 
+                                    WHERE `token_hash` = :th 
+                                    LIMIT 1");
+                $x->execute([':th' => $tHash]);
 
-    // 2) Marca token como usado
-    $tHash = hash('sha256', $token);
-    $x = $pdo->prepare("UPDATE `password_resets` SET `used` = 1 WHERE `token_hash` = :th LIMIT 1");
-    $x->execute([':th' => $tHash]);
-
-    if ($x->rowCount() < 1) {
-        throw new RuntimeException("No se pudo marcar el token como usado.");
-    }
-
-    $pdo->commit();
-    $stage = 'success';
-} catch (Throwable $ex) {
-    if ($pdo->inTransaction()) $pdo->rollBack();
-    $stage = 'error';
-    $error = 'Ocurrió un problema al actualizar tu contraseña. Intenta nuevamente.';
-
-    // Si DEV_MODE=1, mostramos pista del error
-    if ((int)env('DEV_MODE', 0) === 1) {
-        $error .= ' [DEV] ' . $ex->getMessage();
-    }
-}
-
+                $pdo->commit();
+                $stage = 'success';
+            } catch (Throwable $ex) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                $stage = 'error';
+                $error = 'Ocurrió un problema al actualizar tu contraseña. Intenta nuevamente.';
+                // Puedes loguear con: error_log($ex->getMessage());
+            }
         }
     }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
