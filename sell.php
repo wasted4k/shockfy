@@ -1,8 +1,9 @@
 <?php
 // sell.php — UI premium + carrito multiproducto (UN SOLO botón "Vender") + TOAST
 require 'db.php';
-require_once __DIR__ . '/auth_check.php'; // proteger el login y mandarlo a welcome si la persona no ha verificado su email
+require_once __DIR__ . '/auth_check.php'; // proteger: exige login y email verificado
 require 'auth.php';
+
 $user_id = $_SESSION['user_id'];
 
 /* ===================== Productos (traer category_id si existe) ===================== */
@@ -20,7 +21,7 @@ try {
 
 /* ================== Moneda preferida ================== */
 $stmt = $pdo->prepare("SELECT currency_pref FROM users WHERE id=?");
-$stmt->execute([ isset($user['id']) ? $user['id'] : $user_id ]);
+$stmt->execute([$user_id]);
 $currencyPref = $stmt->fetchColumn() ?: 'S/.';
 
 $currencySymbols = [
@@ -64,12 +65,15 @@ if (!$categories) {
 ?>
 <!doctype html>
 <html lang="es">
-<link rel="icon" href="assets/img/favicon.png" type="image/png">
-<link rel="shortcut icon" href="assets/img/favicon.png" type="image/png">
 <head>
   <meta charset="utf-8">
   <title>Registrar venta</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Favicon (dentro de <head>) -->
+  <link rel="icon" href="assets/img/favicon.png" type="image/png">
+  <link rel="shortcut icon" href="assets/img/favicon.png" type="image/png">
+
   <link rel="stylesheet" href="style.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   <style>
@@ -106,7 +110,6 @@ if (!$categories) {
     .p-name{ font-weight:800; margin:8px 0 6px; }
     .pill{ display:inline-block; padding:6px 12px; border-radius:999px; background:#e0f2fe; color:#0284c7; font-weight:700; font-size:12px; margin-bottom:8px; }
 
-    /* Stock con color */
     .stock-line{ font-weight:800; margin:4px 0; }
     .stock-line.low{ color:#ef4444; }   /* <=5 */
     .stock-line.mid{ color:#f59e0b; }   /* 6..10 */
@@ -151,7 +154,6 @@ if (!$categories) {
     .toast.show{ display:block; animation: toastIn .18s ease-out }
     @keyframes toastIn{ from { transform: translateY(8px); opacity: .0 } to { transform: translateY(0); opacity: 1 } }
 
-    /* Precio editable */
     .price-edit-wrap{ display:inline-flex; align-items:center; gap:6px; }
     .price-edit{ width:110px; height:30px; border:1px solid #e5e7eb; border-radius:8px; padding:0 8px; text-align:right; font-weight:600; background:#fff; outline:none; }
     .price-edit:focus{ border-color:#0ea5e9; box-shadow:0 0 0 3px rgba(14,165,233,.15); }
@@ -205,13 +207,17 @@ if (!$categories) {
 
               $pillText = $catName !== '' ? $catName : 'Producto';
               $codigo = 'P' . str_pad((string)$p['id'], 5, '0', STR_PAD_LEFT);
+
+              // Sanitizar ruta de imagen (evitar esquemas peligrosos)
+              $img = (string)($p['image'] ?? '');
+              if (!preg_match('~^(uploads/|https?://)~i', $img)) { $img = ''; }
             ?>
             <div class="card"
                  data-id="<?= (int)$p['id'] ?>"
                  data-stock="<?= $stock ?>"
                  data-category-id="<?= htmlspecialchars($prodCatId) ?>"
                  data-category-name="<?= htmlspecialchars($catName) ?>">
-              <img class="card-img" src="<?= htmlspecialchars($p['image'] ?? '') ?>" alt="<?= htmlspecialchars($p['name']) ?>">
+              <img class="card-img" src="<?= htmlspecialchars($img) ?>" alt="<?= htmlspecialchars($p['name']) ?>">
               <div class="p-name"><?= htmlspecialchars($p['name']) ?></div>
               <div class="pill"><?= htmlspecialchars($pillText) ?></div>
               <div class="stock-line <?= $stockClass ?>">Stock: <?= $stock ?></div>
@@ -343,9 +349,9 @@ function renderCart(){
         <div class="s">${escapeHtml((it.size? it.size : ''))}${it.size && it.color ? ' · ' : ''}${escapeHtml((it.color? it.color : ''))}</div>
         <div class="q">
           Cant:
-          <button class="qty-btn" data-dec="${idx}">−</button>
+          <button type="button" class="qty-btn" data-dec="${idx}" aria-label="Disminuir cantidad">−</button>
           <strong>${it.quantity}</strong>
-          <button class="qty-btn" data-inc="${idx}">+</button>
+          <button type="button" class="qty-btn" data-inc="${idx}" aria-label="Aumentar cantidad">+</button>
           ·
           <span class="price-edit-wrap">
             <span class="price-prefix">${CURRENCY}</span>
@@ -354,7 +360,7 @@ function renderCart(){
           · Subtotal: <strong class="line-subtotal" data-sub="${idx}">${fmt(it.unit_price*it.quantity)}</strong>
         </div>
       </div>
-      <div><button class="mini warn" data-remove="${idx}">❌ Quitar</button></div>
+      <div><button type="button" class="mini warn" data-remove="${idx}" aria-label="Quitar del carrito">❌ Quitar</button></div>
     `;
     cartList.appendChild(row);
   });
@@ -391,27 +397,38 @@ productsGrid.addEventListener('click', (e)=>{
   renderCart();
 });
 
-/* ====== cart actions ====== */
+/* ====== cart actions (NO SUBMIT) ====== */
 cartList.addEventListener('click', (e)=>{
+  // Evita que cualquier botón dentro del carrito envíe el form
+  const btn = e.target.closest('button');
+  if (btn) e.preventDefault();
+
   const rem = e.target.getAttribute('data-remove');
   const inc = e.target.getAttribute('data-inc');
   const dec = e.target.getAttribute('data-dec');
 
-  if(rem !== null){ cart.splice(Number(rem),1); renderCart(); return; }
+  if(rem !== null){
+    cart.splice(Number(rem),1);
+    renderCart();
+    return;
+  }
   if(inc !== null){
-    const i = Number(inc); const stock = Number(cart[i].stock)||0;
+    const i = Number(inc);
+    const stock = Number(cart[i].stock)||0;
     if(cart[i].quantity + 1 > stock){ showToast(`Stock insuficiente. Disponibles: ${stock}`); return; }
     cart[i].quantity += 1;
     const line = cartList.querySelector(`.line-subtotal[data-sub="${i}"]`);
     if(line) line.textContent = fmt(cart[i].unit_price * cart[i].quantity);
-    recomputeTotals(); return;
+    recomputeTotals();
+    return;
   }
   if(dec !== null){
     const i = Number(dec);
     cart[i].quantity = Math.max(1, cart[i].quantity - 1);
     const line = cartList.querySelector(`.line-subtotal[data-sub="${i}"]`);
     if(line) line.textContent = fmt(cart[i].unit_price * cart[i].quantity);
-    recomputeTotals(); return;
+    recomputeTotals();
+    return;
   }
 });
 
@@ -435,6 +452,14 @@ cartList.addEventListener('blur', (e)=>{
   e.target.value = Number(cart[i].unit_price||0).toFixed(2);
 }, true);
 
+/* Bloquear Enter en el input de precio (evita submit accidental) */
+cartList.addEventListener('keydown', (e)=>{
+  if (e.key === 'Enter' && e.target.matches('input.price-edit')) {
+    e.preventDefault();
+    e.target.blur();
+  }
+});
+
 /* ====== descuento ====== */
 discountInput.addEventListener('input', recomputeTotals);
 
@@ -446,9 +471,9 @@ function applyFilters(){
   const term = (searchInput.value || '').trim().toLowerCase();
 
   const sel = categoryFilter.options[categoryFilter.selectedIndex];
-  const kind = (sel && sel.dataset && sel.dataset.kind) ? sel.dataset.kind : '';
-  const rawVal = (categoryFilter.value || '').trim();          // value = categories.category_id (código)
-  const optDbId = sel && sel.dataset ? (sel.dataset.catId || '') : ''; // data-cat-id = categories.id (PK)
+  const kind = sel?.dataset?.kind || '';
+  const rawVal = (categoryFilter.value || '').trim();                // value = categories.category_id (código)
+  const optDbId = sel?.getAttribute('data-cat-id') || '';            // data-cat-id = categories.id (PK)
   const optionName = (sel ? sel.textContent : '').trim().toLowerCase();
 
   document.querySelectorAll('#productsGrid .card').forEach(card=>{
@@ -463,9 +488,7 @@ function applyFilters(){
       const cname = (card.getAttribute('data-category-name') || '').trim().toLowerCase();
 
       if (kind === 'id') {
-        // Coincidir si: (a) cid == category_id (código)  OR  (b) cid == id (PK)
         matchesCat = (cid !== '' && (String(cid) === String(rawVal) || String(cid) === String(optDbId)));
-        // Fallback por nombre (por si el producto no tiene cid que coincida pero sí nombre)
         if (!matchesCat && optionName !== '') {
           matchesCat = (cname !== '' && cname === optionName);
         }
@@ -488,8 +511,8 @@ function validateForm(){
     if(it.quantity > st){ showToast(`Stock insuficiente para "${it.name}". Disponibles: ${st}`); return false; }
   }
   const queue = cart.map(it => ({ id: it.id, unit_price: Number(it.unit_price), quantity: Number(it.quantity) }));
-  localStorage.setItem('batchQueue', JSON.stringify(queue));
-  localStorage.setItem('batchInProgress', '1');
+  saveQueue(queue);
+  setBatchFlag(true);
 
   const first = queue[0];
   selectedProductId.value = first.id;
@@ -508,20 +531,16 @@ window.addEventListener('load', ()=>{
   const url = new URL(window.location.href);
   const urlMsg = url.searchParams.get('msg');
 
-  function getBatchFlag(){ return localStorage.getItem('batchInProgress')==='1'; }
-  function loadQueue(){ try{ return JSON.parse(localStorage.getItem('batchQueue')||'[]'); }catch{ return []; } }
-  function saveQueue(q){ localStorage.setItem('batchQueue', JSON.stringify(q)); }
-
   if (getBatchFlag()) {
     if (urlMsg) { url.searchParams.delete('msg'); history.replaceState({}, '', url.pathname + (url.searchParams.toString()? '?'+url.searchParams.toString() : '')); }
     let queue = loadQueue();
     if (queue.length === 0) {
-      localStorage.removeItem('batchInProgress'); localStorage.removeItem('batchQueue');
+      setBatchFlag(false); localStorage.removeItem('batchQueue');
       cart = []; renderCart(); showToast('Venta completada.'); return;
     }
     queue.shift();
     if (queue.length === 0) {
-      localStorage.removeItem('batchInProgress'); localStorage.removeItem('batchQueue');
+      setBatchFlag(false); localStorage.removeItem('batchQueue');
       cart = []; renderCart(); showToast('Venta completada.'); return;
     }
     saveQueue(queue);
@@ -543,13 +562,12 @@ window.addEventListener('load', ()=>{
 /* init */
 renderCart();
 
-// Mantener modo oscuro si ya estaba activado
-    window.onload = function(){
-      if(localStorage.getItem('darkMode')==='true'){
-        document.body.classList.add('dark');
-      }
-    }
-
+/* Mantener modo oscuro si ya estaba activado */
+window.onload = function(){
+  if(localStorage.getItem('darkMode')==='true'){
+    document.body.classList.add('dark');
+  }
+};
 </script>
 </body>
 </html>
