@@ -184,20 +184,86 @@ $displayName = $_SESSION['full_name'] ?? $_SESSION['username'] ?? $_SESSION['ema
   font-weight:700;
 }
 
+
+    /* === Responsive nav enhancements (non-intrusive) === */
+    .nav-toggle{ display:none; }
+    .nav-burger{ display:none; }
+
+    @media (max-width:980px){
+      .nav-wrap{ position:relative; }
+      .nav-burger{
+        display:inline-flex;
+        flex-direction:column;
+        gap:6px;
+        padding:8px;
+        border:1px solid var(--border);
+        border-radius:12px;
+        cursor:pointer;
+        user-select:none;
+      }
+      .nav-burger span{
+        display:block;
+        width:22px;
+        height:2px;
+        background: var(--text);
+        transition: transform .2s ease, opacity .2s ease;
+      }
+      /* Mobile menu panel */
+      .nav-links{
+        position:absolute;
+        top:100%;
+        left:0;
+        right:0;
+        background:rgba(255,255,255,.9);
+        backdrop-filter:blur(10px);
+        border:1px solid var(--border);
+        border-radius:14px;
+        margin-top:8px;
+        padding:12px 16px;
+        display:grid;
+        gap:10px;
+        max-height:0;
+        overflow:hidden;
+        transition:max-height .25s ease;
+      }
+      #nav-toggle:checked ~ .nav-links{ max-height:420px; }
+      /* Animate the burger into an X */
+      #nav-toggle:checked + .nav-burger span:nth-child(1){ transform: translateY(8px) rotate(45deg); }
+      #nav-toggle:checked + .nav-burger span:nth-child(2){ opacity:0; }
+      #nav-toggle:checked + .nav-burger span:nth-child(3){ transform: translateY(-8px) rotate(-45deg); }
+
+      .nav-links a{ display:block; padding:10px 12px; }
+      .nav-links .cta, .nav-links .login{ text-align:center; }
+    }
+
+    /* Ultra-small phones */
+    @media (max-width:400px){
+      .title{ font-size:24px; }
+    }
+
+    /* Fluid media (keeps images and videos inside containers) */
+    img, video{ max-width:100%; height:auto; }
+
+    /* Optional: wrap tables in .table-wrap to prevent overflow */
+    .table-wrap{ overflow-x:auto; }
+    table{ width:100%; border-collapse:collapse; }
+
   </style>
 </head>
 <body>
 
   <!-- NAV -->
-  <nav>
-    <nav>
+<nav>
   <div class="nav-wrap">
     <div class="brand">
       <img src="assets/img/icono_menu.png" alt="ShockFy Logo">
       ShockFy
     </div>
-
-    <div class="nav-links">
+    <input type="checkbox" id="nav-toggle" class="nav-toggle" aria-label="Abrir menú" />
+    <label for="nav-toggle" class="nav-burger" aria-label="Abrir menú" aria-controls="nav-menu">
+      <span></span><span></span><span></span>
+    </label>
+    <div class="nav-links" id="nav-menu">
       <a href="#features">Características</a>
       <a href="#beneficios">Beneficios</a>
       <a href="#precios">Precio</a>
@@ -212,8 +278,6 @@ $displayName = $_SESSION['full_name'] ?? $_SESSION['username'] ?? $_SESSION['ema
     </div>
   </div>
 </nav>
-
-  </nav>
 
   <!-- HERO -->
   <section class="hero">
