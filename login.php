@@ -324,6 +324,46 @@ img, video{ max-width:100%; height:auto; }
   }
 }
 
+/* ===== Password limpio (sin borde interno ni overlays molestos) ===== */
+.input-wrap{ 
+  position: relative; 
+  overflow: hidden;              /* recorta overlays que sobresalgan */
+}
+
+/* Aplica sólo al campo de contraseña */
+#passwordField{
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  width: 100%;
+  padding-right: 44px;           /* espacio para el botón "ojo" y/o iconos del navegador */
+  font-size: 16px;
+}
+
+/* Reubica el botón ojo para que no empuje al input */
+.input-wrap .eye-btn{
+  position: absolute;
+  right: 6px; 
+  top: 50%; 
+  transform: translateY(-50%);
+  width: 36px; height: 36px;
+  border: 0; background: transparent;
+  border-radius: 8px;
+}
+.input-wrap .eye-btn:hover{ background: #f1f5ff; }
+
+/* Edge/IE: oculta iconos nativos de revelado/borrado */
+#passwordField::-ms-reveal,
+#passwordField::-ms-clear{ display:none; width:0; height:0; }
+
+/* Chrome/Safari: neutraliza color de autofill para que no parezca otro campo */
+#passwordField:-webkit-autofill,
+#passwordField:-webkit-autofill:hover,
+#passwordField:-webkit-autofill:focus{
+  -webkit-box-shadow: 0 0 0 1000px #fff inset !important;
+  -webkit-text-fill-color: #0f172a !important;
+}
 
 </style>
 </head>

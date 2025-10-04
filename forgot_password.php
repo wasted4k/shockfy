@@ -299,6 +299,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   text-decoration: none !important;
 }
 
+/* Desktop: botón "Volver a iniciar sesión" un poco más grande */
+@media (min-width:981px){
+  .card-top .link{
+    height: 56px;            /* antes ~38px */
+    padding: 0 20px;         /* más aire lateral */
+    font-size: 15px;         /* texto apenas mayor */
+    border-radius: 14px;
+    box-shadow: 0 12px 26px rgba(35,68,236,.20);
+    line-height: 1;          /* centra mejor el texto verticalmente */
+  }
+  .card-top{ gap: 14px; }    /* un pelín más de espacio con el título */
+}
+
+/* (Opcional) estilo "pill" redondeado total en desktop */
+/*
+@media (min-width:981px){
+  .card-top .link{ border-radius: 999px; }
+}
+*/
 
 
   </style>
@@ -316,7 +335,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <a href="home.php#features">Características</a>
         <a href="home.php#how">Cómo funciona</a>
         <a href="home.php#pricing">Precio</a>
-        <a href="signup.php" class="cta">Pruébalo gratis</a>
+        
         <a href="login.php" class="login-btn">Iniciar sesión</a>
       </div>
     </div>

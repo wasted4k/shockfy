@@ -429,7 +429,37 @@ $totalMes = $stmt->fetchColumn();
 .table-wrap thead th{ position: static !important; }
 */
 
+/* === FIX icono carrito: que no se estreche ni se achique === */
+.hero-left .icon{
+  flex: 0 0 48px;           /* no permitir que el flex lo comprima */
+  width: 48px; height: 48px;
+  min-width: 48px; min-height: 48px;
+  display: grid; place-items: center;
+}
+.hero-left .icon svg{
+  width: 26px; height: 26px;     /* tamaño consistente dentro del tile */
+}
+.hero-left .icon svg *{ vector-effect: non-scaling-stroke; }
 
+/* === Chips (TZ y Plan) más legibles en móvil: en columnas y con aire === */
+@media (max-width: 640px){
+  .hero .subtitle{ display:block; line-height:1.35; }
+  .hero .subtitle .chip{
+    display:block;               /* cada chip ocupa su propia línea */
+    margin-left: 0 !important;
+    margin-top: 6px;             /* separación vertical */
+    width: fit-content;          /* no ocupar todo el ancho */
+  }
+}
+
+/* === Ocultar botones de acceso rápido en mobile === */
+@media (max-width: 768px){
+  .cta-row{ display:none !important; }
+}
+
+@media (max-width: 640px){
+  .chip{ font-size: 13px; padding: 6px 12px; }
+}
 
   </style>
 </head>
