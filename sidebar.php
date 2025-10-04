@@ -283,45 +283,61 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
 
 <script>
 (function(){
-  const sidebar = document.querySelector('.sidebar');
-  const btnInside = document.getElementById('btn');                 // botón dentro del sidebar
-  const overlay  = document.querySelector('.sidebar-overlay');      // capa para cerrar en móvil
+  const sidebar  = document.querySelector('.sidebar');
+  const btnInside= document.getElementById('btn');                 // botón interno
+  const overlay  = document.querySelector('.sidebar-overlay');      // overlay móvil
   const btnFloat = document.getElementById('sidebarMobileToggle');  // botón flotante
+  const mq       = window.matchMedia('(max-width:1024px)');
 
   if (!sidebar) return;
 
+  const isMobile = () => mq.matches;
+
+  function persist(state){
+    try { localStorage.setItem('sidebarOpen', state ? 'true' : 'false'); } catch(e){}
+  }
   function isOpen(){ return sidebar.classList.contains('open'); }
   function open(){ sidebar.classList.add('open'); persist(true); }
   function close(){ sidebar.classList.remove('open'); persist(false); }
   function toggle(){ isOpen() ? close() : open(); }
 
-  function persist(state){
-    try { localStorage.setItem('sidebarOpen', state ? 'true' : 'false'); } catch(e){}
-  }
-
-  // Botón interno (ya lo tenías)
-  if (btnInside){
-    btnInside.addEventListener('click', toggle);
-    btnInside.addEventListener('keydown', (e)=>{ if (e.key==='Enter'||e.key===' ') { e.preventDefault(); toggle(); }});
-  }
-
-  // Botón flotante (móvil)
-  if (btnFloat){
-    btnFloat.addEventListener('click', toggle);
-  }
-
-  // Cerrar al tocar overlay (móvil)
-  if (overlay){
-    overlay.addEventListener('click', (e)=>{ e.preventDefault(); close(); });
-  }
-
-  // Cerrar con ESC
-  document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape' && isOpen()) close(); });
-
-  // Respetar estado persistido
+  // 1) Estado inicial: en móvil SIEMPRE cerrada; en desktop respeta lo guardado
   try {
     const saved = localStorage.getItem('sidebarOpen');
-    if (saved === 'true') open(); else close();
-  } catch(e){}
+    if (isMobile()){
+      close();                 // fuerza cerrada y persiste 'false'
+    } else {
+      (saved === 'true') ? open() : close();
+    }
+  } catch(e){ close(); }
+
+  // 2) Toggles normales
+  btnInside?.addEventListener('click', toggle);
+  btnInside?.addEventListener('keydown', (e)=>{ if (e.key==='Enter'||e.key===' '){ e.preventDefault(); toggle(); }});
+  btnFloat?.addEventListener('click', toggle);
+  overlay?.addEventListener('click', (e)=>{ e.preventDefault(); close(); });
+  document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape' && isOpen()) close(); });
+
+  // 3) Cerrar automáticamente al navegar con cualquier link del sidebar en móvil
+  sidebar.querySelectorAll('a[href]').forEach(a=>{
+    a.addEventListener('click', ()=>{
+      if (isMobile()){
+        persist(false);  // para que la PRÓXIMA página cargue ya cerrada
+        close();         // feedback inmediato
+      }
+    });
+  });
+
+  // 4) Si cambia el breakpoint en vivo, ajusta el estado
+  const onBPChange = (e)=>{
+    if (e.matches){  // entró a móvil
+      close();       // siempre cerrada en móvil
+    } else {         // volvió a desktop: respeta lo guardado
+      const saved = localStorage.getItem('sidebarOpen');
+      (saved === 'true') ? open() : close();
+    }
+  };
+  if (mq.addEventListener) mq.addEventListener('change', onBPChange);
+  else mq.addListener(onBPChange); // fallback Safari/iOS viejos
 })();
 </script>

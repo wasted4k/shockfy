@@ -218,6 +218,41 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     /* Evitar zoom iOS al enfocar inputs */
     @media (max-width: 560px){ input,select,button{font-size:16px} }
+
+/* 1) Quitar subrayado al botón “+ Agregar producto” */
+.actions .btn-primary,
+.actions .btn-primary:link,
+.actions .btn-primary:visited,
+.actions .btn-primary:hover,
+.actions .btn-primary:focus {
+  text-decoration: none !important;
+}
+
+/* 2) Toolbar 100% responsive en móvil (nada se sale) */
+@media (max-width: 720px){
+  .toolbar{
+    grid-template-columns: 1fr;   /* apila: búsqueda, categorías, orden */
+    gap: 10px;
+  }
+  .toolbar > .search,
+  .toolbar > .select{
+    width: 100%;
+    min-width: 0;                 /* permite encoger sin romper layout */
+  }
+  .select{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .select select{
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .select svg{ flex: 0 0 auto; }  /* el ícono no estira el contenedor */
+}
+
+
   </style>
 </head>
 <body>
@@ -238,7 +273,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
       </div>
       <div class="actions">
-        <a href="add_product.php" class="btn-primary">+ Agregar producto</a>
+        <a href="add_product.php" class="btn-primary">Agregar producto</a>
       </div>
     </div>
 
