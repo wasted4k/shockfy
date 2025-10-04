@@ -161,6 +161,70 @@ $categories = $categories->fetchAll();
         /* Iconos SVG dentro de .avatar y otros contenedores */
         .icon-24{width:20px;height:20px;display:block}
         .icon-18{width:18px;height:18px;display:block}
+
+/* ====== CATEGORIES: vista 100% mobile ====== */
+
+/* 1) Toolbar apilada y fluida */
+@media (max-width: 720px){
+  .toolbar{ grid-template-columns: 1fr; gap: 10px; }
+  .search{ width:100%; min-width:0; }
+  .search input{ min-width:0; }
+}
+
+/* 2) Tabla -> “tarjetas” en móvil (sin scroll horizontal) */
+@media (max-width: 700px){
+  #categoriesTable{ display:block; border-collapse:separate; border-spacing:0; }
+  #categoriesTable thead{ display:none !important; }
+  #categoriesTable tbody{ display:block; }
+
+  #categoriesTable tr{
+    display:block;
+    background:var(--panel,#fff);
+    border:1px solid var(--border);
+    border-radius:12px;
+    box-shadow:var(--shadow);
+    margin:0 0 12px;
+    overflow:hidden;
+  }
+
+  /* Oculta la celda de ID (ya va en el subtítulo bajo el nombre) */
+  #categoriesTable tr td:first-child{ display:none !important; }
+
+  #categoriesTable td{
+    display:block;
+    padding:12px 14px;
+    border-bottom:1px solid var(--border);
+    white-space:normal;
+  }
+  #categoriesTable td:last-child{ border-bottom:0; }
+
+  /* Nombre como “título” de la tarjeta */
+  #categoriesTable .name{ gap:10px; align-items:center; }
+  .cat-title{ font-size:15px; font-weight:800; line-height:1.25; word-break:break-word; }
+
+  /* Botonera al final, a ancho completo y touch-friendly */
+  .actions-cell{ display:flex; gap:8px; padding-top:4px; }
+  .actions-cell a{ flex:1; text-align:center; padding:10px 12px; font-size:14px; }
+}
+
+/* 3) Header compacto en móviles muy angostos */
+@media (max-width: 480px){
+  .header{ flex-direction:column; align-items:flex-start; gap:10px; }
+  .actions{ width:100%; }
+  #addNewBtn{ width:100%; text-align:center; }
+}
+
+/* 4) Evitar zoom iOS al enfocar inputs */
+@media (max-width:560px){
+  input, select, button{ font-size:16px; }
+}
+
+/* 5) Pequeños pulidos de accesibilidad/estética */
+.actions-cell a{ text-decoration:none; }
+.badge{ white-space:nowrap; }
+
+
+
     </style>
 </head>
 <body>
