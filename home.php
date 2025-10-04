@@ -276,6 +276,33 @@ $displayName = $_SESSION['full_name'] ?? $_SESSION['username'] ?? $_SESSION['ema
 }
 
 
+/* KPI cards: mantener 3 columnas y hacer que los números quepan en móvil */
+@media (max-width: 640px){
+  .mock-cards{ 
+    grid-template-columns: repeat(3, 1fr) !important; 
+    gap: 8px;
+  }
+  .mcard{ padding: 10px; }
+  .mcard h5{ font-size: 12px; margin-bottom: 4px; }
+
+  /* Números más pequeños, sin salto de línea */
+  .mcard .val{
+    font-size: clamp(12px, 3.4vw, 16px);
+    line-height: 1.1;
+    white-space: nowrap;
+    letter-spacing: .1px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Opcional: hacer el símbolo $ un poco más chico sin tocar el HTML */
+  .mcard .val::first-letter{ font-size: .85em; opacity: .85; }
+}
+
+/* Ultra-chico (iPhone SE, etc.) */
+@media (max-width:360px){
+  .mcard .val{ font-size: 12px; }
+  .mcard h5{ font-size: 11px; }
+}
 
 
   </style>
