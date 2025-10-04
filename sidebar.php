@@ -40,6 +40,7 @@ $__tz = $_SESSION['timezone'] ?? 'America/New_York';
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400;500;600;700&display=swap');
 *{ margin:0; padding:0; box-sizing:border-box; font-family:"Poppins",sans-serif; }
 
+/* ===== Base desktop ===== */
 .sidebar{
   position:fixed; left:0; top:0; height:100%; width:78px;
   background:#11101D; padding:6px 14px; z-index:99; transition:all .5s ease;
@@ -73,7 +74,7 @@ $__tz = $_SESSION['timezone'] ?? 'America/New_York';
 .sidebar .nav-list{ margin-top:20px; height:100%; }
 .sidebar li{ position:relative; margin:8px 0; list-style:none; }
 
-/* Tooltips (se mantienen por si luego agregas más items) */
+/* Tooltips */
 .sidebar li .tooltip{
   position:absolute; top:-20px; left:calc(100% + 15px); z-index:3; background:#0c95b8ff;
   box-shadow:0 5px 10px rgba(0,0,0,.3); padding:6px 12px; border-radius:4px; font-size:15px;
@@ -91,7 +92,7 @@ $__tz = $_SESSION['timezone'] ?? 'America/New_York';
 .sidebar li a:hover .links_name, .sidebar li a:hover i{ transition:all .5s ease; color:#11101D; }
 .sidebar li i{ height:50px; line-height:50px; font-size:18px; border-radius:12px; }
 
-/* ===== Footer perfil (rediseñado) ===== */
+/* ===== Footer perfil ===== */
 .sidebar li.profile{
   position:fixed; height:auto; width:78px; left:0; bottom:0; padding:10px 14px;
   background:#1d1b31; transition:all .5s ease; overflow:hidden;
@@ -124,24 +125,7 @@ $__tz = $_SESSION['timezone'] ?? 'America/New_York';
 }
 .sidebar.open .profile #log_out{ width:50px; background:none; }
 
-/* Botón modo oscuro (si lo usas) */
-.dark-toggle-btn{
-  position:fixed; top:15px; right:20px; z-index:1000; background:#3498db; color:#fff; border:none; padding:8px 14px; border-radius:6px; cursor:pointer; font-size:14px;
-}
-
-/* ====== Estilos para la imagen de avatar + fallback ====== */
-.profile-avatar .avatar-img{
-  display:block;
-  width:44px; height:44px;
-  border-radius:10px;
-  object-fit:cover;
-  border:1px solid rgba(255,255,255,.12);
-}
-.profile-avatar .avatar-fallback{ display:none; }
-.profile-avatar.avatar-fallback-active .avatar-img{ display:none; }
-.profile-avatar.avatar-fallback-active .avatar-fallback{ display:block; }
-
-/* ====== Overlay de trial expirado ====== */
+/* ===== Overlay de trial expirado ===== */
 .trial-overlay {
   position: fixed; inset: 0; z-index: 9999;
   display: grid; place-items: center;
@@ -159,19 +143,45 @@ $__tz = $_SESSION['timezone'] ?? 'America/New_York';
 }
 .trial-modal h2 { margin: 0 0 6px; font-size: 22px; font-weight: 800; }
 .trial-modal p  { margin: 6px 0 16px; color: #6b7280; font-size: 14px; }
-.trial-actions {
-  display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
-}
-.trial-btn {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 11px 16px; border-radius: 12px; border: 1px solid transparent;
-  background: #299EE6; color: #fff; font-weight: 700; text-decoration: none;
-}
-.trial-btn.secondary {
-  background: #e5e7eb; color: #0f172a; border-color: #d1d5db;
-}
-/* Evitar scroll de fondo cuando overlay está activo */
+.trial-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.trial-btn { display: inline-flex; align-items: center; gap: 8px; padding: 11px 16px; border-radius: 12px; border: 1px solid transparent; background: #299EE6; color: #fff; font-weight: 700; text-decoration: none; }
+.trial-btn.secondary { background: #e5e7eb; color: #0f172a; border-color: #d1d5db; }
 body.trial-locked { overflow: hidden; }
+
+/* ======= RESPONSIVE SIDEBAR (OFF-CANVAS EN MÓVIL) ======= */
+
+/* Empuje del contenido en escritorio (si usas .page) */
+.sidebar ~ .page{ margin-left:78px; transition:margin-left .4s ease; }
+.sidebar.open ~ .page{ margin-left:250px; }
+
+@media (max-width:1024px){
+  /* Sidebar como off-canvas: oculto por la izquierda hasta abrir */
+  .sidebar{
+    width:250px;               /* ancho real del panel */
+    transform: translateX(-100%);
+    padding: 10px 14px;
+  }
+  .sidebar.open{ transform: translateX(0); }
+
+  /* El contenido NO se empuja en móvil; usa todo el ancho */
+  .sidebar ~ .page{ margin-left:0; }
+  .sidebar.open ~ .page{ margin-left:0; }
+
+  /* Ocultar tooltips (no son necesarios en móvil) */
+  .sidebar li .tooltip{ display:none !important; }
+}
+
+/* Overlay para tap-to-close solo en móvil */
+.sidebar-overlay{
+  position: fixed; inset: 0;
+  background: rgba(15,23,42,.35);
+  backdrop-filter: blur(2px);
+  z-index: 98;
+  opacity: 0; pointer-events: none; transition: opacity .2s ease;
+}
+@media (max-width:1024px){
+  .sidebar.open + .sidebar-overlay{ opacity:1; pointer-events:auto; }
+}
 </style>
 
 <link href="https://unpkg.com/boxicons@2.0.7/css/boxicons.min.css" rel="stylesheet">
@@ -180,7 +190,7 @@ body.trial-locked { overflow: hidden; }
   <div class="logo-details">
     <img src="assets/img/icono_menu.png" alt="Logo" class="logo-icon">
     <div class="logo_name">ShockFy</div>
-    <i class="bx bx-menu" id="btn"></i>
+    <i class="bx bx-menu" id="btn" aria-label="Abrir/cerrar menú" role="button" tabindex="0"></i>
   </div>
 
   <ul class="nav-list">
@@ -274,6 +284,9 @@ body.trial-locked { overflow: hidden; }
   </ul>
 </div>
 
+<!-- Overlay para cerrar en móvil -->
+<div class="sidebar-overlay" aria-hidden="true"></div>
+
 <?php
 // === Mostrar overlay si el trial expiró (flag proveniente de auth_check.php) ===
 $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
@@ -316,5 +329,46 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
 })();
 </script>
 
+<!-- JS propio del proyecto -->
 <script src="js/script.js"></script>
+
+<!-- Pequeño refuerzo: cerrar con overlay y con ESC si tu script.js no lo hace -->
+<script>
+(function(){
+  const sidebar = document.querySelector('.sidebar');
+  const btn = document.getElementById('btn');
+  const overlay = document.querySelector('.sidebar-overlay');
+
+  if (!sidebar) return;
+
+  function isOpen(){ return sidebar.classList.contains('open'); }
+  function open(){ sidebar.classList.add('open'); persist(true); }
+  function close(){ sidebar.classList.remove('open'); persist(false); }
+  function toggle(){ isOpen() ? close() : open(); }
+
+  function persist(state){
+    try { localStorage.setItem('sidebarOpen', state ? 'true' : 'false'); } catch(e){}
+  }
+
+  // Botón hamburguesa (ya existente)
+  if (btn){
+    btn.addEventListener('click', toggle);
+    btn.addEventListener('keydown', (e)=>{ if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }});
+  }
+
+  // Cerrar al tocar overlay (solo visible en móvil)
+  if (overlay){
+    overlay.addEventListener('click', (e)=>{ e.preventDefault(); close(); });
+  }
+
+  // Cerrar con ESC
+  document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape' && isOpen()) close(); });
+
+  // Respetar estado persistido
+  try {
+    const saved = localStorage.getItem('sidebarOpen');
+    if (saved === 'true') open(); else close();
+  } catch(e){}
+})();
+</script>
 
