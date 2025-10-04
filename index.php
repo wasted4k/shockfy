@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/auth_check.php'; // protege: exige login y email verificado (redirige a welcome.php si falta)
+require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/db.php';
 
 // ================= Prefs de zona horaria / formato =================
@@ -21,9 +21,8 @@ if (!$user_tz || !$time_fmt) {
 $user_tz  = $user_tz  ?: 'America/New_York';
 $time_fmt = $time_fmt ?: '12h';
 
-// Helpers: convierte desde UTC a TZ del usuario y formatea
+// Helpers
 function dt_in_tz($dt, string $tz): DateTime {
-  // Asumimos $dt guardado en UTC; si tu DB guarda local, cambia 'UTC' por tu TZ del server.
   $d = ($dt instanceof DateTime)
     ? (clone $dt)
     : new DateTime((string)$dt, new DateTimeZone('UTC'));
@@ -35,12 +34,10 @@ function fmt_time_for_user(DateTime $d, string $fmt): string {
 }
 function fmt_datetime_for_user($dt, string $tz, string $fmt): array {
   $d = dt_in_tz($dt, $tz);
-  // Texto visible: "25 Sep 2025, 2:45 PM" / "25 Sep 2025, 14:45"
   $datePart = $d->format('d M Y');
   $timePart = fmt_time_for_user($d, $fmt);
   $visible  = $datePart . ', ' . $timePart;
-  // Timestamp ISO para JS (ordenar/filtrar robusto)
-  $iso = $d->format('c'); // 2025-09-25T14:45:00-05:00
+  $iso = $d->format('c');
   return [$visible, $iso];
 }
 
@@ -61,7 +58,6 @@ if ($uid) {
       $endsUtc = new DateTime($row['trial_ends_at'], new DateTimeZone('UTC'));
       $trialActive   = ($nowUtc <= $endsUtc);
       $trialDaysLeft = max(0, (int)$nowUtc->diff($endsUtc)->format('%r%a'));
-      // Convertimos a zona del usuario para mostrar
       $endsLocal = dt_in_tz($endsUtc, $user_tz);
       $trialEndsLocalText = $endsLocal->format('d M Y') . ', ' . fmt_time_for_user($endsLocal, $time_fmt);
     }
@@ -74,12 +70,12 @@ $stmt = $pdo->prepare('SELECT currency_pref FROM users WHERE id = ?');
 $stmt->execute([$_SESSION['user_id']]);
 $currency = $stmt->fetchColumn() ?: 'S/.';
 
-// últimos 3 productos
+// Últimos productos (por defecto 3)
 $stmt = $pdo->prepare('SELECT * FROM products WHERE user_id = :user_id ORDER BY id DESC LIMIT 3');
 $stmt->execute(['user_id' => $_SESSION['user_id']]);
 $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// ventas recientes (subí a 100 para que funcione la paginación en cliente)
+// Ventas recientes (trae suficiente para paginar/limitar en cliente)
 $stmt = $pdo->prepare('
     SELECT s.*, p.name AS product_name, p.size, p.color
     FROM sales s 
@@ -91,7 +87,7 @@ $stmt = $pdo->prepare('
 $stmt->execute(['user_id' => $_SESSION['user_id']]);
 $recentSales = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// total ventas del mes actual (consulta sigue igual)
+// Total ventas del mes actual
 $stmt = $pdo->prepare('
     SELECT COALESCE(SUM(total),0) as total_mes 
     FROM sales 
@@ -139,14 +135,6 @@ $totalMes = $stmt->fetchColumn();
     }
     a{color:inherit;text-decoration:none}
 
-    #darkToggle{
-      position: fixed; right: 20px; bottom: 20px; z-index: 9999;
-      background: linear-gradient(135deg,var(--primary),var(--primary-2));
-      color:#fff; padding:10px 14px; border-radius:14px; border:none; cursor:pointer;
-      font-weight:800; box-shadow:var(--shadow); transition:transform .2s ease, box-shadow .2s ease;
-    }
-    #darkToggle:hover{ transform: translateY(-2px); box-shadow:0 16px 30px rgba(37,99,235,.25); }
-
     .page{ padding:24px 18px 64px; }
     .container{
       max-width:1200px; margin:0 auto;
@@ -161,7 +149,18 @@ $totalMes = $stmt->fetchColumn();
       display:flex; align-items:center; justify-content:space-between; gap:16px; margin:4px 0 4px;
     }
     .hero-left{ display:flex; align-items:center; gap:14px; }
-    .hero .icon{ width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#e0edff,#f1f7ff);display:grid;place-items:center;border:1px solid #dbeafe; box-shadow:var(--shadow)}
+
+    /* FIX icono carrito */
+    .hero-left .icon{
+      flex: 0 0 48px;
+      width:48px; height:48px;
+      min-width:48px; min-height:48px;
+      border-radius:12px;background:linear-gradient(135deg,#e0edff,#f1f7ff);
+      display:grid;place-items:center;border:1px solid #dbeafe; box-shadow:var(--shadow)
+    }
+    .hero-left .icon svg{ width:26px; height:26px; }
+    .hero-left .icon svg *{ vector-effect: non-scaling-stroke; }
+
     .hero h1{ margin:0; font-size:28px; font-weight:800; color:#0b1220; }
     .hero .subtitle{ font-size:13px; color:#64748b; margin-top:4px; }
     .cta-row{ display:flex; gap:10px; flex-wrap:wrap; }
@@ -171,15 +170,8 @@ $totalMes = $stmt->fetchColumn();
       padding:4px 10px; border-radius:999px; font-weight:800; font-size:12px;
       border:1px solid #cfe0ff; background:#eef5ff; color:#0b3ea8;
     }
-    /* Chip de plan FREE en ámbar suave (más visible) */
-    .chip.plan-free{
-      border-color:#fde68a;      /* amber-200 */
-      background:#fff7ed;        /* amber-50 */
-      color:#92400e;             /* amber-800 */
-    }
-    .chip.plan-warning{
-      border-color:#fde68a; background:#fff7ed; color:#92400e; /* ámbar para expirado */
-    }
+    .chip.plan-free{ border-color:#fde68a; background:#fff7ed; color:#92400e; }
+    .chip.plan-warning{ border-color:#fde68a; background:#fff7ed; color:#92400e; }
 
     .btn{
       padding:10px 14px; border-radius:12px;
@@ -191,10 +183,7 @@ $totalMes = $stmt->fetchColumn();
     }
     .btn:hover{ transform:translateY(-1px); background:#e8edf4; border-color:#b8c3d4; }
     .btn:focus{ outline: 2px solid #bfd3ff; outline-offset:2px; }
-    .btn.primary{
-      background:linear-gradient(135deg,var(--primary),var(--primary-2));
-      color:#fff; border:none;
-    }
+    .btn.primary{ background:linear-gradient(135deg,var(--primary),var(--primary-2)); color:#fff; border:none; }
     .btn.primary:hover{ filter: brightness(0.98); }
 
     .banner{
@@ -202,23 +191,13 @@ $totalMes = $stmt->fetchColumn();
       display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
       box-shadow:var(--shadow); position:relative;
     }
-    /* Banner TRIAL activo en ámbar/naranja */
-    .banner.trial{
-      background:#fff7ed;        /* amber-50 */
-      border-color:#fbbf24;      /* amber-400 */
-      color:#7c2d12;             /* amber-900 */
-    }
+    .banner.trial{ background:#fff7ed; border-color:#fbbf24; color:#7c2d12; }
     .banner.trial::before{
-      content:"";
-      position:absolute; left:0; top:0; bottom:0; width:6px;
-      background: linear-gradient(180deg, #f59e0b, #fbbf24); /* amber-500→400 */
-      border-top-left-radius: inherit;
-      border-bottom-left-radius: inherit;
+      content:""; position:absolute; left:0; top:0; bottom:0; width:6px;
+      background: linear-gradient(180deg, #f59e0b, #fbbf24);
+      border-top-left-radius: inherit; border-bottom-left-radius: inherit;
     }
-    /* Banner de prueba finalizada (se mantiene ámbar suave) */
-    .banner.warn{
-      background:#fff7ed; border-color:#fde68a; color:#92400e;
-    }
+    .banner.warn{ background:#fff7ed; border-color:#fde68a; color:#92400e; }
 
     .stats{ display:grid; grid-template-columns:repeat(3, minmax(220px,1fr)); gap:14px; margin:16px 0 22px; }
     .stat-card{ background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); display:flex; gap:12px; align-items:center; }
@@ -273,52 +252,43 @@ $totalMes = $stmt->fetchColumn();
     body.dark .pill{ background:#0e1630; border-color:#1f2a4a; }
     body.dark .btn{ background:#0e1630; border-color:#2a365a; color:#e5e7eb; }
     body.dark .btn:hover{ background:#132146; border-color:#33416b; }
-
     body.dark .chip{ background:#0e1630; border-color:#33416b; color:#a5b4fc; }
-    body.dark .chip.plan-free{
-      background:#221709;        /* ámbar muy oscuro */
-      border-color:#5c3a0b;
-      color:#f2c48a;
-    }
-    body.dark .chip.plan-warning{
-      background:#221709; border-color:#5c3a0b; color:#f2c48a;
-    }
-    body.dark .banner.trial{
-      background:#221709;
-      border-color:#5c3a0b;
-      color:#f2c48a;
-    }
-    body.dark .banner.trial::before{
-      background: linear-gradient(180deg, #b45309, #d97706); /* amber-600→500 */
-    }
-    body.dark .banner.warn{
-      background:#221709; border-color:#5c3a0b; color:#f2c48a;
-    }
+    body.dark .chip.plan-free{ background:#221709; border-color:#5c3a0b; color:#f2c48a; }
+    body.dark .chip.plan-warning{ background:#221709; border-color:#5c3a0b; color:#f2c48a; }
+    body.dark .banner.trial{ background:#221709; border-color:#5c3a0b; color:#f2c48a; }
+    body.dark .banner.trial::before{ background: linear-gradient(180deg, #b45309, #d97706); }
+    body.dark .banner.warn{ background:#221709; border-color:#5c3a0b; color:#f2c48a; }
 
     /* ===================== */
     /*  RESPONSIVE (MÓVIL)   */
     /* ===================== */
 
-    /* Evita desbordes horizontales y hace medios fluidos */
     html, body { overflow-x: hidden; }
     img, video, svg { max-width: 100%; height: auto; }
 
-    /* Hero y CTA: apilan en tamaños pequeños */
+    /* Chips con aire en móvil */
+    @media (max-width: 640px){
+      .hero .subtitle{ display:block; line-height:1.35; }
+      .hero .subtitle .chip{
+        display:block; margin-left:0 !important; margin-top:6px; width:fit-content;
+      }
+    }
+
+    /* Hero y CTA apilados */
     @media (max-width: 1024px){
       .hero{ flex-direction: column; align-items: flex-start; gap: 12px; }
       .cta-row{ width:100%; gap:8px; }
     }
-    @media (max-width: 400px){
-      .hero h1{ font-size: 22px; }
+    /* Oculta CTA rápidos en mobile */
+    @media (max-width: 768px){
+      .cta-row{ display:none !important; }
     }
 
-    /* Contenedores con padding más compacto en móvil */
     @media (max-width: 768px){
       .page{ padding: 18px 12px 72px; }
       .container{ padding: 12px; border-radius: 12px; max-width: 100%; }
     }
 
-    /* Section-header y herramientas: columnas limpias */
     @media (max-width: 900px){
       .section .section-header{ flex-direction: column; align-items: flex-start; gap: 10px; }
       .section-tools{ width: 100%; }
@@ -329,138 +299,105 @@ $totalMes = $stmt->fetchColumn();
       #minTotal, #maxTotal{ width: 100% !important; }
     }
 
-    /* Tarjetas KPI: 3→2→1 columnas */
-    @media (max-width: 1200px){
-      .stats{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    }
-    @media (max-width: 700px){
-      .stats{ grid-template-columns: 1fr; }
-      .stat-card{ align-items: flex-start; }
-    }
+    /* Tarjetas KPI: 3→2→1 */
+    @media (max-width: 1200px){ .stats{ grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 700px){ .stats{ grid-template-columns: 1fr; } .stat-card{ align-items: flex-start; } }
 
-    /* ===== FIX TABLAS EN MÓVIL (sin superposición) ===== */
+    /* ===== Tablas básicas ===== */
+    .table-wrap{ width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; border-radius:12px; }
+    .table-wrap > table{ width:100%; border-collapse:collapse; table-layout:auto; }
 
-    /* Contenedor con scroll horizontal */
-    .table-wrap{
-      width:100%;
-      overflow-x:auto;
-      -webkit-overflow-scrolling:touch;
-      border-radius:12px;
+    @media (max-width:980px){
+      table:not(.table-cards){ display:table !important; }
+      table:not(.table-cards) thead{ display:table-header-group !important; }
+      table:not(.table-cards) tbody{ display:table-row-group !important; }
+      table:not(.table-cards) tr{ display:table-row !important; }
+      table:not(.table-cards) th, table:not(.table-cards) td{ white-space:nowrap; }
     }
 
-    /* Mantener el layout nativo de tabla */
-    .table-wrap > table{
-      width:100%;
-      border-collapse:collapse;
-      table-layout:auto; /* evita que colapsen columnas */
-    }
-
-    /* En móviles: conservar display nativo y usar scroll */
-    @media (max-width: 980px){
-      table{ display:table !important; }
-      thead{ display:table-header-group !important; }
-      tbody{ display:table-row-group !important; }
-      tr{ display:table-row !important; }
-      th, td{ white-space:nowrap; }
-    }
-
-    /* Compactar padding/tipografía en teléfonos */
     @media (max-width: 640px){
-      .table-wrap th, .table-wrap td{
-        padding:10px 12px;
-        font-size:13px;
-      }
+      .table-wrap th, .table-wrap td{ padding:10px 12px; font-size:13px; }
     }
 
-    /* Encabezado pegajoso (opcional) */
     @supports (position: sticky){
-      .table-wrap thead th{
-        position: sticky;
-        top: 0;
-        background: var(--panel, #fff);
-        z-index: 1;
+      .table-wrap thead th{ position: sticky; top: 0; background: var(--panel, #fff); z-index: 1; }
+    }
+
+    /* Desktop: ancho mínimo en tablas no-cards */
+    .table-wrap > table{ min-width: 1100px; table-layout: fixed; }
+    .table-wrap th, .table-wrap td{
+      overflow: hidden; text-overflow: ellipsis; vertical-align: middle; white-space: nowrap;
+    }
+
+    /* ===== Vista "cards" en móvil ===== */
+    .table-wrap > table.table-cards{ min-width: 0 !important; table-layout: auto !important; }
+
+    @media (max-width:700px){
+      .table-cards{ display:block !important; border-collapse:separate; border-spacing:0; }
+      .table-cards thead{ display:none !important; }
+      .table-cards tbody{ display:block !important; }
+      .table-cards tr{
+        display:block !important; background: var(--panel,#fff);
+        border:1px solid var(--border); border-radius:12px;
+        box-shadow: var(--shadow); margin: 0 0 12px; overflow:hidden;
+      }
+      .table-cards td{
+        display:grid !important; grid-template-columns: 40% 1fr;
+        align-items:center; gap:8px; padding:10px 12px;
+        border-bottom:1px solid var(--border); white-space: normal !important;
+      }
+      .table-cards td:last-child{ border-bottom:0; }
+      .table-cards td::before{ content: attr(data-label); font-weight:600; color:#64748b; }
+
+      /* Productos: oculta ID y Precio Costo */
+      .products-table.table-cards td:nth-child(1),
+      .products-table.table-cards td:nth-child(6){ display:none !important; }
+
+      .products-table.table-cards td[data-label="Prenda"]{
+        grid-template-columns: 1fr !important; font-weight:800; font-size:14px;
+      }
+      .products-table.table-cards td[data-label="Prenda"]::before{ content:""; display:none; }
+
+      /* Ventas: oculta ID y Precio unitario */
+      .sales-table.table-cards td:nth-child(1),
+      .sales-table.table-cards td:nth-child(6){ display:none !important; }
+
+      .sales-table.table-cards td[data-label="Producto"]{
+        grid-template-columns: 1fr !important; font-weight:800; font-size:14px;
+      }
+      .sales-table.table-cards td[data-label="Producto"]::before{ content:""; display:none; }
+
+      /* Acciones al final */
+      .sales-table.table-cards td:nth-child(9){
+        display:flex !important; justify-content:flex-end; padding-top:12px;
+      }
+
+      /* Compacto móvil (ventas) + oculta filtros y paginación */
+      #salesSection .section-tools{ display:none !important; }
+      #salesSection .pagination{ display:none !important; }
+    }
+
+    /* === Chips (TZ y Plan) con aire en móvil === */
+    .hero-left .icon{ flex:0 0 48px; width:48px; height:48px; min-width:48px; min-height:48px; display:grid; place-items:center; }
+    .hero-left .icon svg{ width:26px; height:26px; }
+    .hero-left .icon svg *{ vector-effect: non-scaling-stroke; }
+
+    @media (max-width: 640px){
+      .hero .subtitle{ display:block; line-height:1.35; }
+      .hero .subtitle .chip{ display:block; margin-left:0 !important; margin-top:6px; width:fit-content; }
+    }
+
+    @media (max-width: 768px){ .cta-row{ display:none !important; } }
+    @media (max-width: 640px){ .chip{ font-size: 13px; padding: 6px 12px; } }
+
+    /* ========= CLAVE: limitar a 3 filas en móvil (CSS puro) ========= */
+    @media (max-width:700px){
+      /* Asegurar que las “cards” se puedan ocultar: regla más fuerte */
+      #productsSection tbody tr:nth-child(n+4),
+      #salesSection tbody tr:nth-child(n+4){
+        display:none !important;
       }
     }
-
-    /* Botones a ancho completo en teléfonos para mejor toque */
-    @media (max-width: 640px){
-      .btn{ width: 100%; text-align: center; }
-    }
-
-    /* Si la sidebar queda "open" en móviles, que no aplaste el contenido */
-    @media (max-width: 640px){
-      .sidebar.open ~ .page{ margin-left: 78px; }
-    }
-
-
-/* ===== PARCHE DEFINITIVO TABLAS EN MÓVIL ===== */
-
-/* 1) Fuerza un ancho mínimo real para que aparezca scroll
-      (ajusta 1100px si necesitas un poco más o menos) */
-.table-wrap > table{
-  min-width: 1100px;       /* evita que las columnas colapsen */
-  table-layout: fixed;     /* reparte el ancho y estabiliza celdas */
-}
-
-/* 2) Evita que el texto se “escape” de las celdas y se monte */
-.table-wrap th,
-.table-wrap td{
-  overflow: hidden;
-  text-overflow: ellipsis;
-  vertical-align: middle;
-  white-space: nowrap;     /* coherente con scroll horizontal */
-}
-
-/* 3) En pantallas pequeñas, usa encabezados más compactos */
-@media (max-width: 640px){
-  .table-wrap th{
-    font-size: 11px;
-    letter-spacing: .03em;   /* menos separación para que entre mejor */
-    padding: 10px 10px;
-  }
-  .table-wrap td{
-    font-size: 13px;
-    padding: 10px 10px;
-  }
-}
-
-/* 4) (Opcional) Si notas parpadeo con sticky, puedes desactivarlo así: */
-/*
-.table-wrap thead th{ position: static !important; }
-*/
-
-/* === FIX icono carrito: que no se estreche ni se achique === */
-.hero-left .icon{
-  flex: 0 0 48px;           /* no permitir que el flex lo comprima */
-  width: 48px; height: 48px;
-  min-width: 48px; min-height: 48px;
-  display: grid; place-items: center;
-}
-.hero-left .icon svg{
-  width: 26px; height: 26px;     /* tamaño consistente dentro del tile */
-}
-.hero-left .icon svg *{ vector-effect: non-scaling-stroke; }
-
-/* === Chips (TZ y Plan) más legibles en móvil: en columnas y con aire === */
-@media (max-width: 640px){
-  .hero .subtitle{ display:block; line-height:1.35; }
-  .hero .subtitle .chip{
-    display:block;               /* cada chip ocupa su propia línea */
-    margin-left: 0 !important;
-    margin-top: 6px;             /* separación vertical */
-    width: fit-content;          /* no ocupar todo el ancho */
-  }
-}
-
-/* === Ocultar botones de acceso rápido en mobile === */
-@media (max-width: 768px){
-  .cta-row{ display:none !important; }
-}
-
-@media (max-width: 640px){
-  .chip{ font-size: 13px; padding: 6px 12px; }
-}
-
   </style>
 </head>
 
@@ -479,11 +416,9 @@ $totalMes = $stmt->fetchColumn();
             <h1>Panel de control</h1>
             <div class="subtitle">
               Resumen de tu actividad y accesos rápidos.
-              <!-- chip con TZ y formato -->
               <span class="chip" style="margin-left:8px;">
                 <?= htmlspecialchars($user_tz) ?> · <?= htmlspecialchars(strtoupper($time_fmt)) ?>
               </span>
-              <!-- chip de plan -->
               <?php if ($plan === 'free' && $trialActive): ?>
                 <span class="chip plan-free" style="margin-left:6px;">Plan: Gratis · Prueba (<?= (int)$trialDaysLeft ?> día<?= $trialDaysLeft==1?'':'s' ?>)</span>
               <?php elseif ($plan === 'free' && !$trialActive): ?>
@@ -570,9 +505,8 @@ $totalMes = $stmt->fetchColumn();
           </div>
         </div>
         <div class="section-body">
-          <!-- ENVOLTURA PARA TABLA -->
           <div class="table-wrap">
-            <table class="products-table" id="productsTable">
+            <table class="products-table table-cards" id="productsTable">
               <thead>
                 <tr>
                   <th data-key="id">ID</th>
@@ -588,32 +522,28 @@ $totalMes = $stmt->fetchColumn();
               </thead>
               <tbody id="productsBody">
               <?php foreach ($products as $p): ?>
-                <?php
-                  // Si created_at está en UTC en DB:
-                  [$pCreatedText, $pCreatedISO] = fmt_datetime_for_user($p['created_at'] ?? 'now', $user_tz, $time_fmt);
-                ?>
+                <?php [$pCreatedText, $pCreatedISO] = fmt_datetime_for_user($p['created_at'] ?? 'now', $user_tz, $time_fmt); ?>
                 <tr>
-                  <td><?= $p['id'] ?></td>
-                  <td><?= htmlspecialchars($p['code'] ?? '') ?></td>
-                  <td><?= htmlspecialchars($p['name'] ?? '') ?></td>
-                  <td><?= htmlspecialchars($p['size'] ?? '') ?></td>
-                  <td><?= htmlspecialchars($p['color'] ?? '') ?></td>
-                  <td><?= $currency . ' ' . number_format($p['cost_price'], 2) ?></td>
-                  <td><?= $currency . ' ' . number_format($p['sale_price'], 2) ?></td>
-                  <td>
+                  <td data-label="ID"><?= $p['id'] ?></td>
+                  <td data-label="Código"><?= htmlspecialchars($p['code'] ?? '') ?></td>
+                  <td data-label="Prenda"><?= htmlspecialchars($p['name'] ?? '') ?></td>
+                  <td data-label="Talla"><?= htmlspecialchars($p['size'] ?? '') ?></td>
+                  <td data-label="Color"><?= htmlspecialchars($p['color'] ?? '') ?></td>
+                  <td data-label="Precio Costo"><?= $currency . ' ' . number_format($p['cost_price'], 2) ?></td>
+                  <td data-label="Precio Venta"><?= $currency . ' ' . number_format($p['sale_price'], 2) ?></td>
+                  <td data-label="Stock">
                     <?php if ((int)$p['stock'] < 5): ?>
                       <span class="low-stock">⚠ <?= (int)$p['stock'] ?></span>
                     <?php else: ?>
                       <?= (int)$p['stock'] ?>
                     <?php endif; ?>
                   </td>
-                  <td data-ts="<?= htmlspecialchars($pCreatedISO) ?>"><?= htmlspecialchars($pCreatedText) ?></td>
+                  <td data-label="Creado" data-ts="<?= htmlspecialchars($pCreatedISO) ?>"><?= htmlspecialchars($pCreatedText) ?></td>
                 </tr>
               <?php endforeach; ?>
               </tbody>
             </table>
           </div>
-          <!-- FIN ENVOLTURA -->
         </div>
       </div>
 
@@ -653,9 +583,8 @@ $totalMes = $stmt->fetchColumn();
           </div>
         </div>
         <div class="section-body">
-          <!-- ENVOLTURA PARA TABLA -->
           <div class="table-wrap">
-            <table class="sales-table" id="salesTable">
+            <table class="sales-table table-cards" id="salesTable">
               <thead>
                 <tr>
                   <th data-key="id">ID</th>
@@ -671,19 +600,17 @@ $totalMes = $stmt->fetchColumn();
               </thead>
               <tbody id="salesBody">
               <?php foreach ($recentSales as $s): ?>
-                <?php
-                  [$saleText, $saleISO] = fmt_datetime_for_user($s['sale_date'] ?? 'now', $user_tz, $time_fmt);
-                ?>
+                <?php [$saleText, $saleISO] = fmt_datetime_for_user($s['sale_date'] ?? 'now', $user_tz, $time_fmt); ?>
                 <tr>
-                  <td><?= $s['id'] ?></td>
-                  <td><?= htmlspecialchars($s['product_name'] ?? '') ?></td>
-                  <td><?= htmlspecialchars($s['size'] ?? '') ?></td>
-                  <td><?= htmlspecialchars($s['color'] ?? '') ?></td>
-                  <td><?= (int)$s['quantity'] ?></td>
-                  <td><?= $currency . ' ' . number_format($s['unit_price'], 2) ?></td>
-                  <td><?= $currency . ' ' . number_format($s['total'], 2) ?></td>
-                  <td data-ts="<?= htmlspecialchars($saleISO) ?>"><?= htmlspecialchars($saleText) ?></td>
-                  <td>
+                  <td data-label="ID"><?= $s['id'] ?></td>
+                  <td data-label="Producto"><?= htmlspecialchars($s['product_name'] ?? '') ?></td>
+                  <td data-label="Talla"><?= htmlspecialchars($s['size'] ?? '') ?></td>
+                  <td data-label="Color"><?= htmlspecialchars($s['color'] ?? '') ?></td>
+                  <td data-label="Cantidad"><?= (int)$s['quantity'] ?></td>
+                  <td data-label="Precio"><?= $currency . ' ' . number_format($s['unit_price'], 2) ?></td>
+                  <td data-label="Total"><?= $currency . ' ' . number_format($s['total'], 2) ?></td>
+                  <td data-label="Fecha" data-ts="<?= htmlspecialchars($saleISO) ?>"><?= htmlspecialchars($saleText) ?></td>
+                  <td data-label="Acciones">
                     <a href="delete_sale.php?id=<?= $s['id'] ?>" class="delete-btn"
                        onclick="return confirm('¿Seguro que deseas eliminar esta venta?');">
                       Eliminar
@@ -694,9 +621,8 @@ $totalMes = $stmt->fetchColumn();
               </tbody>
             </table>
           </div>
-          <!-- FIN ENVOLTURA -->
 
-          <!-- Paginación -->
+          <!-- Paginación (se oculta en móvil por CSS) -->
           <div class="pagination" id="salesPagination">
             <button class="btn" id="prevPage">⟨</button>
             <div class="pill"><span id="pageInfo">Página 1</span></div>
@@ -729,7 +655,6 @@ $totalMes = $stmt->fetchColumn();
       return parseFloat(num) || 0;
     };
     const parseDate = (txtOrISO, el) => {
-      // Si el TD trae data-ts (ISO), úsalo; si no, intenta parsear el texto
       const iso = el?.dataset?.ts || txtOrISO;
       const t = Date.parse(iso);
       return isNaN(t) ? NaN : t;
@@ -737,7 +662,7 @@ $totalMes = $stmt->fetchColumn();
 
     // Búsqueda Productos
     const productSearch = document.getElementById('productSearch');
-    const productsBody = document.getElementById('productsBody');
+    const productsBody  = document.getElementById('productsBody');
     productSearch.addEventListener('input', () => {
       const q = productSearch.value.trim().toLowerCase();
       [...productsBody.rows].forEach(tr => {
@@ -745,9 +670,10 @@ $totalMes = $stmt->fetchColumn();
         const show = !q || cells.some(t => t.includes(q));
         tr.style.display = show ? '' : 'none';
       });
+      // En móvil, el CSS limita a 3 (no se necesita JS extra)
     });
 
-    // Ordenamiento genérico (ahora usa data-ts si está)
+    // Ordenamiento genérico (usa data-ts si está)
     function enableSorting(tableId){
       const table = document.getElementById(tableId);
       const thead = table.tHead;
@@ -765,36 +691,33 @@ $totalMes = $stmt->fetchColumn();
             const A = getCellValue(a, idx);
             const B = getCellValue(b, idx);
 
-            // Números (dinero)
             const aNum = parseFloat(A.replace(/[^0-9.,-]/g,'').replace(/\./g,'').replace(/,/g,'.'));
             const bNum = parseFloat(B.replace(/[^0-9.,-]/g,'').replace(/\./g,'').replace(/,/g,'.'));
             if (!isNaN(aNum) && !isNaN(bNum)) return asc ? aNum - bNum : bNum - aNum;
 
-            // Fechas (preferir data-ts)
             const aDate = parseDate(A, Ael), bDate = parseDate(B, Bel);
             if (!isNaN(aDate) && !isNaN(bDate)) return asc ? aDate - bDate : bDate - aDate;
 
-            // Texto
             return asc ? A.localeCompare(B) : B.localeCompare(A);
           });
           rows.forEach(r => tbody.appendChild(r));
-          asc = !asc;
+          // En móvil, el CSS seguirá mostrando los primeros 3 del nuevo orden
         });
       });
     }
     enableSorting('productsTable');
     enableSorting('salesTable');
 
-    // Filtros + Paginación Ventas
-    const salesBody = document.getElementById('salesBody');
+    // Filtros + Paginación Ventas (desktop)
+    const salesBody   = document.getElementById('salesBody');
     const salesSearch = document.getElementById('salesSearch');
-    const dateQuick = document.getElementById('dateQuick');
-    const minTotal = document.getElementById('minTotal');
-    const maxTotal = document.getElementById('maxTotal');
+    const dateQuick   = document.getElementById('dateQuick');
+    const minTotal    = document.getElementById('minTotal');
+    const maxTotal    = document.getElementById('maxTotal');
     const rowsPerPage = document.getElementById('rowsPerPage');
-    const prevPage = document.getElementById('prevPage');
-    const nextPage = document.getElementById('nextPage');
-    const pageInfo = document.getElementById('pageInfo');
+    const prevPage    = document.getElementById('prevPage');
+    const nextPage    = document.getElementById('nextPage');
+    const pageInfo    = document.getElementById('pageInfo');
     let page = 1;
 
     function getFilteredSalesRows(){
@@ -857,3 +780,4 @@ $totalMes = $stmt->fetchColumn();
   </script>
 </body>
 </html>
+
