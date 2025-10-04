@@ -294,6 +294,67 @@ $totalMes = $stmt->fetchColumn();
     body.dark .banner.warn{
       background:#221709; border-color:#5c3a0b; color:#f2c48a;
     }
+
+    /* ===================== */
+    /*  RESPONSIVE (MÓVIL)   */
+    /* ===================== */
+
+    /* Evita desbordes horizontales y hace medios fluidos */
+    html, body { overflow-x: hidden; }
+    img, video, svg { max-width: 100%; height: auto; }
+
+    /* Hero y CTA: apilan en tamaños pequeños */
+    @media (max-width: 1024px){
+      .hero{ flex-direction: column; align-items: flex-start; gap: 12px; }
+      .cta-row{ width:100%; gap:8px; }
+    }
+    @media (max-width: 400px){
+      .hero h1{ font-size: 22px; }
+    }
+
+    /* Contenedores con padding más compacto en móvil */
+    @media (max-width: 768px){
+      .page{ padding: 18px 12px 72px; }
+      .container{ padding: 12px; border-radius: 12px; max-width: 100%; }
+    }
+
+    /* Section-header y herramientas: columnas limpias */
+    @media (max-width: 900px){
+      .section .section-header{ flex-direction: column; align-items: flex-start; gap: 10px; }
+      .section-tools{ width: 100%; }
+    }
+    @media (max-width: 640px){
+      .pill{ width: 100%; }
+      .pill input, .pill select{ width: 100%; min-width: 0; }
+      #minTotal, #maxTotal{ width: 100% !important; }
+    }
+
+    /* Tarjetas KPI: 3→2→1 columnas */
+    @media (max-width: 1200px){
+      .stats{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 700px){
+      .stats{ grid-template-columns: 1fr; }
+      .stat-card{ align-items: flex-start; }
+    }
+
+    /* Tablas usables en móvil: scroll horizontal (sin romper columnas) */
+    /* Sin envolver el HTML: se hace solo por CSS */
+    @media (max-width: 980px){
+      table{ display:block; width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+      thead, tbody, tr{ display:table; width:100%; table-layout:fixed; }
+      th, td{ white-space:nowrap; }
+    }
+
+    /* Botones a ancho completo en teléfonos para mejor toque */
+    @media (max-width: 640px){
+      .btn{ width: 100%; text-align: center; }
+    }
+
+    /* Si la sidebar queda "open" en móviles, que no aplaste el contenido */
+    @media (max-width: 640px){
+      .sidebar.open ~ .page{ margin-left: 78px; }
+    }
   </style>
 </head>
 
@@ -538,8 +599,6 @@ $totalMes = $stmt->fetchColumn();
   <div id="notification" role="status" aria-live="polite"></div>
 
   <script>
-   
-
     function showNotification(message, duration = 3000) {
       const notif = document.getElementById('notification');
       notif.textContent = message;
@@ -565,20 +624,24 @@ $totalMes = $stmt->fetchColumn();
     // Búsqueda Productos
     const productSearch = document.getElementById('productSearch');
     const productsBody = document.getElementById('productsBody');
-    productSearch.addEventListener('input', () => {
-      const q = productSearch.value.trim().toLowerCase();
-      [...productsBody.rows].forEach(tr => {
-        const cells = [...tr.cells].map(td => td.textContent.toLowerCase());
-        const show = !q || cells.some(t => t.includes(q));
-        tr.style.display = show ? '' : 'none';
+    if (productSearch && productsBody) {
+      productSearch.addEventListener('input', () => {
+        const q = productSearch.value.trim().toLowerCase();
+        [...productsBody.rows].forEach(tr => {
+          const cells = [...tr.cells].map(td => td.textContent.toLowerCase());
+          const show = !q || cells.some(t => t.includes(q));
+          tr.style.display = show ? '' : 'none';
+        });
       });
-    });
+    }
 
-    // Ordenamiento genérico (ahora usa data-ts si está)
+    // Ordenamiento genérico (usa data-ts si está)
     function enableSorting(tableId){
       const table = document.getElementById(tableId);
+      if (!table) return;
       const thead = table.tHead;
       const tbody = table.tBodies[0];
+      if (!thead || !tbody) return;
       const getCellValue = (tr, idx) => tr.children[idx].textContent.trim();
 
       [...thead.rows[0].cells].forEach((th, idx) => {
@@ -625,12 +688,12 @@ $totalMes = $stmt->fetchColumn();
     let page = 1;
 
     function getFilteredSalesRows(){
-      const q = salesSearch.value.trim().toLowerCase();
-      const min = parseFloat(minTotal.value || ''); const max = parseFloat(maxTotal.value || '');
+      const q = (salesSearch?.value || '').trim().toLowerCase();
+      const min = parseFloat(minTotal?.value || ''); const max = parseFloat(maxTotal?.value || '');
       const now = new Date(); now.setHours(0,0,0,0);
       let fromTs = Number.NEGATIVE_INFINITY;
 
-      const opt = dateQuick.value;
+      const opt = dateQuick?.value || 'all';
       if (opt === 'today') fromTs = now.getTime();
       else if (!isNaN(parseInt(opt))) {
         const days = parseInt(opt);
@@ -638,7 +701,7 @@ $totalMes = $stmt->fetchColumn();
         fromTs = from.getTime();
       }
 
-      const allRows = [...salesBody.rows];
+      const allRows = salesBody ? [...salesBody.rows] : [];
       return allRows.filter(tr => {
         const tds = [...tr.cells];
         const textHit = !q || tds.slice(0,8).some(td => td.textContent.toLowerCase().includes(q));
@@ -655,11 +718,12 @@ $totalMes = $stmt->fetchColumn();
     }
 
     function renderSales(){
+      if (!salesBody) return;
       const rows = [...salesBody.rows];
       rows.forEach(r => r.style.display = 'none');
 
       const filtered = getFilteredSalesRows();
-      const perPage = parseInt(rowsPerPage.value, 10) || 20;
+      const perPage = parseInt((rowsPerPage?.value || '20'), 10) || 20;
       const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
       if (page > totalPages) page = totalPages;
 
@@ -667,18 +731,18 @@ $totalMes = $stmt->fetchColumn();
       const end = start + perPage;
       filtered.slice(start, end).forEach(r => r.style.display = '');
 
-      pageInfo.textContent = `Página ${page} de ${totalPages} — ${filtered.length} resultados`;
-      prevPage.disabled = page <= 1;
-      nextPage.disabled = page >= totalPages;
+      if (pageInfo) pageInfo.textContent = `Página ${page} de ${totalPages} — ${filtered.length} resultados`;
+      if (prevPage) prevPage.disabled = page <= 1;
+      if (nextPage) nextPage.disabled = page >= totalPages;
     }
 
-    salesSearch.addEventListener('input', () => { page = 1; renderSales(); });
-    dateQuick.addEventListener('change', () => { page = 1; renderSales(); });
-    minTotal.addEventListener('input', () => { page = 1; renderSales(); });
-    maxTotal.addEventListener('input', () => { page = 1; renderSales(); });
-    rowsPerPage.addEventListener('change', () => { page = 1; renderSales(); });
-    prevPage.addEventListener('click', () => { if (page>1){ page--; renderSales(); }});
-    nextPage.addEventListener('click', () => { page++; renderSales(); });
+    salesSearch?.addEventListener('input', () => { page = 1; renderSales(); });
+    dateQuick?.addEventListener('change', () => { page = 1; renderSales(); });
+    minTotal?.addEventListener('input', () => { page = 1; renderSales(); });
+    maxTotal?.addEventListener('input', () => { page = 1; renderSales(); });
+    rowsPerPage?.addEventListener('change', () => { page = 1; renderSales(); });
+    prevPage?.addEventListener('click', () => { if (page>1){ page--; renderSales(); }});
+    nextPage?.addEventListener('click', () => { page++; renderSales(); });
 
     renderSales();
   </script>
