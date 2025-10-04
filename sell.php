@@ -62,6 +62,14 @@ if (!$categories) {
     foreach ($names as $n) $categories[] = ['value' => $n, 'name' => $n, 'kind' => 'name', 'id' => ''];
   }
 }
+
+// Placeholder SVG (en data URI) para carrito y onerror
+$PLACEHOLDER_DATAURI = 'data:image/svg+xml;utf8,' . rawurlencode(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="140" height="120" viewBox="0 0 24 24" fill="none">
+     <rect x="3" y="3" width="18" height="14" rx="2" stroke="#94a3b8" stroke-width="2"/>
+     <path d="m3 13 4-4 3 3 5-5 4 4" stroke="#94a3b8" stroke-width="2" fill="none"/>
+   </svg>'
+);
 ?>
 <!doctype html>
 <html lang="es">
@@ -128,7 +136,7 @@ if (!$categories) {
 
     .card{ background:#fff; border:1px solid var(--gray-200); border-radius:18px; box-shadow: var(--shadow); overflow:hidden; transition: transform .15s, box-shadow .2s; padding:14px; text-align:center; }
     .card:hover{ transform:translateY(-2px); box-shadow: var(--shadow-lg); }
-    .card-img{ width:140px; height:120px; object-fit:contain; background:var(--gray-100); margin:8px auto 6px; border-radius:12px; }
+    .card-img{ width:140px; height:120px; object-fit:contain; background:var(--gray-100); margin:8px auto 6px; border-radius:12px; display:grid; place-items:center; color:#94a3b8; }
     @media (max-width:640px){ .card-img{ width:110px; height:90px; } }
 
     .p-name{ font-weight:800; margin:6px 0 6px; font-size:14px; line-height:1.25; }
@@ -166,6 +174,7 @@ if (!$categories) {
     .cart-item{ border:1px solid var(--gray-200); border-radius:12px; padding:10px; display:flex; gap:12px; align-items:center; background:#fff; box-shadow: var(--shadow); animation: enter .26s ease forwards; }
     @keyframes enter{ from{opacity:.0; transform: translateY(6px)} to{opacity:1; transform: translateY(0)} }
     .thumb{ width:56px; height:56px; border-radius:10px; object-fit:cover; background:#fff; }
+
     .meta{ flex:1; min-width:0; }
     .meta .t{ font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .meta .s{ font-size:12px; color:#6b7280 }
@@ -275,7 +284,25 @@ if (!$categories) {
                  data-stock="<?= $stock ?>"
                  data-category-id="<?= htmlspecialchars($prodCatId) ?>"
                  data-category-name="<?= htmlspecialchars($catName) ?>">
-              <img class="card-img" src="<?= htmlspecialchars($img) ?>" alt="<?= htmlspecialchars($p['name']) ?>">
+
+              <?php if ($img): ?>
+                <!-- Imagen real con fallback onerror a SVG -->
+                <img
+                  class="card-img"
+                  src="<?= htmlspecialchars($img) ?>"
+                  alt="<?= htmlspecialchars($p['name']) ?>"
+                  onerror="this.onerror=null;this.src='<?= $PLACEHOLDER_DATAURI ?>';"
+                >
+              <?php else: ?>
+                <!-- Placeholder SVG (sin <img> roto) -->
+                <div class="card-img">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <rect x="3" y="3" width="18" height="14" rx="2" stroke="#94a3b8" stroke-width="2"/>
+                    <path d="m3 13 4-4 3 3 5-5 4 4" stroke="#94a3b8" stroke-width="2" fill="none"/>
+                  </svg>
+                </div>
+              <?php endif; ?>
+
               <div class="p-name"><?= htmlspecialchars($p['name']) ?></div>
               <div class="pill"><?= htmlspecialchars($pillText) ?></div>
               <div class="stock-line <?= $stockClass ?>">Stock: <?= $stock ?></div>
@@ -339,8 +366,15 @@ if (!$categories) {
 /* ====== Datos desde PHP ====== */
 const products = <?= json_encode($products, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT); ?>;
 const CURRENCY = <?= json_encode($currencySymbol) ?>;
+/* Placeholder SVG para miniaturas en carrito (data URI) */
+const PLACEHOLDER_SVG = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" fill="none">' +
+  '<rect x="3" y="3" width="18" height="14" rx="2" stroke="#94a3b8" stroke-width="2"/>' +
+  '<path d="m3 13 4-4 3 3 5-5 4 4" stroke="#94a3b8" stroke-width="2" fill="none"/>' +
+  '</svg>'
+);
 
-/* ====== refs (UNA sola vez; no redefinir luego) ====== */
+/* ====== refs (UNA sola vez) ====== */
 const selectedProductId = document.getElementById('selected_product_id');
 const unitPriceInput    = document.getElementById('unit_price');
 const quantityInput     = document.getElementById('quantity');
@@ -382,11 +416,10 @@ function fmt(n){ return (CURRENCY ? (CURRENCY + ' ') : '') + Number(n || 0).toFi
 function escapeHtml(str){ return str ? String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;') : ''; }
 function showToast(message, ms=2500){ if(!message) return; toastEl.textContent = message; toastEl.classList.add('show'); setTimeout(()=> toastEl.classList.remove('show'), ms); }
 
-/* Mostrar/ocultar dock (mobile) */
+/* Dock mostrar/ocultar (mobile) */
 function updateDock(total, count){
   dockCount.textContent = String(count);
   dockTotal.textContent = fmt(total).replace(/^(\S+)\s?/, '$1 ');
-  // Se añade clase _show SOLO si hay items; el CSS la muestra en ≤1024px
   if (count > 0) { dock.classList.add('_show'); } else { dock.classList.remove('_show'); }
 }
 
@@ -427,10 +460,12 @@ function renderCart(){
     var it = cart[idx];
     subtotal += it.unit_price * it.quantity;
 
+    var imgSrc = (it.image && it.image.trim()) ? escapeHtml(it.image) : PLACEHOLDER_SVG;
+
     var row = document.createElement('div');
     row.className = 'cart-item';
     row.innerHTML =
-      '<img class="thumb" src="'+escapeHtml(it.image||'')+'" alt="">' +
+      '<img class="thumb" src="'+ imgSrc +'" alt="">' +
       '<div class="meta">' +
         '<div class="t">'+escapeHtml(it.name)+'</div>' +
         '<div class="s">'+escapeHtml(it.size? it.size : '')+(it.size && it.color ? ' · ' : '')+escapeHtml(it.color? it.color : '')+'</div>' +
