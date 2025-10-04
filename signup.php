@@ -139,6 +139,11 @@ unset($_SESSION['flash']);
 
     .footer{margin-top:14px;text-align:center;color:var(--subtext);font-size:.95rem}
     a{color:var(--primary);text-decoration:none} a:hover{text-decoration:underline}
+
+/* signup: quitar ícono hamburguesa en todas las resoluciones */
+.site-header .hamb{ display:none !important; }
+
+
   </style>
 </head>
 <body>
@@ -229,7 +234,7 @@ unset($_SESSION['flash']);
             <input class="input" id="phone_local" name="phone" type="tel" placeholder="Tu número local" required autocomplete="tel"
                    inputmode="tel" pattern="^[0-9()\s\-\.]{6,20}$" aria-describedby="phoneHelp">
           </div>
-          <div class="hint" id="phoneHelp">Sólo tu número local (puedes incluir espacios, guiones o paréntesis).</div>
+          <div class="hint" id="phoneHelp">Ingresa tu numero de telefono. Puedes incluir el codigo del pais.</div>
         </div>
 
         <!-- Contraseña -->
