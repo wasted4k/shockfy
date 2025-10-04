@@ -16,7 +16,6 @@ $current_tz       = $user['timezone']      ?? 'America/New_York';
 $current_fmt      = $user['time_format']   ?? '12h';
 
 // ===== Sincronización del avatar con la sesión =====
-// Intentar cargar avatar existente desde disco (convención: uploads/avatars/{user_id}.{ext})
 $avatarUrl = null;
 $avatarCandidates = [
   "uploads/avatars/{$user_id}.jpg",
@@ -26,7 +25,6 @@ $avatarCandidates = [
 ];
 foreach ($avatarCandidates as $path) {
   if (file_exists($path)) {
-    // Generar URL pública relativa + cache-busting
     $avatarUrl = $path . '?v=' . filemtime($path);
     break;
   }
@@ -36,10 +34,7 @@ foreach ($avatarCandidates as $path) {
 if ($avatarUrl) {
   $_SESSION['avatar_url'] = $avatarUrl;
 } else {
-  // Si no hay archivo en disco, limpia la variable de sesión (p.ej., tras eliminar avatar)
-  if (isset($_SESSION['avatar_url'])) {
-    unset($_SESSION['avatar_url']);
-  }
+  if (isset($_SESSION['avatar_url'])) unset($_SESSION['avatar_url']);
 }
 
 // Mensajes flash
@@ -72,22 +67,25 @@ unset($_SESSION['ajustes_success'], $_SESSION['ajustes_error']);
       --shadow:0 10px 22px rgba(15,23,42,.06);
       --radius:16px;
     }
-    body{ background:var(--bg); color:var(--text); }
+    *{ box-sizing:border-box }
+    html,body{ overflow-x:hidden; }
+    body{ background:var(--bg); color:var(--text); margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
     body.dark{ background:#1f2125; color:#e9edf5; }
 
     .app-shell{ display:flex; min-height:100vh; }
-    .content{ flex:1; padding:28px 24px 48px; }
+
+    /* Empuje por sidebar en escritorio; en móvil no se empuja */
+    .content{ flex:1; padding:28px 24px 48px; transition: margin-left .3s ease; }
     .with-fixed-sidebar{ margin-left:var(--sidebar-w); }
+    @media (max-width:1024px){
+      .with-fixed-sidebar{ margin-left:0; padding:24px 16px 64px; }
+    }
 
     .header-wrap{ max-width:980px; margin:0 auto 18px; text-align:center; }
-    .page-title{
-      font-size:30px; font-weight:800; letter-spacing:.2px; margin:0;
-    }
+    .page-title{ font-size:30px; font-weight:800; letter-spacing:.2px; margin:0; }
     .page-sub{ color:var(--muted); margin-top:6px; font-size:13px; }
 
-    .grid{
-      max-width:980px; margin:0 auto; display:grid; gap:18px; grid-template-columns:1fr;
-    }
+    .grid{ max-width:980px; margin:0 auto; display:grid; gap:18px; grid-template-columns:1fr; }
 
     .card{
       background:var(--card); border:1px solid var(--border);
@@ -109,9 +107,11 @@ unset($_SESSION['ajustes_success'], $_SESSION['ajustes_error']);
       width:100%; padding:12px 14px; border:1px solid #d1d5db; border-radius:12px; outline:none; background:#fff; font-size:15px;
       transition:border .2s, box-shadow .2s, background .2s, color .2s;
     }
-    input:focus, select:focus{
-      border-color:var(--primary); box-shadow:0 0 0 4px var(--ring);
+    /* Evita zoom iOS en mobile */
+    @media (max-width:640px){
+      input[type="text"], input[type="password"], select, input[type="file"]{ font-size:16px; }
     }
+    input:focus, select:focus{ border-color:var(--primary); box-shadow:0 0 0 4px var(--ring); }
     body.dark input, body.dark select, body.dark input[type="file"]{ background:#323644; color:#e9edf5; border-color:#475569; }
     body.dark input:focus, body.dark select:focus{ box-shadow:0 0 0 4px rgba(41,158,230,.25); }
 
@@ -129,6 +129,10 @@ unset($_SESSION['ajustes_success'], $_SESSION['ajustes_error']);
     body.dark .btn.ghost{ background:#2b303c; color:#e9edf5; border-color:#3b4252; }
 
     .actions{ display:flex; gap:12px; justify-content:flex-end; margin-top:12px; }
+    @media (max-width:640px){
+      .actions{ flex-direction:column; align-items:stretch; }
+      .actions .btn{ width:100%; justify-content:center; }
+    }
 
     .alert{ padding:12px 16px; border-radius:12px; font-weight:700; text-align:center; margin-bottom:14px; }
     .alert-success{ background:var(--success); color:#fff; }
@@ -136,6 +140,7 @@ unset($_SESSION['ajustes_success'], $_SESSION['ajustes_error']);
 
     /* Avatar block */
     .profile-block{ display:flex; gap:16px; align-items:center; }
+    @media (max-width:640px){ .profile-block{ flex-direction:column; align-items:flex-start; } }
     .avatar{
       width:92px; height:92px; border-radius:14px; background:linear-gradient(135deg,#202040,#2a2850);
       display:grid; place-items:center; border:1px solid rgba(0,0,0,.07); overflow:hidden;
@@ -169,24 +174,10 @@ unset($_SESSION['ajustes_success'], $_SESSION['ajustes_error']);
     .pw-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
     @media (max-width:720px){ .pw-grid{ grid-template-columns:1fr; } }
 
-
-/* --- Espaciado de textos descriptivos bajo inputs/selects --- */
-.sub{
-  margin: 8px 0 12px !important;   /* antes: -6px 0 12px */
-  line-height: 1.4;
-}
-.help{
-  margin-top: 8px !important;      /* antes: 4px */
-  line-height: 1.4;
-}
-
-/* Por si algún control necesita un poco de aire extra */
-input[type="text"],
-input[type="password"],
-input[type="file"],
-select {
-  margin-bottom: 4px;               /* añade un pelín de separación del texto de ayuda */
-}
+    /* --- Espaciado de ayudas bajo inputs --- */
+    .sub{ margin:8px 0 12px !important; line-height:1.4; }
+    .help{ margin-top:8px !important; line-height:1.4; }
+    input[type="text"], input[type="password"], input[type="file"], select { margin-bottom:4px; }
   </style>
 </head>
 <body>
@@ -223,14 +214,13 @@ select {
                 </svg>
               <?php endif; ?>
             </div>
-            <div style="flex:1">
+            <div style="flex:1; width:100%;">
               <label for="avatar">Foto de perfil</label>
               <input type="file" id="avatar" name="avatar" accept="image/png,image/jpeg,image/webp">
               <div class="hint" id="avatarHint">Formatos: JPG, PNG o WEBP — Máx 2MB.</div>
               <div class="inline-actions">
                 <button type="button" class="btn linklike" id="btnRemoveAvatar">
-                  <!-- SVG borrar -->
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M9 6v12m6-12v12M5 6l1 14a2 2 0 002 2h8a2 2 0 002-2l1-14M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M9 6v12m6-12v12M5 6l1 14a2 2 0 002 2h8a2 2 0 002-2l1-14M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                   Quitar imagen
                 </button>
               </div>
@@ -246,10 +236,10 @@ select {
                 <svg class="icon-left" viewBox="0 0 24 24" fill="none"><path d="M12 12a5 5 0 100-10 5 5 0 000 10zM3 21a9 9 0 1118 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                 <input class="with-icon" type="text" id="full_name" name="full_name" value="<?= htmlspecialchars($user['full_name'] ?? '') ?>" required>
               </div>
-              <div class="sub">Para saber como llamarte :)</div>
+              <div class="sub">Para saber cómo llamarte :)</div>
             </div>
             <div>
-              <label for="username">Correo eletrónico</label>
+              <label for="username">Correo electrónico</label>
               <div class="field">
                 <svg class="icon-left" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h8M4 18h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                 <input class="with-icon" type="text" id="username" value="<?= htmlspecialchars($user['username'] ?? '') ?>" disabled>
@@ -308,19 +298,17 @@ select {
 
           <div class="actions">
             <button type="button" class="btn ghost" onclick="window.history.back()">
-              <!-- flecha -->
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M10 19l-7-7 7-7M3 12h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
               Volver
             </button>
             <button type="submit" class="btn">
-              <!-- disquete -->
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M7 3h10l4 4v14H7z" stroke="currentColor" stroke-width="2"/><path d="M7 7h8v4H7zM13 21v-6" stroke="currentColor" stroke-width="2"/></svg>
               Guardar cambios
             </button>
           </div>
         </form>
 
-        <!-- CAMBIO DE CONTRASEÑA (estético, con SVGs) -->
+        <!-- CAMBIO DE CONTRASEÑA -->
         <form class="card" action="cambiar_password.php" method="POST" novalidate>
           <h3>Seguridad</h3>
           <div class="sub">Actualiza tu contraseña para proteger tu cuenta</div>
@@ -329,11 +317,9 @@ select {
             <div>
               <label for="current_password">Contraseña actual</label>
               <div class="field">
-                <!-- candado -->
                 <svg class="icon-left" viewBox="0 0 24 24" fill="none"><path d="M7 10V7a5 5 0 0110 0v3M5 10h14v10H5z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                 <input class="with-icon" type="password" id="current_password" name="current_password" required>
                 <span class="toggle-vis" data-target="current_password" title="Mostrar/Ocultar">
-                  <!-- ojo -->
                   <svg viewBox="0 0 24 24" fill="none"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg>
                 </span>
               </div>
@@ -365,7 +351,6 @@ select {
 
             <div style="display:flex; align-items:flex-end;">
               <button type="submit" class="btn" style="width:100%">
-                <!-- shield -->
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2l7 3v6c0 5-3.5 9-7 11-3.5-2-7-6-7-11V5l7-3z" stroke="currentColor" stroke-width="2"/></svg>
                 Actualizar contraseña
               </button>
@@ -378,11 +363,7 @@ select {
   </div>
 
   <script>
-    // ===== Configurables (mantén estos en sync con el servidor) =====
-    const MAX_FILE_MB = 2;                    // Tamaño máximo en MB (cliente)
-    const MAX_BYTES   = MAX_FILE_MB * 1024 * 1024;
-    const MAX_W       = 2000;                 // Ancho máximo en px (cliente)
-    const MAX_H       = 2000;                 // Alto máximo en px (cliente)
+    const MAX_FILE_MB = 2, MAX_BYTES = MAX_FILE_MB * 1024 * 1024, MAX_W = 2000, MAX_H = 2000;
 
     // Dark mode persistente
     (function(){ if(localStorage.getItem('darkMode')==='true'){ document.body.classList.add('dark'); } })();
@@ -463,13 +444,12 @@ select {
     fillCountries();
     fillTimezones(currentCountry);
 
-    // ===== Avatar preview & remover (con validación de tamaño y dimensiones) =====
+    // ===== Avatar preview & remover =====
     const inputAvatar  = document.getElementById('avatar');
     const avatarBox    = document.getElementById('avatarBox');
     const btnRemove    = document.getElementById('btnRemoveAvatar');
     const avatarHint   = document.getElementById('avatarHint');
 
-    // Actualiza el texto de ayuda con los límites actuales
     if (avatarHint) {
       avatarHint.textContent = `Formatos: JPG, PNG o WEBP — Máx ${MAX_FILE_MB}MB, hasta ${MAX_W}×${MAX_H}px.`;
     }
@@ -483,53 +463,33 @@ select {
       const f = inputAvatar.files?.[0];
       if (!f) return;
 
-      // 1) Validar tipo
       const okType = /image\/(jpeg|png|webp)/i.test(f.type);
       if (!okType){
         alert('Formato inválido. Usa JPG, PNG o WEBP.');
-        inputAvatar.value='';
-        return;
+        inputAvatar.value=''; return;
       }
-
-      // 2) Validar tamaño (bytes)
       if (f.size > MAX_BYTES){
-        alert(`La imagen supera ${MAX_FILE_MB}MB.`);
-        inputAvatar.value='';
-        return;
+        alert(`La imagen supera ${MAX_FILE_MB}MB.`); inputAvatar.value=''; return;
       }
 
-      // 3) Validar dimensiones (cargamos la imagen en memoria)
       const url = URL.createObjectURL(f);
       const imgProbe = new Image();
       imgProbe.onload = () => {
-        const w = imgProbe.naturalWidth;
-        const h = imgProbe.naturalHeight;
+        const w = imgProbe.naturalWidth, h = imgProbe.naturalHeight;
         URL.revokeObjectURL(url);
-
         if (w > MAX_W || h > MAX_H) {
           alert(`Dimensiones máximas: ${MAX_W}×${MAX_H}px. Esta imagen es ${w}×${h}px.`);
-          inputAvatar.value='';
-          return;
+          inputAvatar.value=''; return;
         }
-
-        // 4) Mostrar preview en el cuadro
         let img = document.getElementById('avatarPreview');
         if (!img){
-          img = document.createElement('img');
-          img.id = 'avatarPreview';
-          avatarBox.innerHTML = '';
-          avatarBox.appendChild(img);
+          img = document.createElement('img'); img.id = 'avatarPreview';
+          avatarBox.innerHTML = ''; avatarBox.appendChild(img);
         }
-        img.src = URL.createObjectURL(f); // usamos otra URL para el preview visible
-
-        // 5) Si había “quitar imagen” marcado, lo limpiamos
+        img.src = URL.createObjectURL(f);
         resetRemoveFlagIfAny();
       };
-      imgProbe.onerror = () => {
-        URL.revokeObjectURL(url);
-        alert('No se pudo leer la imagen seleccionada.');
-        inputAvatar.value='';
-      };
+      imgProbe.onerror = () => { URL.revokeObjectURL(url); alert('No se pudo leer la imagen seleccionada.'); inputAvatar.value=''; };
       imgProbe.src = url;
     });
 
@@ -579,6 +539,9 @@ select {
         confirm.setCustomValidity('Las contraseñas no coinciden');
       } else { confirm.setCustomValidity(''); }
     });
+
+    // Dark mode inicial
+    if (localStorage.getItem('darkMode') === 'true') document.body.classList.add('dark');
   </script>
 </body>
 </html>
