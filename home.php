@@ -385,8 +385,8 @@ $displayName = $_SESSION['full_name'] ?? $_SESSION['username'] ?? $_SESSION['ema
 
         <div class="mock-cards">
           <div class="mcard">
-            <h5>Ventas del mes</h5>
-            <div class="val ok">$ 12,450</div>
+            <h5>Ventas mensuales</h5>
+            <div class="val ok">$ 42,450</div>
           </div>
           <div class="mcard">
             <h5>Ganancia</h5>
