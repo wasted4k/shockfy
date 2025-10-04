@@ -294,7 +294,52 @@ $totalMes = $stmt->fetchColumn();
     body.dark .banner.warn{
       background:#221709; border-color:#5c3a0b; color:#f2c48a;
     }
-  </style>
+  
+
+/* === Mobile-first responsive tweaks (index-only) === */
+/* Sidebar-aware content shift (no cambios en sidebar.php) */
+:root{
+  --sidebar-collapsed: 78px;
+  --sidebar-expanded: 250px;
+}
+/* Desktop: empuja el contenido según el estado del sidebar */
+.sidebar ~ .page{ margin-left: var(--sidebar-collapsed); transition: margin-left .3s ease; }
+.sidebar.open ~ .page{ margin-left: var(--sidebar-expanded); }
+
+/* Hero y cabeceras */
+@media (max-width: 1024px){
+  .hero{ flex-direction: column; align-items: flex-start; gap: 10px; }
+  .cta-row{ width: 100%; }
+  .section .section-header{ flex-direction: column; align-items: flex-start; gap: 10px; }
+  .section-tools{ width: 100%; }
+}
+@media (max-width: 768px){
+  .page{ padding: 18px 12px 64px; }
+  .container{ padding: 12px; }
+  .pill{ width: 100%; }
+  .pill input, .pill select{ width: 100%; min-width: 0; }
+  /* inputs con width fija inline */
+  #minTotal, #maxTotal{ width: 100% !important; }
+}
+
+/* Tablas: scroll horizontal en pantallas pequeñas sin romper estilos */
+@media (max-width: 980px){
+  table{ display: block; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  thead, tbody{ display: table; width: 100%; table-layout: fixed; }
+  th, td{ white-space: nowrap; }
+}
+
+/* Sidebar: en móviles fuerza tamaño colapsado para evitar solapamiento (override local) */
+@media (max-width: 768px){
+  .sidebar{ width: var(--sidebar-collapsed) !important; }
+  .sidebar.open{ width: var(--sidebar-collapsed) !important; }
+}
+/* Tipografía ultra pequeña */
+@media (max-width: 400px){
+  .hero h1{ font-size: 24px; }
+}
+/* === Fin de tweaks index-only === */
+</style>
 </head>
 
 <body class="home">
