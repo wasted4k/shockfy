@@ -3,8 +3,6 @@ require 'db.php';
 require_once __DIR__ . '/auth_check.php'; // proteger el login y mandarlo a welcome si la persona no ha verificado su email
 require 'auth.php'; // requiere iniciar sesion
 
-
-
 $id = intval($_GET['id'] ?? 0);
 $product = $pdo->prepare("SELECT * FROM products WHERE id=?");
 $product->execute([$id]);
@@ -65,6 +63,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
 <head>
   <meta charset="utf-8">
   <title>Editar producto</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"> <!-- importante para móvil -->
   <link rel="stylesheet" href="style.css">
   <style>
     :root{
@@ -80,11 +79,24 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
       --radius:16px;
     }
     *{box-sizing:border-box}
-    body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-      background:linear-gradient(180deg,#fff,#f9fbff 45%,var(--bg));color:var(--text)}
+    html,body{overflow-x:hidden;}
+    body{
+      margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+      background:linear-gradient(180deg,#fff,#f9fbff 45%,var(--bg));color:var(--text)
+    }
     a{color:inherit;text-decoration:none}
 
-    .page{padding:24px 20px 64px}
+    /* Sidebar-aware: empuja en desktop, no en móvil */
+    .page{
+      padding:24px 20px 64px;
+      transition: margin-left .3s ease;
+    }
+    .sidebar ~ .page{ margin-left:78px; }
+    .sidebar.open ~ .page{ margin-left:250px; }
+    @media (max-width:1024px){
+      .sidebar ~ .page, .sidebar.open ~ .page{ margin-left:0; padding:20px 16px 72px; }
+    }
+
     .header{
       max-width:980px;margin:0 auto 16px;
       display:flex;align-items:center;gap:14px;
@@ -93,8 +105,12 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
       width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#e0edff,#f1f7ff);
       display:grid;place-items:center;border:1px solid #dbeafe;box-shadow:var(--shadow)
     }
-    .header h1{margin:0;font-size:22px;font-weight:800}
+    .header h1{margin:0;font-size:22px;font-weight:800;line-height:1.2}
     .subtitle{font-size:13px;color:var(--muted);margin-top:2px}
+    @media (max-width:640px){
+      .header{ gap:12px; }
+      .header h1{ font-size:20px; }
+    }
 
     .card{
       max-width:980px;margin:0 auto;background:var(--panel);
@@ -102,7 +118,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
       box-shadow:var(--shadow);overflow:hidden
     }
     .card-head{
-      display:flex;align-items:center;justify-content:space-between;
+      display:flex;align-items:center;justify-content:space-between;gap:10px;
       padding:14px 16px;background:linear-gradient(180deg,#ffffff,#f7fafc);border-bottom:1px solid var(--border)
     }
     .card-body{padding:18px}
@@ -116,6 +132,10 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
       padding:10px 12px;outline:none;font-size:14px;transition:border .2s ease, box-shadow .2s ease
     }
     .input:focus, .select:focus{border-color:#bfdbfe;box-shadow:0 0 0 4px rgba(191,219,254,.4)}
+    /* Evita zoom iOS */
+    @media (max-width:640px){
+      .input, .select{ font-size:16px; }
+    }
 
     /* Bloque imagen */
     .image-section{
@@ -139,9 +159,13 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
       border:1px solid #fecaca;background:#fef2f2;color:#991b1b
     }
 
-    @media (max-width:800px){
+    @media (max-width:900px){
       .form-grid{grid-template-columns:1fr}
       .image-section{grid-template-columns:1fr}
+    }
+    @media (max-width:560px){
+      .image-preview{ width:100%; height:200px; }
+      .btn{ width:100%; text-align:center; }
     }
   </style>
 </head>
@@ -249,7 +273,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
             </div>
           </div>
 
-          <!-- Botonera secundaria (mobile) -->
+          <!-- Botonera secundaria (si algún tema oculta la superior, puedes usar esta) -->
           <div class="actions" style="display:none">
             <a href="products.php" class="btn ghost">Cancelar</a>
             <button type="submit" class="btn primary">Guardar cambios</button>
@@ -263,7 +287,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     // Mantener modo oscuro si estaba activo
     (function(){
       if(localStorage.getItem('darkMode')==='true'){
-        document.body.classList.add('dark'); // (no hay estilos dark aquí, pero respetamos tu preferencia)
+        document.body.classList.add('dark');
       }
     })();
 
@@ -294,10 +318,8 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     btnClear.addEventListener('click', () => {
       // Limpia únicamente la selección actual del input file (no borra la imagen existente del producto)
       imageInput.value = '';
-      // Si había imagen original y existe en el DOM, la conservamos; si se había reemplazado por preview, mostrar placeholder
       const existingImg = previewBox.querySelector('img');
       if(existingImg){
-        // Si hay imagen original en el src igual a archivo local (data:), quítala y vuelve a placeholder
         if(existingImg.src.startsWith('data:')){
           previewBox.innerHTML = `
             <svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="40" height="40" aria-hidden="true">
@@ -305,7 +327,6 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
               <path d="m3 13 4-4 3 3 5-5 4 4"/>
             </svg>`;
         }
-        // Si el src era una ruta del servidor (imagen actual), no la tocamos: queda como está.
       }
     });
   </script>
