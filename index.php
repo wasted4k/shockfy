@@ -294,60 +294,7 @@ $totalMes = $stmt->fetchColumn();
     body.dark .banner.warn{
       background:#221709; border-color:#5c3a0b; color:#f2c48a;
     }
-  
-
-/* === Responsive fixes (index-only, no HTML changes) === */
-
-/* Make tables scrollable on small screens without changing markup */
-.table-responsive{ width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; }
-.table-responsive > table{ width:100%; border-collapse:collapse; }
-.table-responsive th, .table-responsive td{ white-space:nowrap; }
-
-/* If tables are not wrapped, still try to keep them usable */
-@media (max-width: 980px){
-  table{ display:block; width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; }
-  thead, tbody, tr{ display:table; width:100%; table-layout:fixed; }
-  th, td{ white-space:nowrap; }
-}
-
-/* Hero and headers stack */
-@media (max-width: 1024px){
-  .hero{ flex-direction:column; align-items:flex-start; gap:12px; }
-  .cta-row{ width:100%; }
-  .section .section-header{ flex-direction:column; align-items:flex-start; gap:10px; }
-  .section-tools{ width:100%; }
-}
-
-/* Filters and pills full width on phones */
-@media (max-width: 768px){
-  .page{ padding:18px 12px 64px; }
-  .container{ padding:12px; }
-  .pill{ width:100%; }
-  .pill input, .pill select{ width:100%; min-width:0; }
-  #minTotal, #maxTotal{ width:100% !important; }
-}
-
-/* Stats grid collapse */
-@media (max-width: 1024px){
-  .stats{ grid-template-columns: 1fr 1fr; }
-}
-@media (max-width: 640px){
-  .stats{ grid-template-columns: 1fr; }
-  .stat-card{ align-items:flex-start; }
-}
-
-/* Prevent sidebar open state from crushing content on phones */
-@media (max-width: 640px){
-  .sidebar.open ~ .page{ margin-left: 78px; }
-}
-
-/* Very small phones: tame headings */
-@media (max-width: 380px){
-  .hero h1{ font-size:22px; }
-}
-/* === End responsive fixes === */
-
-</style>
+  </style>
 </head>
 
 <body class="home">
