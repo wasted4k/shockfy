@@ -245,6 +245,29 @@ img, video{ max-width:100%; height:auto; }
 @media (max-width:400px){
   .intro h1{ font-size:26px; }
 }
+
+
+/* --- LOGIN: no comprimir logo; apilar CTA en móvil --- */
+@media (max-width: 560px){
+  .card-top{
+    flex-direction: column;
+    align-items: stretch;    /* que el botón ocupe todo el ancho */
+    gap: 10px;
+  }
+  .brand-circle{ width: 64px; height: 64px; }
+  .brand-circle img{ width: 36px; height: 36px; }
+
+  /* CTA como botón ancho y centrado */
+  .create-inline{
+    align-self: stretch;
+    text-align: center;
+    padding: 12px 14px;
+    font-size: 14px;
+    border-radius: 12px;
+  }
+}
+
+
 </style>
 </head>
 <body>
