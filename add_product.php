@@ -424,7 +424,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         btnRemove.style.display = 'none';
       }
 
-      // Validación rápida de requeridos en cliente (no sustituye backend)
+      // Validación rápida de requeridos en cliente 
       const form = document.getElementById('productForm');
       form.addEventListener('submit', (e) => {
         const name = document.getElementById('name').value.trim();
