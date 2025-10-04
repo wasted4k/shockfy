@@ -294,29 +294,7 @@ $totalMes = $stmt->fetchColumn();
     body.dark .banner.warn{
       background:#221709; border-color:#5c3a0b; color:#f2c48a;
     }
-  
-
-/* === Mobile tweaks for index page (layout-safe) === */
-@media (max-width: 1024px){
-  .hero{ flex-direction: column; align-items: flex-start; gap: 10px; }
-  .hero-left{ align-items: center; }
-  .cta-row{ width: 100%; }
-}
-@media (max-width: 768px){
-  .container{ padding: 12px; }
-  .section .section-header{ flex-direction: column; align-items: flex-start; gap: 10px; }
-  .section-tools{ width: 100%; }
-  .pill{ width: 100%; }
-  .pill input, .pill select{ width: 100%; min-width: 0; }
-}
-
-/* Tables: make them horizontally scrollable on small screens without breaking layout */
-@media (max-width: 980px){
-  table{ display: block; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  thead, tbody, tr{ display: table; width: 100%; table-layout: fixed; }
-  th, td{ white-space: nowrap; }
-}
-</style>
+  </style>
 </head>
 
 <body class="home">
