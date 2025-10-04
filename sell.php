@@ -157,7 +157,7 @@ if (!$categories) {
     .panel-body{ padding:14px; }
     .empty{ text-align:center; color:#9ca3af; font-size:14px; margin-bottom:12px; }
 
-    /* En móvil, panel deja de ser sticky y ocupa 100% debajo */
+    /* En móvil, el panel deja de ser sticky y ocupa 100% debajo */
     @media (max-width:1024px){
       .panel{ position:static; top:auto; }
     }
@@ -202,16 +202,20 @@ if (!$categories) {
     .price-edit:focus{ border-color:#0ea5e9; box-shadow:0 0 0 3px rgba(14,165,233,.15); }
     .price-prefix{ color:#6b7280; font-size:12px; }
 
-    /* Afinado en móviles pequeños */
-    @media (max-width:480px){
-      .page-wrap{ padding:16px 12px 80px; }
-      .section-title{ font-size:22px; }
-      .icon-btn{ height:40px; width:40px; }
-      .btn-blue{ min-width:unset; width:100%; }
-      .meta .t{ white-space:normal; } /* deja saltar línea si el nombre es largo */
-      .row{ flex-wrap:wrap; }
-      .disc-input{ flex:0 0 120px; }
+    /* ===== Barra flotante de carrito (solo móvil si hay items) ===== */
+    .cart-dock{
+      position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%);
+      display: none; /* se controla por JS y breakpoint */
+      align-items: center; justify-content: space-between; gap:12px;
+      width: min(560px, 92vw);
+      background: #0ea5e9; color:#fff; border: 1px solid #dbeafe;
+      padding: 12px 14px; border-radius: 14px; box-shadow: 0 16px 36px rgba(2,6,23,.25);
+      font-weight: 800; z-index: 3001;
     }
+    .cart-dock .count{ display:inline-flex; align-items:center; gap:8px; }
+    .cart-dock .total{ font-size:16px; }
+    .cart-dock .cta{ margin-left:auto; background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.25); border-radius:10px; padding:8px 12px; color:#fff; text-decoration:none; }
+    @media (max-width:1024px){ .cart-dock._show{ display:flex; } }
   </style>
 </head>
 <body>
@@ -287,7 +291,7 @@ if (!$categories) {
       </div>
 
       <!-- ====== Panel Vender ====== -->
-      <aside class="panel">
+      <aside class="panel" id="sellPanel">
         <div class="panel-head">
           <div class="panel-title">Vender</div>
           <div class="items-count" id="cartCount">0 items</div>
@@ -322,6 +326,13 @@ if (!$categories) {
   </div>
 </section>
 
+<!-- ===== Barra flotante de carrito (mobile) ===== -->
+<div class="cart-dock" id="cartDock">
+  <div class="count">🛒 <span id="dockCount">0</span></div>
+  <div class="total" id="dockTotal"><?= htmlspecialchars($currencySymbol) ?> 0.00</div>
+  <a href="#sellPanel" class="cta" id="dockGo">Ir al carrito</a>
+</div>
+
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -329,7 +340,7 @@ if (!$categories) {
 const products = <?= json_encode($products, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT); ?>;
 const CURRENCY = <?= json_encode($currencySymbol) ?>;
 
-/* ====== refs ====== */
+/* ====== refs (UNA sola vez; no redefinir luego) ====== */
 const selectedProductId = document.getElementById('selected_product_id');
 const unitPriceInput    = document.getElementById('unit_price');
 const quantityInput     = document.getElementById('quantity');
@@ -349,6 +360,13 @@ const discountInput= document.getElementById('discountInput');
 const clearCartBtn = document.getElementById('clearCart');
 const toastEl      = document.getElementById('toast');
 
+/* Dock (barra flotante) */
+const dock      = document.getElementById('cartDock');
+const dockCount = document.getElementById('dockCount');
+const dockTotal = document.getElementById('dockTotal');
+const dockGo    = document.getElementById('dockGo');
+const sellPanel = document.getElementById('sellPanel');
+
 let cart = [];
 
 /* ====== batch ====== */
@@ -364,6 +382,14 @@ function fmt(n){ return (CURRENCY ? (CURRENCY + ' ') : '') + Number(n || 0).toFi
 function escapeHtml(str){ return str ? String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;') : ''; }
 function showToast(message, ms=2500){ if(!message) return; toastEl.textContent = message; toastEl.classList.add('show'); setTimeout(()=> toastEl.classList.remove('show'), ms); }
 
+/* Mostrar/ocultar dock (mobile) */
+function updateDock(total, count){
+  dockCount.textContent = String(count);
+  dockTotal.textContent = fmt(total).replace(/^(\S+)\s?/, '$1 ');
+  // Se añade clase _show SOLO si hay items; el CSS la muestra en ≤1024px
+  if (count > 0) { dock.classList.add('_show'); } else { dock.classList.remove('_show'); }
+}
+
 /* ====== totals ====== */
 function recomputeTotals(){
   var subtotal = 0;
@@ -376,6 +402,8 @@ function recomputeTotals(){
   subtotalText.textContent = fmt(subtotal);
   totalText.textContent    = fmt(total);
   totalsBox.style.display = cart.length ? 'block' : 'none';
+
+  updateDock(total, cart.length);
 }
 
 /* ====== render ====== */
@@ -388,6 +416,7 @@ function renderCart(){
     selectedProductId.value = '';
     unitPriceInput.value    = '';
     quantityInput.value     = 1;
+    updateDock(0, 0);
     return;
   }
   emptyMsg.style.display = 'none';
@@ -428,6 +457,8 @@ function renderCart(){
   subtotalText.textContent = fmt(subtotal);
   totalText.textContent = fmt(total);
   totalsBox.style.display = 'block';
+
+  updateDock(total, cart.length);
 }
 
 /* ====== add to cart ====== */
@@ -493,7 +524,7 @@ cartList.addEventListener('click', function(e){
     var qtyEl2 = cartList.querySelector('.qty-val[data-qty="'+i2+'"]');
     if (qtyEl2) qtyEl2.textContent = String(cart[i2].quantity);
     var line2 = cartList.querySelector('.line-subtotal[data-sub="'+i2+'"]');
-    if (line2) line.textContent = fmt(cart[i2].unit_price * cart[i2].quantity);
+    if (line2) line2.textContent = fmt(cart[i2].unit_price * cart[i2].quantity);
 
     recomputeTotals();
     return;
@@ -633,6 +664,13 @@ window.addEventListener('load', function(){
     url.searchParams.delete('msg');
     history.replaceState({}, '', url.pathname + (url.searchParams.toString()? '?'+url.searchParams.toString() : ''));
   }
+});
+
+/* ====== Dock: scroll al carrito ====== */
+dockGo.addEventListener('click', function(ev){
+  ev.preventDefault();
+  if (!sellPanel) return;
+  sellPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
 /* init */
