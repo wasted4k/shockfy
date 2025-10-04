@@ -362,6 +362,28 @@ body.dark .range-item.active{ background:#0e1630 }
   .actions, .header .icon, .sidebar, #sidebar, .range-menu { display:none !important; }
   .container{ box-shadow:none; border:none; margin:0; }
 }
+
+/* === Centrar el container en desktop y dejar espacio a la sidebar === */
+@media (min-width:1025px){
+  /* cancela el pin a la izquierda y centra */
+  .sidebar ~ .container,
+  .sidebar.open ~ .container{
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+  /* reserva aire interno para que el contenido no quede bajo la sidebar */
+  .container{ padding-left: calc(16px + 78px); }           /* sidebar colapsada */
+  .sidebar.open ~ .container{ padding-left: calc(16px + 250px); } /* sidebar abierta */
+}
+
+/* móvil ya estaba OK: sin push y centrado */
+@media (max-width:1024px){
+  .sidebar ~ .container,
+  .sidebar.open ~ .container{ margin-left:0; }
+}
+
+
+
 </style>
 </head>
 <body>
