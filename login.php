@@ -199,7 +199,53 @@ a.cta:active {
 a.cta {
   display: inline-block; 
 }
-  </style>
+  
+/* === Responsive nav enhancements (mobile ≤980px) === */
+.nav-toggle{ display:none; }
+.nav-burger{ display:none; }
+
+@media (max-width:980px){
+  .nav-container{ position:relative; }
+  .nav-burger{
+    display:inline-flex; flex-direction:column; gap:6px;
+    padding:8px; border:1px solid var(--border);
+    border-radius:12px; cursor:pointer; user-select:none;
+  }
+  .nav-burger span{
+    display:block; width:22px; height:2px; background: var(--text);
+    transition: transform .2s ease, opacity .2s ease;
+  }
+  .nav-links{
+    position:absolute; top:100%; left:18px; right:18px;
+    background:rgba(255,255,255,.92); backdrop-filter:blur(10px);
+    border:1px solid var(--border); border-radius:14px;
+    margin-top:8px; padding:12px 16px;
+    display:grid; gap:10px; max-height:0; overflow:hidden;
+    box-shadow: var(--shadow);
+    transition:max-height .25s ease;
+  }
+  #nav-toggle:checked ~ .nav-burger span:nth-child(1){ transform: translateY(8px) rotate(45deg); }
+  #nav-toggle:checked ~ .nav-burger span:nth-child(2){ opacity:0; }
+  #nav-toggle:checked ~ .nav-burger span:nth-child(3){ transform: translateY(-8px) rotate(-45deg); }
+  #nav-toggle:checked ~ #nav-menu{ max-height:420px; }
+  .nav-links a{ display:block; padding:10px 12px; }
+  .nav-links .cta, .nav-links .login-btn{ text-align:center; }
+}
+
+/* Fluid media */
+img, video{ max-width:100%; height:auto; }
+
+/* Helpers stack nicely on small screens */
+@media (max-width:480px){
+  .helpers{ flex-direction:column; align-items:stretch; gap:10px; }
+  .forgot{ align-self:flex-end; }
+}
+
+/* Ultra-small phones */
+@media (max-width:400px){
+  .intro h1{ font-size:26px; }
+}
+</style>
 </head>
 <body>
 
@@ -210,14 +256,17 @@ a.cta {
         <img src="assets/img/icono_menu.png" alt="ShockFy">
         <h3>ShockFy</h3>
       </div>
-      <div class="nav-links">
+      <input type="checkbox" id="nav-toggle" class="nav-toggle" aria-label="Abrir menú" />
+      <label for="nav-toggle" class="nav-burger" aria-label="Abrir menú" aria-controls="nav-menu">
+        <span></span><span></span><span></span>
+      </label>
+      <div class="nav-links" id="nav-menu">
         <a href="home.php#features">Características</a>
         <a href="home.php#how">Cómo funciona</a>
         <a href="home.php#pricing">Precio</a>
         <a href="signup.php" class="cta">Pruébalo gratis</a>
         <a href="login.php" class="login-btn">Iniciar sesión</a>
       </div>
-      <button class="mobile-toggle" aria-label="Abrir menú"><span></span></button>
     </div>
   </nav>
 
