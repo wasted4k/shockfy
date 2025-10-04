@@ -268,6 +268,63 @@ img, video{ max-width:100%; height:auto; }
 }
 
 
+/* LOGIN: centrar y quitar subrayado al link "¿Olvidaste tu contraseña?" */
+.card .helpers{
+  justify-content: center;        /* centra el contenido dentro de la fila */
+}
+
+.card .helpers .forgot,
+.card .helpers .forgot:link,
+.card .helpers .forgot:visited,
+.card .helpers .forgot:hover,
+.card .helpers .forgot:active,
+.card .helpers .forgot:focus{
+  text-decoration: none !important;  /* sin subrayado en todos los estados */
+  display: inline-block;
+  text-align: center;
+}
+
+/* Accesibilidad: indicar foco sin subrayado */
+.card .helpers .forgot:focus-visible{
+  outline: 2px solid #cfe0ff;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* En móviles, asegúrate de que no se alinee a la derecha por reglas previas */
+@media (max-width:480px){
+  .helpers{ align-items: center; }     /* antes podía ser stretch */
+  .forgot{ align-self: center !important; }
+}
+
+
+/* === FIX: ocultar por completo el panel del menú cuando está colapsado === */
+@media (max-width: 980px){
+  /* Estado colapsado (checkbox no marcado) */
+  #nav-toggle ~ #nav-menu{
+    max-height: 0;
+    padding: 0;              /* quita espacio interno */
+    margin-top: 0;           /* quita separación bajo el header */
+    border-width: 0;         /* evita que el borde se vea como una línea/pastilla */
+    background: transparent; /* evita “parche” blanco */
+    box-shadow: none;        /* por si había sombra */
+    opacity: 0;              /* por si hay efectos de fondo translúcido */
+    overflow: hidden;
+  }
+
+  /* Estado expandido (checkbox marcado) */
+  #nav-toggle:checked ~ #nav-menu{
+    max-height: 420px;
+    padding: 12px 16px;
+    margin-top: 8px;
+    border-width: 1px;
+    background: rgba(255,255,255,.92);
+    box-shadow: var(--shadow, 0 10px 24px rgba(0,0,0,.06));
+    opacity: 1;
+  }
+}
+
+
 </style>
 </head>
 <body>

@@ -201,6 +201,106 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     /* FOOTER */
     .foot{padding:12px 18px;border-top:1px solid var(--border);background:#fff;color:var(--muted);font-size:13px}
     .foot-inner{max-width:var(--max);margin:0 auto;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+
+/* ======= MOBILE ≤ 640px ======= */
+@media (max-width:640px){
+  /* Layout general */
+  .wrap{
+    grid-template-columns: 1fr !important;
+    padding: 20px 14px 36px;
+    gap: 18px;
+  }
+  .intro h1{ font-size: 26px; line-height: 1.15; }
+  .intro p{ font-size: 14px; }
+
+  /* Navbar: evita desbordes mostrando solo CTAs */
+  .nav-links{ gap: 8px; flex-wrap: nowrap; }
+  .nav-links a{ padding: 8px 10px; }
+  .nav-links a:not(.cta):not(.login-btn){ display:none; }
+
+  /* Tarjeta compacta */
+  .card{ padding: 22px 16px; border-radius: 16px; }
+
+  /* Encabezado de tarjeta apilado */
+  .card-top{
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .brand-circle{ width: 64px; height: 64px; }
+  .brand-circle img{ width: 36px; height: 36px; object-fit: contain; }
+
+  /* “Volver a iniciar sesión” como botón/link ancho */
+  .card-top .link{
+    align-self: stretch;
+    text-align: center;
+    padding: 10px 12px;
+    border: 1px solid #dbe4ff;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 6px 16px rgba(35,68,236,.08);
+  }
+
+  /* Campos amigables en iOS */
+  input[type="email"]{ font-size:16px; }
+
+  /* Helpers apilados y legibles */
+  .helpers{
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .helpers .link{ text-align:center; }
+}
+
+/* Ultra-chico (≤360px) */
+@media (max-width:360px){
+  .intro h1{ font-size:22px; }
+  .card h2{ font-size:20px; }
+}
+
+
+/* Botón "Volver a iniciar sesión" con paleta del sitio (sin subrayado) */
+.card-top .link{
+  display:inline-flex; align-items:center; justify-content:center;
+  height:38px; padding:0 14px;
+  border-radius:12px; border:1px solid #cfe0ff;
+  background:linear-gradient(135deg, var(--primary), var(--primary-2));
+  color:#fff !important; font-weight:800; letter-spacing:.1px;
+  text-decoration:none !important;
+  box-shadow:0 10px 22px rgba(35,68,236,.18);
+  transition:transform .12s ease, filter .12s ease, box-shadow .12s ease;
+}
+.card-top .link:hover{
+  filter:brightness(.96);
+  transform:translateY(-1px);
+  text-decoration:none !important;
+}
+.card-top .link:focus-visible{
+  outline:2px solid #cfe0ff; outline-offset:2px;
+}
+
+/* En móvil que sea ancho completo y con padding cómodo */
+@media (max-width:640px){
+  .card-top .link{
+    align-self:stretch;
+    height:auto; padding:12px 14px;
+  }
+}
+
+/* "Crear cuenta"  sin subrayado */
+.helpers .link,
+.helpers .link:link,
+.helpers .link:visited,
+.helpers .link:hover,
+.helpers .link:active,
+.helpers .link:focus{
+  text-decoration: none !important;
+}
+
+
+
   </style>
 </head>
 <body>
@@ -261,7 +361,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <div class="helpers">
           <a class="link" href="signup.php">Crear cuenta</a>
-          <span style="font-size:12px;color:#64748b">¿Problemas? Revisa spam o “Promociones”.</span>
+          <span style="font-size:12px;color:#64748b">¿No llega el email? Revisa spam o “Promociones”.</span>
         </div>
       </form>
     </div>
