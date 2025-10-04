@@ -391,6 +391,46 @@ $totalMes = $stmt->fetchColumn();
     @media (max-width: 640px){
       .sidebar.open ~ .page{ margin-left: 78px; }
     }
+
+
+/* ===== PARCHE DEFINITIVO TABLAS EN MÓVIL ===== */
+
+/* 1) Fuerza un ancho mínimo real para que aparezca scroll
+      (ajusta 1100px si necesitas un poco más o menos) */
+.table-wrap > table{
+  min-width: 1100px;       /* evita que las columnas colapsen */
+  table-layout: fixed;     /* reparte el ancho y estabiliza celdas */
+}
+
+/* 2) Evita que el texto se “escape” de las celdas y se monte */
+.table-wrap th,
+.table-wrap td{
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;     /* coherente con scroll horizontal */
+}
+
+/* 3) En pantallas pequeñas, usa encabezados más compactos */
+@media (max-width: 640px){
+  .table-wrap th{
+    font-size: 11px;
+    letter-spacing: .03em;   /* menos separación para que entre mejor */
+    padding: 10px 10px;
+  }
+  .table-wrap td{
+    font-size: 13px;
+    padding: 10px 10px;
+  }
+}
+
+/* 4) (Opcional) Si notas parpadeo con sticky, puedes desactivarlo así: */
+/*
+.table-wrap thead th{ position: static !important; }
+*/
+
+
+
   </style>
 </head>
 
