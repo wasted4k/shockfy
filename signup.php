@@ -144,6 +144,38 @@ unset($_SESSION['flash']);
 .site-header .hamb{ display:none !important; }
 
 
+/* ===== Términos y condiciones (limpio y responsive) ===== */
+.tos{
+  display: grid;
+  grid-template-columns: 18px 1fr;   /* [☑] [texto] */
+  column-gap: .6rem;
+  align-items: start;
+  margin-top: 10px;
+  padding: 6px 0;
+  border-radius: 10px;
+}
+.tos input[type="checkbox"]{
+  width: 18px; height: 18px;
+  margin: 2px 0 0;                  /* alinea con 1ª línea del texto */
+  accent-color: var(--primary);
+}
+.tos label{
+  margin: 0;
+  display: block;                    /* ← quita el flex del label */
+  line-height: 1.35;
+  font-weight: 500;
+  color: var(--subtext);
+  text-wrap: pretty;                 /* mejora saltos en navegadores modernos */
+}
+.tos a{ color: var(--primary); text-decoration: none; }
+.tos a:hover{ text-decoration: underline; }
+
+/* Opcional: tamaño un poco menor en teléfonos muy angostos */
+@media (max-width: 360px){
+  .tos label{ font-size: .95rem; }
+}
+
+
   </style>
 </head>
 <body>
