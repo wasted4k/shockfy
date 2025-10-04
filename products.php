@@ -1,34 +1,26 @@
 <?php
 require 'db.php';
-require_once __DIR__ . '/auth_check.php'; // proteger el login y mandarlo a welcome si la persona no ha verificado su email
+require_once __DIR__ . '/auth_check.php';
 require 'auth.php';
 
-
-// Obtener la preferencia de moneda del usuario
+// Moneda
 $stmt = $pdo->prepare("SELECT currency_pref FROM users WHERE id=?");
 $stmt->execute([$user['id']]);
 $currencyPref = $stmt->fetchColumn() ?: 'S/.';
 
-// Lista de símbolos de moneda
+// Símbolos
 $currencySymbols = [
-  'S/.' => 'S/.',
-  '$' => '$',
-  'USD' => '$',
-  'EUR' => '€',
-  'VES' => 'Bs.',
-  'COP' => '$',
-  'CLP' => '$',
-  'MXN' => '$',
-  'ARS' => '$'
+  'S/.' => 'S/.', '$' => '$', 'USD' => '$', 'EUR' => '€', 'VES' => 'Bs.',
+  'COP' => '$', 'CLP' => '$', 'MXN' => '$', 'ARS' => '$'
 ];
 $currencySymbol = $currencySymbols[$currencyPref] ?? $currencyPref;
 
-// Obtener categorías
+// Categorías
 $categories = $pdo->prepare("SELECT id, name FROM categories WHERE user_id=? ORDER BY name");
 $categories->execute([$user['id']]);
 $categories = $categories->fetchAll(PDO::FETCH_ASSOC);
 
-// Obtener productos
+// Productos
 $sql = "SELECT p.*, c.name AS category_name
         FROM products p
         LEFT JOIN categories c ON p.category_id = c.id
@@ -41,10 +33,12 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <!doctype html>
 <html lang="es">
 <head>
-   <link rel="icon" href="assets/img/favicon.png" type="image/png">
-    <link rel="shortcut icon" href="assets/img/favicon.png" type="image/png">
   <meta charset="utf-8">
   <title>Productos</title>
+  <link rel="icon" href="assets/img/favicon.png" type="image/png">
+  <link rel="shortcut icon" href="assets/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
   <style>
     :root{
       --bg:#eef3f8;
@@ -55,32 +49,35 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
       --primary-2:#60a5fa;
       --danger:#e11d48;
       --success:#16a34a;
-      --warning:#f59e0b;
       --border:#e2e8f0;
       --shadow:0 10px 24px rgba(15,23,42,.06);
       --radius:16px;
     }
     *{box-sizing:border-box}
+    html,body{overflow-x:hidden;}
+    img,svg{max-width:100%;height:auto;display:block}
+
     body{
-      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
       margin:0;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
       background: linear-gradient(180deg,#fff,#f9fbff 45%,var(--bg));
       color: var(--text);
     }
 
-    .page{padding:24px 20px 80px}
+    /* ===== Estructura general ===== */
+    .page{padding:22px 16px 84px}
     .header{
-      max-width:1200px;margin:0 auto 16px;
-      display:flex;align-items:center;justify-content:space-between;gap:16px;
+      max-width:1200px;margin:0 auto 14px;
+      display:flex;align-items:center;justify-content:space-between;gap:12px;
     }
-    .title{display:flex;align-items:center;gap:14px}
+    .title{display:flex;align-items:center;gap:12px}
     .title .icon{
-      width:44px;height:44px;border-radius:12px;
+      width:40px;height:40px;border-radius:10px;
       background:linear-gradient(135deg,#e0edff,#f1f7ff);
       display:grid;place-items:center;border:1px solid #dbeafe;box-shadow:var(--shadow)
     }
-    .title h1{margin:0;font-size:24px;font-weight:800}
-    .subtitle{font-size:13px;color:var(--muted);margin-top:2px}
+    .title h1{margin:0;font-size:22px;font-weight:800;line-height:1.2}
+    .subtitle{font-size:12px;color:var(--muted);margin-top:2px;line-height:1.35}
 
     .actions{display:flex;align-items:center;gap:10px}
     .btn-primary{
@@ -91,12 +88,12 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
     .btn-primary:hover{transform:translateY(-2px)}
 
     .toolbar{
-      max-width:1200px;margin:0 auto 18px;
-      display:grid;grid-template-columns:1fr auto auto;gap:12px;
+      max-width:1200px;margin:0 auto 16px;
+      display:grid;grid-template-columns:1fr auto auto;gap:10px;
     }
     .search, .select{
       background:var(--panel);border:1px solid var(--border);border-radius:12px;
-      padding:10px 12px;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow)
+      padding:9px 12px;display:flex;align-items:center;gap:8px;box-shadow:var(--shadow)
     }
     .search input, .select select{
       border:none;background:transparent;outline:none;color:var(--text);font-size:14px
@@ -110,36 +107,43 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
     .card-header{
       display:flex;align-items:center;justify-content:space-between;
-      padding:14px 16px;background:linear-gradient(180deg,#ffffff,#f7fafc);
+      padding:12px 14px;background:linear-gradient(180deg,#ffffff,#f7fafc);
       border-bottom:1px solid var(--border)
     }
     .card-header .meta{font-size:12px;color:var(--muted)}
 
+    /* ===== Grid de productos (mobile-first) ===== */
     .products-grid{
-      padding:18px;
-      display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px
+      padding:14px;
+      display:grid;
+      grid-template-columns:1fr;          /* 1 columna en mobile */
+      gap:12px;
     }
+
     .product-card{
       background:#fff;border:1px solid var(--border);border-radius:14px;
-      padding:14px;box-shadow:0 8px 18px rgba(2,6,23,.06);
+      padding:12px;box-shadow:0 8px 18px rgba(2,6,23,.06);
       display:flex;flex-direction:column;align-items:center;text-align:center;
       transition:.25s transform ease,.25s box-shadow ease,.2s border-color ease
     }
-    .product-card:hover{
-      transform:translateY(-4px);
-      box-shadow:0 12px 26px rgba(2,6,23,.1);
-      border-color:#dbeafe;
-    }
+    .product-card:hover{ transform:translateY(-2px); box-shadow:0 12px 26px rgba(2,6,23,.1); border-color:#dbeafe; }
+
     .product-img{
-      width:150px;height:120px;object-fit:contain;border-radius:10px;
+      width:110px;height:88px;object-fit:contain;border-radius:10px;
       background:linear-gradient(180deg,#fbfdff,#f2f6ff);
-      border:1px solid #eef2ff;
-      margin-bottom:10px;transition:transform .3s ease
+      border:1px solid #eef2ff;margin-bottom:8px;transition:transform .3s ease
     }
-    .product-card:hover .product-img{transform:scale(1.03)}
-    .product-name{font-size:15px;font-weight:700;margin-bottom:4px}
-    .muted{font-size:12px;color:var(--muted)}
-    .price{margin-top:6px;font-size:13px;font-weight:700}
+    .product-card:hover .product-img{transform:scale(1.02)}
+
+    .product-name{font-size:14px;font-weight:800;margin:4px 0 3px;line-height:1.25}
+    .muted{font-size:12px;color:var(--muted);line-height:1.35}
+    .price{margin-top:6px;font-size:13px;font-weight:800}
+
+    .badge{
+      display:inline-flex;align-items:center;gap:6px;
+      padding:4px 8px;border-radius:10px;font-size:11px;font-weight:600;
+      border:1px solid var(--border);background:#f8fafc;color:#334155
+    }
 
     .chip{
       display:inline-flex;align-items:center;gap:6px;
@@ -150,53 +154,70 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
     .chip.stock.mid{color:#92400e;background:#fffbeb;border-color:#fde68a}
     .chip.stock.low{color:#991b1b;background:#fef2f2;border-color:#fecaca}
 
-    .badge{
-      display:inline-flex;align-items:center;gap:6px;
-      padding:4px 8px;border-radius:10px;font-size:11px;font-weight:600;
-      border:1px solid var(--border);background:#f8fafc;color:#334155
-    }
-
+    /* Acciones: iconos y botones compactos en mobile */
     .product-actions{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
     .product-actions a{
-      font-size:13px;padding:8px 12px;border-radius:10px;text-decoration:none;
+      font-size:12px;padding:8px 10px;border-radius:10px;text-decoration:none;
       display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);
-      transition:.2s transform ease,.2s background ease
+      transition:.2s transform ease,.2s background ease;
+      min-width:120px; justify-content:center;
     }
+    .product-actions a svg{ width:16px; height:16px; flex:0 0 16px; }
     a.edit{background:#299EE6;color:#fff;border-color:#bfdbfe}
     a.edit:hover{transform:translateY(-1px)}
     a.delete{background:#F52727;color:#fff;border-color:#fecaca}
     a.delete:hover{transform:translateY(-1px)}
 
+    /* FAB */
     .fab{
-      position:fixed;right:24px;bottom:24px;width:56px;height:56px;border-radius:50%;
+      position:fixed;right:18px;bottom:18px;width:52px;height:52px;border-radius:50%;
       background:linear-gradient(135deg,var(--primary),var(--primary-2));
-      color:#fff;display:grid;place-items:center;font-size:26px;font-weight:800;
+      color:#fff;display:grid;place-items:center;font-size:24px;font-weight:800;
       text-decoration:none;box-shadow:0 14px 30px rgba(37,99,235,.35);
       border:1px solid #dbeafe;transition:.2s transform ease;z-index:800
     }
     .fab:hover{transform:translateY(-3px)}
 
     #toastMessage{
-      position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
-      background:#11101D;color:#fff;padding:12px 18px;border-radius:12px;
+      position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+      background:#11101D;color:#fff;padding:10px 16px;border-radius:12px;
       box-shadow:0 12px 28px rgba(0,0,0,.25);opacity:0;pointer-events:none;
-      transition:opacity .25s ease;z-index:9999;font-weight:700
+      transition:opacity .25s ease;z-index:9999;font-weight:700;font-size:13px
     }
     #toastMessage.show{opacity:1;pointer-events:auto}
 
     .empty{
-      grid-column:1/-1;display:flex;flex-direction:column;align-items:center;gap:10px;
-      padding:24px;border:1px dashed var(--border);border-radius:14px;background:#fff
+      grid-column:1/-1;display:flex;flex-direction:column;align-items:center;gap:8px;
+      padding:18px;border:1px dashed var(--border);border-radius:14px;background:#fff;text-align:center
     }
-    .empty .icon{width:40px;height:40px;color:#94a3b8}
+    .empty .icon{width:38px;height:38px;color:#94a3b8}
 
-    @media (max-width:768px){
-      .toolbar{grid-template-columns:1fr;gap:10px}
+    /* ===== Breakpoints: ampliamos gradualmente ===== */
+    @media (min-width: 481px){
+      .products-grid{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .product-img{ width:120px;height:96px; }
+    }
+    @media (min-width: 720px){
+      .header{gap:14px}
+      .title .icon{ width:44px; height:44px; }
+      .title h1{ font-size:24px; }
+      .toolbar{ grid-template-columns: 1fr auto auto; }
+      .products-grid{ grid-template-columns: repeat(3, minmax(0,1fr)); gap:14px; padding:16px; }
+      .product-img{ width:140px;height:110px; }
+      .product-actions a{ font-size:13px; padding:8px 12px; min-width:unset; }
+      .product-actions a svg{ width:18px; height:18px; }
+    }
+    @media (min-width: 1024px){
+      .products-grid{ grid-template-columns: repeat(4, minmax(0,1fr)); }
     }
 
-    .icon-18{width:18px;height:18px;display:block}
-    .icon-20{width:20px;height:20px;display:block}
-    .icon-24{width:24px;height:24px;display:block}
+    /* Sidebar abierta no debe aplastar el contenido en phone si quedó persistida */
+    @media (max-width: 640px){
+      .sidebar.open ~ .page{ margin-left:78px; }
+    }
+
+    /* Evitar zoom iOS al enfocar inputs */
+    @media (max-width: 560px){ input,select,button{font-size:16px} }
   </style>
 </head>
 <body>
@@ -206,7 +227,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <div class="header">
       <div class="title">
         <div class="icon">
-          <svg class="icon-20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 2 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
             <path d="M3.27 6.96 12 12l8.73-5.04M12 22V12"/>
           </svg>
@@ -223,14 +244,14 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     <div class="toolbar">
       <div class="search">
-        <svg class="icon-18" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="11" cy="11" r="8"></circle>
           <path d="m21 21-3.6-3.6"></path>
         </svg>
         <input type="text" id="search" placeholder="Buscar por nombre, código, color, talla o categoría...">
       </div>
       <div class="select">
-        <svg class="icon-18" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M20.59 13.41 11 3H4v7l9.59 9.59a2 2 0 0 0 2.82 0l4.18-4.18a2 2 0 0 0 0-2.82Z"/>
           <path d="M7 7h.01"/>
         </svg>
@@ -242,7 +263,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </select>
       </div>
       <div class="select">
-        <svg class="icon-18" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M3 6h13M3 12h9M3 18h5"/>
         </svg>
         <select id="order">
@@ -273,7 +294,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
               <img class="product-img" src="<?= htmlspecialchars($p['image'] ?? '') ?>" alt="<?= htmlspecialchars($p['name'] ?? '') ?>">
             <?php else: ?>
               <div class="product-img" style="display:grid;place-items:center;color:#94a3b8;">
-                <svg class="icon-24" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <rect x="3" y="3" width="18" height="14" rx="2"></rect>
                   <path d="m3 13 4-4 3 3 5-5 4 4"/>
                 </svg>
@@ -281,8 +302,9 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <?php endif; ?>
 
             <div class="product-name"><?= htmlspecialchars($p['name'] ?? '') ?></div>
-            <div class="badge">
-              <svg class="icon-18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+
+            <div class="badge" style="margin-top:2px">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M20.59 13.41 11 3H4v7l9.59 9.59a2 2 0 0 0 2.82 0l4.18-4.18a2 2 0 0 0 0-2.82Z"/>
                 <path d="M7 7h.01"/>
               </svg>
@@ -297,7 +319,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <div style="margin-top:8px">
               <?php $cls = $stockClass==='ok'?'ok':($stockClass==='mid'?'mid':'low'); ?>
               <span class="chip stock <?= $cls ?>">
-                <svg class="icon-18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 2 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
                 </svg>
                 Stock: <?= (int)$p['stock'] ?>
@@ -308,14 +330,14 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             <div class="product-actions">
               <a class="edit" href="edit_product.php?id=<?= $p['id'] ?>">
-                <svg class="icon-18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M12 20h9"/>
                   <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4Z"/>
                 </svg>
                 Editar
               </a>
               <a class="delete" href="delete_product.php?id=<?= $p['id'] ?>" onclick="return confirm('¿Eliminar este producto?')">
-                <svg class="icon-18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M3 6h18"/>
                   <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
                   <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
@@ -358,13 +380,8 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
       setTimeout(() => toast.classList.remove('show'), 3000);
     }
 
-    // Helpers: normalizar (quita acentos) y a minúsculas
-    const norm = s => (s || '')
-      .toString()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g,'')
-      .toLowerCase()
-      .trim();
+    // Helpers: normalizar y a minúsculas
+    const norm = s => (s || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
 
     // Filtros
     const cards = [...document.querySelectorAll('.product-card')],
@@ -379,13 +396,8 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
       const c = norm(catSel.value);
 
       let filtered = cards.filter(x => {
-        const haystack = [
-          x.dataset.name,
-          x.dataset.code,
-          x.dataset.color,
-          x.dataset.size,
-          x.dataset.cat
-        ].map(norm).join(' ');
+        const haystack = [x.dataset.name, x.dataset.code, x.dataset.color, x.dataset.size, x.dataset.cat]
+          .map(norm).join(' ');
         const byText = !t || haystack.includes(t);
         const byCat  = !c || norm(x.dataset.cat) === c;
         return byText && byCat;
@@ -424,7 +436,8 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
     search.addEventListener('input', render);
     order.addEventListener('change', render);
     catSel.addEventListener('change', render);
-    render(); // ordenar/filtrar al cargar
+    render();
   </script>
 </body>
 </html>
+
