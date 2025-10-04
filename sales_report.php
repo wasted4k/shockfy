@@ -85,8 +85,7 @@ function fmt_time(DateTime $d, string $fmt): string {
   return $fmt === '24h' ? $d->format('H:i') : $d->format('g:i A');
 }
 function fmt_datetime_for_user($src, string $tz, string $fmt): string {
-  // ⚠️ Si tu DB NO está en UTC, cambia 'UTC' por la TZ del servidor, p.ej. 'America/Lima'
-  $d = new DateTime((string)$src, new DateTimeZone('UTC'));
+  $d = new DateTime((string)$src, new DateTimeZone('UTC')); // ⚠️ ajusta si tu DB no está en UTC
   $d->setTimezone(new DateTimeZone($tz));
   return $d->format('d M Y') . ', ' . fmt_time($d, $fmt);
 }
@@ -95,7 +94,6 @@ function fmt_datetime_for_user($src, string $tz, string $fmt): string {
 [$startTZ, $endTZ, $periodLabel, $granularity] = start_end_for_range($range, $user_tz);
 
 /* ================== Traer datos ================== */
-// Si histórico, primero averiguamos la primera venta para definir el inicio y los labels
 if ($range === 'historico') {
   $stmt = $pdo->prepare("SELECT MIN(sale_date) FROM sales WHERE user_id = ?");
   $stmt->execute([$user_id]);
@@ -104,17 +102,14 @@ if ($range === 'historico') {
   if ($firstSale) {
     $first = new DateTime($firstSale, new DateTimeZone('UTC'));
     $first->setTimezone(new DateTimeZone($user_tz));
-    // Comenzamos el histórico al inicio del mes de la primera venta
     $startTZ = (clone $first)->modify('first day of this month')->setTime(0,0,0);
     $periodLabel = $startTZ->format('M Y').' – '.dt_tz_now($user_tz)->format('M Y');
   } else {
-    // no hay ventas
     $startTZ = (clone $endTZ)->setTime(0,0,0);
     $periodLabel = 'Sin ventas';
   }
 }
 
-// Consultas principales (ventas, resumen, ranking)
 if ($range === 'historico') {
   $stmt = $pdo->prepare("
     SELECT s.*, p.name AS product_name, p.cost_price
@@ -185,9 +180,7 @@ $ingresoTotal = (float)$stmt->fetchColumn();
 $chartLabels = [];
 $chartData   = [];
 
-// Inicializar buckets
-if ($granularity === 'day' && $range !== 'historico') {
-  // Días del mes (TZ del usuario)
+if ($granularity === 'day' && $range!=='historico') {
   $cursor = clone $startTZ;
   while ($cursor <= $endTZ) {
     $chartLabels[] = (int)$cursor->format('j'); // 1..31
@@ -195,31 +188,25 @@ if ($granularity === 'day' && $range !== 'historico') {
     $cursor->modify('+1 day');
   }
   $idxBy = array_flip($chartLabels);
-
   foreach ($sales as $s) {
-    $dt = new DateTime($s['sale_date'], new DateTimeZone('UTC')); // ⚠️ cambia 'UTC' si corresponde
+    $dt = new DateTime($s['sale_date'], new DateTimeZone('UTC'));
     $dt->setTimezone(new DateTimeZone($user_tz));
     $d = (int)$dt->format('j');
     if (isset($idxBy[$d])) $chartData[$idxBy[$d]] += (float)$s['total'];
   }
 } else {
-  // Agregar por mes
-  // Determinar inicio y fin por mes en TZ usuario
   $mStart = (clone $startTZ)->modify('first day of this month')->setTime(0,0,0);
   $mEnd   = (clone $endTZ)->modify('first day of this month')->setTime(0,0,0);
-  $idxByKey = [];
-  $i = 0;
-
+  $idxByKey = []; $i = 0;
   while ($mStart <= $mEnd) {
     $key = $mStart->format('Y-m');
-    $chartLabels[] = $mStart->format('M'); // "Jan", "Feb"...
+    $chartLabels[] = $mStart->format('M');
     $chartData[]   = 0;
     $idxByKey[$key] = $i++;
     $mStart->modify('+1 month');
   }
-
   foreach ($sales as $s) {
-    $dt = new DateTime($s['sale_date'], new DateTimeZone('UTC')); // ⚠️ cambia 'UTC' si corresponde
+    $dt = new DateTime($s['sale_date'], new DateTimeZone('UTC'));
     $dt->setTimezone(new DateTimeZone($user_tz));
     $key = $dt->format('Y-m');
     if (isset($idxByKey[$key])) $chartData[$idxByKey[$key]] += (float)$s['total'];
@@ -250,7 +237,6 @@ if ($range === 'historico') {
   $stmt->execute([':uid'=>$user_id, ':start'=>$startUTC, ':end'=>$endUTC]);
 }
 $ranking = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
 ?>
 <!doctype html>
 <html lang="es">
@@ -269,8 +255,18 @@ $ranking = $stmt->fetchAll(PDO::FETCH_ASSOC);
   --border:#e2e8f0; --shadow:0 10px 24px rgba(15,23,42,.06); --radius:16px;
 }
 *{box-sizing:border-box}
+html,body{overflow-x:hidden;}
+img,svg{max-width:100%;height:auto;display:block}
 body{background:var(--bg); color:var(--text); margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
-.container{ max-width:1200px; margin:24px auto 64px; padding:16px; background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); }
+
+/* Sidebar push en escritorio; no en móvil */
+.container{ max-width:1200px; margin:24px auto 64px; padding:16px; background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); transition:margin-left .3s ease; }
+.sidebar ~ .container{ margin-left:78px; }
+.sidebar.open ~ .container{ margin-left:250px; }
+@media (max-width:1024px){
+  .sidebar ~ .container, .sidebar.open ~ .container{ margin-left:0; }
+}
+
 .header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px}
 .header .title{display:flex; align-items:center; gap:12px}
 .header .icon{ width:44px; height:44px; border-radius:12px; background:linear-gradient(135deg,#e0edff,#f1f7ff); display:grid; place-items:center; border:1px solid #dbeafe; box-shadow:var(--shadow)}
@@ -300,7 +296,6 @@ body{background:var(--bg); color:var(--text); margin:0; font-family:Inter,system
 .range-item:hover{ background:#eef4ff; }
 .range-item.active{ background:#e6f0ff; font-weight:800; }
 
-/* Botones secundarios */
 .btn{
   padding:10px 14px; border-radius:12px; border:1px solid var(--border);
   background:var(--panel-2); color:var(--text); font-weight:800; cursor:pointer; box-shadow:var(--shadow);
@@ -308,24 +303,36 @@ body{background:var(--bg); color:var(--text); margin:0; font-family:Inter,system
 .btn:hover{ transform:translateY(-1px); background:#e8edf4; border-color:#b8c3d4}
 .btn.primary{ background:linear-gradient(135deg,var(--primary),var(--primary-2)); color:#fff; border:none}
 
+/* Summary cards */
 .summary{ display:grid; grid-template-columns:repeat(3, minmax(220px,1fr)); gap:14px; margin:12px 0 18px; }
 .card{ background: linear-gradient(135deg, #7b2ff7, #1c92d2) !important; color:#fff; padding:22px; border-radius:16px; min-width: 200px; text-align:center; box-shadow:0 10px 25px rgba(0,0,0,0.15); transition: transform .25s ease, box-shadow .25s ease, background .25s ease; }
 .card:hover{ transform: translateY(-6px); box-shadow: 0 15px 35px rgba(0,0,0,0.22); background: linear-gradient(135deg, #1c92d2, #7b2ff7) !important; }
 .card h3{margin:0 0 6px; font-size:22px; font-weight:800}
 .card p{margin:0; font-size:12px; opacity:.95}
 
+/* Secciones */
 .section{ margin-top:14px; background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden; }
 .section-header{ padding:14px 16px; border-bottom:1px solid var(--border); background:linear-gradient(180deg,#ffffff,#f7fafc); display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
 .section-title{ font-size:14px; font-weight:800 }
 .section-hint{ font-size:12px; color:var(--muted) }
 .section-body{ padding:16px }
 
-table{ width:100%; border-collapse:separate; border-spacing:0 }
-thead th{ font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:#475569; padding:14px 16px; background:#f8fafc; border-bottom:1px solid var(--border); text-align:left }
-tbody td{ padding:14px 16px; border-bottom:1px solid var(--border) }
+/* Chart responsive wrapper */
+.chart-wrap{ position:relative; width:100%; }
+.chart-wrap canvas{ width:100% !important; height:380px !important; }
+@media (max-width:720px){
+  .chart-wrap canvas{ height:260px !important; }
+}
+
+/* Tabla + scroll horizontal sin romper layout */
+.table-wrap{ width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; border-radius:12px; }
+.table-wrap table{ width:100%; border-collapse:separate; border-spacing:0; }
+thead th{ font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:#475569; padding:14px 16px; background:#f8fafc; border-bottom:1px solid var(--border); text-align:left; position:sticky; top:0; z-index:1; }
+tbody td{ padding:14px 16px; border-bottom:1px solid var(--border); white-space:nowrap; }
 tbody tr{ transition: background .18s ease }
 tbody tr:hover{ background:#f1f5f9 }
 
+/* Dark mode */
 body.dark{ background:#0c1326; color:#e5e7eb }
 body.dark .container{ background:#0b1220; border-color:#1f2a4a }
 body.dark .section, body.dark .range-btn{ background:#0b1220; border-color:#1f2a4a; color:#e5e7eb }
@@ -337,7 +344,24 @@ body.dark .btn:hover{ background:#132146; border-color:#33416b }
 body.dark .range-menu{ background:#0b1220; border-color:#1f2a4a }
 body.dark .range-item:hover{ background:#132146 }
 body.dark .range-item.active{ background:#0e1630 }
-@media print{ .actions, .header .icon, .sidebar, #sidebar, .range-menu { display:none !important; } .container{ box-shadow:none; border:none; } }
+
+/* ======= RESPONSIVE FINO ======= */
+@media (max-width:980px){
+  .summary{ grid-template-columns:repeat(2, minmax(0,1fr)); }
+}
+@media (max-width:640px){
+  .header{ flex-direction:column; align-items:flex-start; gap:10px; }
+  .actions{ width:100%; gap:10px; }
+  .actions .btn, .actions .range-btn{ flex:1 1 auto; text-align:center; }
+  .summary{ grid-template-columns:1fr; }
+  .container{ margin:16px auto 80px; padding:12px; border-radius:12px; }
+}
+
+/* Impresión */
+@media print{
+  .actions, .header .icon, .sidebar, #sidebar, .range-menu { display:none !important; }
+  .container{ box-shadow:none; border:none; margin:0; }
+}
 </style>
 </head>
 <body>
@@ -366,7 +390,6 @@ body.dark .range-item.active{ background:#0e1630 }
     </div>
 
     <div class="actions">
-      <!-- Botón Rango -->
       <div class="range-dropdown" id="rangeDropdown">
         <button type="button" class="range-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="rangeMenu">
           <span>Rango: <?= htmlspecialchars($currentRangeLabel) ?></span>
@@ -407,7 +430,9 @@ body.dark .range-item.active{ background:#0e1630 }
       </div>
     </div>
     <div class="section-body">
-      <canvas id="ventasChart" height="120"></canvas>
+      <div class="chart-wrap">
+        <canvas id="ventasChart"></canvas>
+      </div>
     </div>
   </div>
 
@@ -418,22 +443,24 @@ body.dark .range-item.active{ background:#0e1630 }
       <div class="section-hint"><?= $ranking ? 'Ordenado por cantidad vendida' : 'No hay ventas para este período' ?></div>
     </div>
     <div class="section-body">
-      <table id="rankingTable">
-        <thead>
-          <tr><th>Producto</th><th>Cantidad</th><th>Total (<?= $currency ?>)</th></tr>
-        </thead>
-        <tbody id="rankingBody">
-          <?php if ($ranking): foreach($ranking as $r): ?>
-            <tr>
-              <td><?=htmlspecialchars($r['name'])?></td>
-              <td><?= (int)$r['q'] ?></td>
-              <td><?= $currency . ' ' . number_format($r['t'],2) ?></td>
-            </tr>
-          <?php endforeach; else: ?>
-            <tr><td colspan="3">No hay ventas para este período.</td></tr>
-          <?php endif; ?>
-        </tbody>
-      </table>
+      <div class="table-wrap">
+        <table id="rankingTable">
+          <thead>
+            <tr><th>Producto</th><th>Cantidad</th><th>Total (<?= $currency ?>)</th></tr>
+          </thead>
+          <tbody id="rankingBody">
+            <?php if ($ranking): foreach($ranking as $r): ?>
+              <tr>
+                <td><?=htmlspecialchars($r['name'])?></td>
+                <td><?= (int)$r['q'] ?></td>
+                <td><?= $currency . ' ' . number_format($r['t'],2) ?></td>
+              </tr>
+            <?php endforeach; else: ?>
+              <tr><td colspan="3">No hay ventas para este período.</td></tr>
+            <?php endif; ?>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>
@@ -483,6 +510,7 @@ body.dark .range-item.active{ background:#0e1630 }
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false, // permite que la altura definida por CSS mande
       plugins: {
         legend: { display: false },
         tooltip: { mode: 'index', intersect: false }
