@@ -4,8 +4,6 @@ require 'db.php';
 require_once __DIR__ . '/auth_check.php'; // proteger el login y mandarlo a welcome si la persona no ha verificado su email
 $user_id = $_SESSION['user_id']; // el ID del usuario que está logueado
 
-
-
 // Traer todas las categorías
 $categories = $pdo->prepare("SELECT id, name FROM categories WHERE user_id = ? ORDER BY name");
 $categories->execute([$user_id]);
@@ -168,27 +166,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .btn:hover{ transform: translateY(-1px); background:#f5f7fb; }
         .btn.primary{ background:linear-gradient(135deg,var(--primary),var(--primary-2)); color:#fff; border:none; }
         .btn.primary:hover{ filter:brightness(.98); }
-       /* --- Mejora de contraste para botones "ghost" (Cancelar / Quitar imagen) --- */
-.btn.ghost{
-  background: var(--panel-2);        /* antes: #fff */
-  border-color: #cfd7e3;              /* borde más visible */
-  color: var(--text);                 /* texto oscuro */
-}
-.btn.ghost:hover{
-  background: #e8edf4;                /* hover con más contraste */
-  border-color: #b8c3d4;
-}
 
-/* Dark mode se mantiene legible */
-body.dark .btn.ghost{
-  background:#0e1630;
-  border-color:#1f2a4a;
-  color:#e5e7eb;
-}
-body.dark .btn.ghost:hover{
-  background:#132146;
-  border-color:#33416b;
-}
+        /* Mejora contraste botones ghost */
+        .btn.ghost{ background: var(--panel-2); border-color:#cfd7e3; color: var(--text); }
+        .btn.ghost:hover{ background:#e8edf4; border-color:#b8c3d4; }
+        body.dark .btn.ghost{ background:#0e1630; border-color:#1f2a4a; color:#e5e7eb; }
+        body.dark .btn.ghost:hover{ background:#132146; border-color:#33416b; }
 
         .btn.danger{ background:linear-gradient(135deg,#ef4444,#f87171); color:#fff; border:none; }
 
@@ -205,13 +188,33 @@ body.dark .btn.ghost:hover{
         }
         #toast.show{ opacity:1; pointer-events:auto; }
 
-        /* Responsive */
+        /* ====== Responsive ====== */
+        @media (max-width: 1024px){
+          .page{ padding:20px 14px 72px; }
+          .container{ max-width:100%; }
+        }
         @media (max-width: 900px){
             .form-grid{ grid-template-columns:1fr; }
             .form-col-span-2{ grid-column: auto; }
         }
+        @media (max-width: 640px){
+            .card-body{ padding:14px; }
+            .title h1{ font-size:22px; }
+            .actions{ flex-direction:column; align-items:stretch; }
+            .btn{ width:100%; text-align:center; }
+            .image-uploader{ flex-direction:column; }
+            .image-preview{ width:100%; max-width:360px; height:200px; }
+            .field input[type="text"],
+            .field input[type="number"],
+            .field input[type="file"],
+            .field select{ font-size:16px; } /* evita zoom iOS */
+        }
+        @media (max-width: 380px){
+            .page{ padding:16px 10px 68px; }
+            .title h1{ font-size:20px; }
+        }
 
-        /* Modo oscuro si tu toggle global lo aplica */
+        /* Modo oscuro coherente */
         body.dark{ background:#0c1326; color:#e5e7eb; }
         body.dark .card, body.dark .field{ background:#0b1220; border-color:#1f2a4a; }
         body.dark .card-header{ background:#0e1630; }
@@ -448,3 +451,4 @@ body.dark .btn.ghost:hover{
     </script>
 </body>
 </html>
+
