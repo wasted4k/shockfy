@@ -3,6 +3,7 @@ require 'db.php';
 require_once __DIR__ . '/auth_check.php'; // proteger el login y mandarlo a welcome si la persona no ha verificado su email
 require 'auth.php';
 
+
 // Obtener la preferencia de moneda del usuario
 $stmt = $pdo->prepare("SELECT currency_pref FROM users WHERE id=?");
 $stmt->execute([$user['id']]);
@@ -40,12 +41,10 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <!doctype html>
 <html lang="es">
 <head>
+   <link rel="icon" href="assets/img/favicon.png" type="image/png">
+    <link rel="shortcut icon" href="assets/img/favicon.png" type="image/png">
   <meta charset="utf-8">
   <title>Productos</title>
-  <link rel="icon" href="assets/img/favicon.png" type="image/png">
-  <link rel="shortcut icon" href="assets/img/favicon.png" type="image/png">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-
   <style>
     :root{
       --bg:#eef3f8;
@@ -62,9 +61,6 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
       --radius:16px;
     }
     *{box-sizing:border-box}
-    html,body{overflow-x:hidden;}
-    img,svg{max-width:100%;height:auto;display:block}
-
     body{
       font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
       margin:0;
@@ -83,7 +79,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
       background:linear-gradient(135deg,#e0edff,#f1f7ff);
       display:grid;place-items:center;border:1px solid #dbeafe;box-shadow:var(--shadow)
     }
-    .title h1{margin:0;font-size:24px;font-weight:800;line-height:1.2}
+    .title h1{margin:0;font-size:24px;font-weight:800}
     .subtitle{font-size:13px;color:var(--muted);margin-top:2px}
 
     .actions{display:flex;align-items:center;gap:10px}
@@ -141,8 +137,8 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
       margin-bottom:10px;transition:transform .3s ease
     }
     .product-card:hover .product-img{transform:scale(1.03)}
-    .product-name{font-size:15px;font-weight:700;margin-bottom:4px;line-height:1.25}
-    .muted{font-size:12px;color:var(--muted);line-height:1.4}
+    .product-name{font-size:15px;font-weight:700;margin-bottom:4px}
+    .muted{font-size:12px;color:var(--muted)}
     .price{margin-top:6px;font-size:13px;font-weight:700}
 
     .chip{
@@ -190,117 +186,17 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     .empty{
       grid-column:1/-1;display:flex;flex-direction:column;align-items:center;gap:10px;
-      padding:24px;border:1px dashed var(--border);border-radius:14px;background:#fff;text-align:center
+      padding:24px;border:1px dashed var(--border);border-radius:14px;background:#fff
     }
     .empty .icon{width:40px;height:40px;color:#94a3b8}
 
-    /* ========= RESPONSIVE ========= */
-
-    /* Toolbar apilada en móvil */
-    @media (max-width: 860px){
+    @media (max-width:768px){
       .toolbar{grid-template-columns:1fr;gap:10px}
     }
 
-    /* Header apilado y botones cómodos */
-    @media (max-width: 720px){
-      .header{flex-direction:column;align-items:flex-start;gap:10px}
-      .actions{width:100%}
-      .btn-primary{width:100%;text-align:center}
-      .title h1{font-size:22px}
-    }
-
-    /* Grid más flexible y tarjetas compactas */
-    @media (max-width: 960px){
-      .products-grid{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
-    }
-    @media (max-width: 560px){
-      .page{padding:18px 14px 84px}
-      .products-grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
-      .product-card{padding:12px}
-      .product-img{width:120px;height:96px;margin-bottom:8px}
-      .product-name{font-size:14px}
-      .muted{font-size:12px}
-      .badge{font-size:10.5px}
-      .price{font-size:13px}
-      .product-actions a{flex:1;justify-content:center}
-    }
-
-    /* Sidebar abierta no debe aplastar el contenido en móvil (por si quedó persistida) */
-    @media (max-width: 640px){
-      .sidebar.open ~ .page{ margin-left:78px; }
-    }
-
-    /* Preferencias mínimas para iOS (evita zoom al enfocar inputs) */
-    @media (max-width: 560px){
-      input,select,button{font-size:16px}
-    }
-
-/* ===== FIX MOBILE: grid, icons & buttons ===== */
-
-/* 1) Grilla: 2 columnas hasta 560px; 1 columna en ≤480px */
-@media (max-width: 560px){
-  .products-grid{
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 12px;
-  }
-}
-@media (max-width: 480px){
-  .products-grid{
-    grid-template-columns: 1fr;   /* una sola columna (evita aplastamiento) */
-    gap: 12px;
-  }
-}
-
-/* 2) Tarjeta e imagen más compactas en móvil */
-@media (max-width: 560px){
-  .product-card{ padding: 12px; }
-  .product-img{ width: 110px; height: 88px; margin-bottom: 8px; }
-  .product-name{ font-size: 14px; line-height: 1.25; }
-  .muted{ font-size: 12px; }
-  .badge{ font-size: 11px; }
-  .price{ font-size: 13px; }
-}
-
-/* 3) Botones de acción: tamaños consistentes y sin “gigantismo” */
-.product-actions a svg{
-  width: 16px; height: 16px; flex: 0 0 16px;
-}
-@media (max-width: 560px){
-  .product-actions{ gap: 8px; }
-  .product-actions a{
-    padding: 8px 10px;            /* menos padding */
-    font-size: 12px;              /* texto más compacto */
-    border-radius: 10px;
-    flex: 1 1 auto;               /* se reparten el ancho */
-    min-width: 120px;             /* evita botones súper estrechos */
-    max-width: 180px;             /* evita que ocupen toda la fila */
-    justify-content: center;      /* centra icono + texto */
-  }
-}
-
-/* 4) Asegurar que ningún estilo global hinche iconos dentro de tarjetas */
-.product-card .icon-18{ width:18px; height:18px; }
-.product-card .icon-20{ width:20px; height:20px; }
-.product-card .icon-24{ width:24px; height:24px; }
-
-/* 5) Header/toolbar un poco más cómodos en pantallas chicas */
-@media (max-width: 720px){
-  .header{ flex-direction: column; align-items: flex-start; gap: 10px; }
-  .actions{ width: 100%; }
-  .btn-primary{ width: 100%; text-align: center; }
-}
-@media (max-width: 860px){
-  .toolbar{ grid-template-columns: 1fr; gap: 10px; }
-}
-
-/* 6) Sidebar abierta no aplasta contenido en phone (por si quedó abierta) */
-@media (max-width: 640px){
-  .sidebar.open ~ .page{ margin-left: 78px; }
-}
-
-
-
-
+    .icon-18{width:18px;height:18px;display:block}
+    .icon-20{width:20px;height:20px;display:block}
+    .icon-24{width:24px;height:24px;display:block}
   </style>
 </head>
 <body>
@@ -532,4 +428,3 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
   </script>
 </body>
 </html>
-
