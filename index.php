@@ -338,12 +338,48 @@ $totalMes = $stmt->fetchColumn();
       .stat-card{ align-items: flex-start; }
     }
 
-    /* Tablas usables en móvil: scroll horizontal (sin romper columnas) */
-    /* Sin envolver el HTML: se hace solo por CSS */
+    /* ===== FIX TABLAS EN MÓVIL (sin superposición) ===== */
+
+    /* Contenedor con scroll horizontal */
+    .table-wrap{
+      width:100%;
+      overflow-x:auto;
+      -webkit-overflow-scrolling:touch;
+      border-radius:12px;
+    }
+
+    /* Mantener el layout nativo de tabla */
+    .table-wrap > table{
+      width:100%;
+      border-collapse:collapse;
+      table-layout:auto; /* evita que colapsen columnas */
+    }
+
+    /* En móviles: conservar display nativo y usar scroll */
     @media (max-width: 980px){
-      table{ display:block; width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; }
-      thead, tbody, tr{ display:table; width:100%; table-layout:fixed; }
+      table{ display:table !important; }
+      thead{ display:table-header-group !important; }
+      tbody{ display:table-row-group !important; }
+      tr{ display:table-row !important; }
       th, td{ white-space:nowrap; }
+    }
+
+    /* Compactar padding/tipografía en teléfonos */
+    @media (max-width: 640px){
+      .table-wrap th, .table-wrap td{
+        padding:10px 12px;
+        font-size:13px;
+      }
+    }
+
+    /* Encabezado pegajoso (opcional) */
+    @supports (position: sticky){
+      .table-wrap thead th{
+        position: sticky;
+        top: 0;
+        background: var(--panel, #fff);
+        z-index: 1;
+      }
     }
 
     /* Botones a ancho completo en teléfonos para mejor toque */
@@ -464,46 +500,50 @@ $totalMes = $stmt->fetchColumn();
           </div>
         </div>
         <div class="section-body">
-          <table class="products-table" id="productsTable">
-            <thead>
-              <tr>
-                <th data-key="id">ID</th>
-                <th data-key="code">Código</th>
-                <th data-key="name">Prenda</th>
-                <th data-key="size">Talla</th>
-                <th data-key="color">Color</th>
-                <th data-key="cost_price">Precio Costo</th>
-                <th data-key="sale_price">Precio Venta</th>
-                <th data-key="stock">Stock</th>
-                <th data-key="created_at">Creado</th>
-              </tr>
-            </thead>
-            <tbody id="productsBody">
-            <?php foreach ($products as $p): ?>
-              <?php
-                // Si created_at está en UTC en DB:
-                [$pCreatedText, $pCreatedISO] = fmt_datetime_for_user($p['created_at'] ?? 'now', $user_tz, $time_fmt);
-              ?>
-              <tr>
-                <td><?= $p['id'] ?></td>
-                <td><?= htmlspecialchars($p['code'] ?? '') ?></td>
-                <td><?= htmlspecialchars($p['name'] ?? '') ?></td>
-                <td><?= htmlspecialchars($p['size'] ?? '') ?></td>
-                <td><?= htmlspecialchars($p['color'] ?? '') ?></td>
-                <td><?= $currency . ' ' . number_format($p['cost_price'], 2) ?></td>
-                <td><?= $currency . ' ' . number_format($p['sale_price'], 2) ?></td>
-                <td>
-                  <?php if ((int)$p['stock'] < 5): ?>
-                    <span class="low-stock">⚠ <?= (int)$p['stock'] ?></span>
-                  <?php else: ?>
-                    <?= (int)$p['stock'] ?>
-                  <?php endif; ?>
-                </td>
-                <td data-ts="<?= htmlspecialchars($pCreatedISO) ?>"><?= htmlspecialchars($pCreatedText) ?></td>
-              </tr>
-            <?php endforeach; ?>
-            </tbody>
-          </table>
+          <!-- ENVOLTURA PARA TABLA -->
+          <div class="table-wrap">
+            <table class="products-table" id="productsTable">
+              <thead>
+                <tr>
+                  <th data-key="id">ID</th>
+                  <th data-key="code">Código</th>
+                  <th data-key="name">Prenda</th>
+                  <th data-key="size">Talla</th>
+                  <th data-key="color">Color</th>
+                  <th data-key="cost_price">Precio Costo</th>
+                  <th data-key="sale_price">Precio Venta</th>
+                  <th data-key="stock">Stock</th>
+                  <th data-key="created_at">Creado</th>
+                </tr>
+              </thead>
+              <tbody id="productsBody">
+              <?php foreach ($products as $p): ?>
+                <?php
+                  // Si created_at está en UTC en DB:
+                  [$pCreatedText, $pCreatedISO] = fmt_datetime_for_user($p['created_at'] ?? 'now', $user_tz, $time_fmt);
+                ?>
+                <tr>
+                  <td><?= $p['id'] ?></td>
+                  <td><?= htmlspecialchars($p['code'] ?? '') ?></td>
+                  <td><?= htmlspecialchars($p['name'] ?? '') ?></td>
+                  <td><?= htmlspecialchars($p['size'] ?? '') ?></td>
+                  <td><?= htmlspecialchars($p['color'] ?? '') ?></td>
+                  <td><?= $currency . ' ' . number_format($p['cost_price'], 2) ?></td>
+                  <td><?= $currency . ' ' . number_format($p['sale_price'], 2) ?></td>
+                  <td>
+                    <?php if ((int)$p['stock'] < 5): ?>
+                      <span class="low-stock">⚠ <?= (int)$p['stock'] ?></span>
+                    <?php else: ?>
+                      <?= (int)$p['stock'] ?>
+                    <?php endif; ?>
+                  </td>
+                  <td data-ts="<?= htmlspecialchars($pCreatedISO) ?>"><?= htmlspecialchars($pCreatedText) ?></td>
+                </tr>
+              <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
+          <!-- FIN ENVOLTURA -->
         </div>
       </div>
 
@@ -543,44 +583,48 @@ $totalMes = $stmt->fetchColumn();
           </div>
         </div>
         <div class="section-body">
-          <table class="sales-table" id="salesTable">
-            <thead>
-              <tr>
-                <th data-key="id">ID</th>
-                <th data-key="product_name">Producto</th>
-                <th data-key="size">Talla</th>
-                <th data-key="color">Color</th>
-                <th data-key="quantity">Cantidad</th>
-                <th data-key="unit_price">Precio</th>
-                <th data-key="total">Total</th>
-                <th data-key="sale_date">Fecha</th>
-                <th data-sortable="false">Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="salesBody">
-            <?php foreach ($recentSales as $s): ?>
-              <?php
-                [$saleText, $saleISO] = fmt_datetime_for_user($s['sale_date'] ?? 'now', $user_tz, $time_fmt);
-              ?>
-              <tr>
-                <td><?= $s['id'] ?></td>
-                <td><?= htmlspecialchars($s['product_name'] ?? '') ?></td>
-                <td><?= htmlspecialchars($s['size'] ?? '') ?></td>
-                <td><?= htmlspecialchars($s['color'] ?? '') ?></td>
-                <td><?= (int)$s['quantity'] ?></td>
-                <td><?= $currency . ' ' . number_format($s['unit_price'], 2) ?></td>
-                <td><?= $currency . ' ' . number_format($s['total'], 2) ?></td>
-                <td data-ts="<?= htmlspecialchars($saleISO) ?>"><?= htmlspecialchars($saleText) ?></td>
-                <td>
-                  <a href="delete_sale.php?id=<?= $s['id'] ?>" class="delete-btn"
-                     onclick="return confirm('¿Seguro que deseas eliminar esta venta?');">
-                    Eliminar
-                  </a>
-                </td>
-              </tr>
-            <?php endforeach; ?>
-            </tbody>
-          </table>
+          <!-- ENVOLTURA PARA TABLA -->
+          <div class="table-wrap">
+            <table class="sales-table" id="salesTable">
+              <thead>
+                <tr>
+                  <th data-key="id">ID</th>
+                  <th data-key="product_name">Producto</th>
+                  <th data-key="size">Talla</th>
+                  <th data-key="color">Color</th>
+                  <th data-key="quantity">Cantidad</th>
+                  <th data-key="unit_price">Precio</th>
+                  <th data-key="total">Total</th>
+                  <th data-key="sale_date">Fecha</th>
+                  <th data-sortable="false">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="salesBody">
+              <?php foreach ($recentSales as $s): ?>
+                <?php
+                  [$saleText, $saleISO] = fmt_datetime_for_user($s['sale_date'] ?? 'now', $user_tz, $time_fmt);
+                ?>
+                <tr>
+                  <td><?= $s['id'] ?></td>
+                  <td><?= htmlspecialchars($s['product_name'] ?? '') ?></td>
+                  <td><?= htmlspecialchars($s['size'] ?? '') ?></td>
+                  <td><?= htmlspecialchars($s['color'] ?? '') ?></td>
+                  <td><?= (int)$s['quantity'] ?></td>
+                  <td><?= $currency . ' ' . number_format($s['unit_price'], 2) ?></td>
+                  <td><?= $currency . ' ' . number_format($s['total'], 2) ?></td>
+                  <td data-ts="<?= htmlspecialchars($saleISO) ?>"><?= htmlspecialchars($saleText) ?></td>
+                  <td>
+                    <a href="delete_sale.php?id=<?= $s['id'] ?>" class="delete-btn"
+                       onclick="return confirm('¿Seguro que deseas eliminar esta venta?');">
+                      Eliminar
+                    </a>
+                  </td>
+                </tr>
+              <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
+          <!-- FIN ENVOLTURA -->
 
           <!-- Paginación -->
           <div class="pagination" id="salesPagination">
@@ -624,24 +668,20 @@ $totalMes = $stmt->fetchColumn();
     // Búsqueda Productos
     const productSearch = document.getElementById('productSearch');
     const productsBody = document.getElementById('productsBody');
-    if (productSearch && productsBody) {
-      productSearch.addEventListener('input', () => {
-        const q = productSearch.value.trim().toLowerCase();
-        [...productsBody.rows].forEach(tr => {
-          const cells = [...tr.cells].map(td => td.textContent.toLowerCase());
-          const show = !q || cells.some(t => t.includes(q));
-          tr.style.display = show ? '' : 'none';
-        });
+    productSearch.addEventListener('input', () => {
+      const q = productSearch.value.trim().toLowerCase();
+      [...productsBody.rows].forEach(tr => {
+        const cells = [...tr.cells].map(td => td.textContent.toLowerCase());
+        const show = !q || cells.some(t => t.includes(q));
+        tr.style.display = show ? '' : 'none';
       });
-    }
+    });
 
-    // Ordenamiento genérico (usa data-ts si está)
+    // Ordenamiento genérico (ahora usa data-ts si está)
     function enableSorting(tableId){
       const table = document.getElementById(tableId);
-      if (!table) return;
       const thead = table.tHead;
       const tbody = table.tBodies[0];
-      if (!thead || !tbody) return;
       const getCellValue = (tr, idx) => tr.children[idx].textContent.trim();
 
       [...thead.rows[0].cells].forEach((th, idx) => {
@@ -688,12 +728,12 @@ $totalMes = $stmt->fetchColumn();
     let page = 1;
 
     function getFilteredSalesRows(){
-      const q = (salesSearch?.value || '').trim().toLowerCase();
-      const min = parseFloat(minTotal?.value || ''); const max = parseFloat(maxTotal?.value || '');
+      const q = salesSearch.value.trim().toLowerCase();
+      const min = parseFloat(minTotal.value || ''); const max = parseFloat(maxTotal.value || '');
       const now = new Date(); now.setHours(0,0,0,0);
       let fromTs = Number.NEGATIVE_INFINITY;
 
-      const opt = dateQuick?.value || 'all';
+      const opt = dateQuick.value;
       if (opt === 'today') fromTs = now.getTime();
       else if (!isNaN(parseInt(opt))) {
         const days = parseInt(opt);
@@ -701,7 +741,7 @@ $totalMes = $stmt->fetchColumn();
         fromTs = from.getTime();
       }
 
-      const allRows = salesBody ? [...salesBody.rows] : [];
+      const allRows = [...salesBody.rows];
       return allRows.filter(tr => {
         const tds = [...tr.cells];
         const textHit = !q || tds.slice(0,8).some(td => td.textContent.toLowerCase().includes(q));
@@ -718,12 +758,11 @@ $totalMes = $stmt->fetchColumn();
     }
 
     function renderSales(){
-      if (!salesBody) return;
       const rows = [...salesBody.rows];
       rows.forEach(r => r.style.display = 'none');
 
       const filtered = getFilteredSalesRows();
-      const perPage = parseInt((rowsPerPage?.value || '20'), 10) || 20;
+      const perPage = parseInt(rowsPerPage.value, 10) || 20;
       const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
       if (page > totalPages) page = totalPages;
 
@@ -731,18 +770,18 @@ $totalMes = $stmt->fetchColumn();
       const end = start + perPage;
       filtered.slice(start, end).forEach(r => r.style.display = '');
 
-      if (pageInfo) pageInfo.textContent = `Página ${page} de ${totalPages} — ${filtered.length} resultados`;
-      if (prevPage) prevPage.disabled = page <= 1;
-      if (nextPage) nextPage.disabled = page >= totalPages;
+      pageInfo.textContent = `Página ${page} de ${totalPages} — ${filtered.length} resultados`;
+      prevPage.disabled = page <= 1;
+      nextPage.disabled = page >= totalPages;
     }
 
-    salesSearch?.addEventListener('input', () => { page = 1; renderSales(); });
-    dateQuick?.addEventListener('change', () => { page = 1; renderSales(); });
-    minTotal?.addEventListener('input', () => { page = 1; renderSales(); });
-    maxTotal?.addEventListener('input', () => { page = 1; renderSales(); });
-    rowsPerPage?.addEventListener('change', () => { page = 1; renderSales(); });
-    prevPage?.addEventListener('click', () => { if (page>1){ page--; renderSales(); }});
-    nextPage?.addEventListener('click', () => { page++; renderSales(); });
+    salesSearch.addEventListener('input', () => { page = 1; renderSales(); });
+    dateQuick.addEventListener('change', () => { page = 1; renderSales(); });
+    minTotal.addEventListener('input', () => { page = 1; renderSales(); });
+    maxTotal.addEventListener('input', () => { page = 1; renderSales(); });
+    rowsPerPage.addEventListener('change', () => { page = 1; renderSales(); });
+    prevPage.addEventListener('click', () => { if (page>1){ page--; renderSales(); }});
+    nextPage.addEventListener('click', () => { page++; renderSales(); });
 
     renderSales();
   </script>
