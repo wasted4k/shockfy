@@ -65,5 +65,37 @@
         toggleSidebar();
       }
     });
+
+// --- Responsive: also allow external toggles and overlay close ---
+  var overlay = document.querySelector('.sidebar-overlay');
+  var externalToggles = document.querySelectorAll('[data-toggle-sidebar]');
+
+  function closeSidebar(){
+    if (sidebar.classList.contains('open')) {
+      sidebar.classList.remove('open');
+      updateMenuIcon();
+      persist();
+    }
+  }
+
+  if (overlay) {
+    overlay.addEventListener('click', function(e){
+      e.preventDefault();
+      closeSidebar();
+    });
+  }
+  if (externalToggles && externalToggles.length) {
+    externalToggles.forEach(function(btn){
+      btn.addEventListener('click', function(e){
+        e.preventDefault();
+        toggleSidebar();
+      });
+    });
+  }
+  // Close on ESC
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') closeSidebar();
+  });
+
   }
 })();

@@ -174,6 +174,67 @@ $__tz = $_SESSION['timezone'] ?? 'America/New_York';
 body.trial-locked { overflow: hidden; }
 </style>
 
+<style>
+/* === Responsive enhancements for sidebar & layout (non-intrusive) === */
+:root{
+  --sidebar-collapsed: 78px;
+  --sidebar-expanded: 250px;
+}
+
+/* Shift the main page when sidebar is present (desktop) */
+.sidebar ~ .page{
+  margin-left: var(--sidebar-collapsed);
+  transition: margin-left .4s ease;
+}
+.sidebar.open ~ .page{
+  margin-left: var(--sidebar-expanded);
+}
+
+/* Mobile behavior: off-canvas sidebar + overlay + toggle button */
+.sidebar-overlay{
+  position: fixed; inset: 0;
+  background: rgba(15, 23, 42, .35);
+  backdrop-filter: blur(2px);
+  z-index: 90; 
+  opacity: 0; pointer-events: none;
+  transition: opacity .2s ease;
+}
+/* overlay becomes interactive when sidebar is open (on small screens) */
+@media (max-width: 1024px){
+  .sidebar{ 
+    width: var(--sidebar-expanded);
+    transform: translateX(-100%);
+  }
+  .sidebar.open{ transform: translateX(0); }
+  .sidebar ~ .page{ margin-left: 0; } /* content uses full width on mobile */
+  .sidebar.open ~ .sidebar-overlay{ opacity: 1; pointer-events: auto; }
+}
+
+/* Mobile open button (visible only on small screens) */
+.sidebar-mobile-toggle{
+  position: fixed; top: 12px; left: 12px; 
+  display: none; align-items: center; justify-content: center;
+  gap: 6px; padding: 8px 10px;
+  border-radius: 12px; border: 1px solid rgba(255,255,255,.15);
+  background: rgba(17,16,29,.7); color: #fff;
+  z-index: 92; cursor: pointer; box-shadow: 0 8px 20px rgba(0,0,0,.25);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+.sidebar-mobile-toggle i{ font-size: 20px; line-height: 1; }
+@media (max-width: 1024px){
+  .sidebar-mobile-toggle{ display: inline-flex; }
+}
+
+/* Keep the menu button clickable above the overlay */
+.sidebar .logo-details #btn{ position: absolute; z-index: 101; }
+
+/* Safer touch targets in collapsed mode */
+@media (max-width: 1024px){
+  .sidebar li a{ padding-right: 8px; }
+}
+</style>
+
+
 <link href="https://unpkg.com/boxicons@2.0.7/css/boxicons.min.css" rel="stylesheet">
 
 <div class="sidebar">
