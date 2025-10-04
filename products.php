@@ -3,7 +3,6 @@ require 'db.php';
 require_once __DIR__ . '/auth_check.php'; // proteger el login y mandarlo a welcome si la persona no ha verificado su email
 require 'auth.php';
 
-
 // Obtener la preferencia de moneda del usuario
 $stmt = $pdo->prepare("SELECT currency_pref FROM users WHERE id=?");
 $stmt->execute([$user['id']]);
@@ -41,10 +40,12 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <!doctype html>
 <html lang="es">
 <head>
-   <link rel="icon" href="assets/img/favicon.png" type="image/png">
-    <link rel="shortcut icon" href="assets/img/favicon.png" type="image/png">
   <meta charset="utf-8">
   <title>Productos</title>
+  <link rel="icon" href="assets/img/favicon.png" type="image/png">
+  <link rel="shortcut icon" href="assets/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
   <style>
     :root{
       --bg:#eef3f8;
@@ -61,6 +62,9 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
       --radius:16px;
     }
     *{box-sizing:border-box}
+    html,body{overflow-x:hidden;}
+    img,svg{max-width:100%;height:auto;display:block}
+
     body{
       font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
       margin:0;
@@ -79,7 +83,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
       background:linear-gradient(135deg,#e0edff,#f1f7ff);
       display:grid;place-items:center;border:1px solid #dbeafe;box-shadow:var(--shadow)
     }
-    .title h1{margin:0;font-size:24px;font-weight:800}
+    .title h1{margin:0;font-size:24px;font-weight:800;line-height:1.2}
     .subtitle{font-size:13px;color:var(--muted);margin-top:2px}
 
     .actions{display:flex;align-items:center;gap:10px}
@@ -137,8 +141,8 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
       margin-bottom:10px;transition:transform .3s ease
     }
     .product-card:hover .product-img{transform:scale(1.03)}
-    .product-name{font-size:15px;font-weight:700;margin-bottom:4px}
-    .muted{font-size:12px;color:var(--muted)}
+    .product-name{font-size:15px;font-weight:700;margin-bottom:4px;line-height:1.25}
+    .muted{font-size:12px;color:var(--muted);line-height:1.4}
     .price{margin-top:6px;font-size:13px;font-weight:700}
 
     .chip{
@@ -186,17 +190,50 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     .empty{
       grid-column:1/-1;display:flex;flex-direction:column;align-items:center;gap:10px;
-      padding:24px;border:1px dashed var(--border);border-radius:14px;background:#fff
+      padding:24px;border:1px dashed var(--border);border-radius:14px;background:#fff;text-align:center
     }
     .empty .icon{width:40px;height:40px;color:#94a3b8}
 
-    @media (max-width:768px){
+    /* ========= RESPONSIVE ========= */
+
+    /* Toolbar apilada en móvil */
+    @media (max-width: 860px){
       .toolbar{grid-template-columns:1fr;gap:10px}
     }
 
-    .icon-18{width:18px;height:18px;display:block}
-    .icon-20{width:20px;height:20px;display:block}
-    .icon-24{width:24px;height:24px;display:block}
+    /* Header apilado y botones cómodos */
+    @media (max-width: 720px){
+      .header{flex-direction:column;align-items:flex-start;gap:10px}
+      .actions{width:100%}
+      .btn-primary{width:100%;text-align:center}
+      .title h1{font-size:22px}
+    }
+
+    /* Grid más flexible y tarjetas compactas */
+    @media (max-width: 960px){
+      .products-grid{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+    }
+    @media (max-width: 560px){
+      .page{padding:18px 14px 84px}
+      .products-grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+      .product-card{padding:12px}
+      .product-img{width:120px;height:96px;margin-bottom:8px}
+      .product-name{font-size:14px}
+      .muted{font-size:12px}
+      .badge{font-size:10.5px}
+      .price{font-size:13px}
+      .product-actions a{flex:1;justify-content:center}
+    }
+
+    /* Sidebar abierta no debe aplastar el contenido en móvil (por si quedó persistida) */
+    @media (max-width: 640px){
+      .sidebar.open ~ .page{ margin-left:78px; }
+    }
+
+    /* Preferencias mínimas para iOS (evita zoom al enfocar inputs) */
+    @media (max-width: 560px){
+      input,select,button{font-size:16px}
+    }
   </style>
 </head>
 <body>
@@ -428,3 +465,4 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
   </script>
 </body>
 </html>
+
