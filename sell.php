@@ -30,7 +30,7 @@ $currencySymbols = [
 ];
 $currencySymbol = $currencySymbols[$currencyPref] ?? $currencyPref;
 
-/* ================== Categorías (categories: id, user_id, category_id, name) ================== */
+/* ================== Categorías ================== */
 $categories = [];
 $catByCode = []; // category_id (código externo) => name
 $catByDbId = []; // id (PK) => name
@@ -46,11 +46,8 @@ try {
     if($code !== '') $catByCode[$code] = $name;
     $catByDbId[$id] = $name;
   }
-} catch (Throwable $e) {
-  // Ignorar si no existe tabla
-}
+} catch (Throwable $e) {}
 if (!$categories) {
-  // Fallback de nombres (si no hay tabla o está vacía y tienes products.category texto)
   $names = [];
   foreach ($products as $p) {
     $catName = isset($p['category']) ? trim((string)$p['category']) : '';
@@ -70,12 +67,11 @@ if (!$categories) {
   <title>Registrar venta</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- Favicon -->
   <link rel="icon" href="assets/img/favicon.png" type="image/png">
   <link rel="shortcut icon" href="assets/img/favicon.png" type="image/png">
-
   <link rel="stylesheet" href="style.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+
   <style>
     :root{
       --shadow: 0 10px 28px rgba(0,0,0,.08);
@@ -157,7 +153,7 @@ if (!$categories) {
     .panel-body{ padding:14px; }
     .empty{ text-align:center; color:#9ca3af; font-size:14px; margin-bottom:12px; }
 
-    /* En móvil, panel deja de ser sticky y ocupa 100% debajo */
+    /* En móvil, el panel deja de ser sticky y ocupa 100% debajo */
     @media (max-width:1024px){
       .panel{ position:static; top:auto; }
     }
@@ -202,16 +198,20 @@ if (!$categories) {
     .price-edit:focus{ border-color:#0ea5e9; box-shadow:0 0 0 3px rgba(14,165,233,.15); }
     .price-prefix{ color:#6b7280; font-size:12px; }
 
-    /* Afinado en móviles pequeños */
-    @media (max-width:480px){
-      .page-wrap{ padding:16px 12px 80px; }
-      .section-title{ font-size:22px; }
-      .icon-btn{ height:40px; width:40px; }
-      .btn-blue{ min-width:unset; width:100%; }
-      .meta .t{ white-space:normal; } /* deja saltar línea si el nombre es largo */
-      .row{ flex-wrap:wrap; }
-      .disc-input{ flex:0 0 120px; }
+    /* ===== Barra flotante de carrito (solo móvil) ===== */
+    .cart-dock{
+      position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%);
+      display: none; /* visible solo en móvil */
+      align-items: center; justify-content: space-between; gap:12px;
+      width: min(560px, 92vw);
+      background: #0ea5e9; color:#fff; border: 1px solid #dbeafe;
+      padding: 12px 14px; border-radius: 14px; box-shadow: 0 16px 36px rgba(2,6,23,.25);
+      font-weight: 800; z-index: 3001;
     }
+    .cart-dock .count{ display:inline-flex; align-items:center; gap:8px; }
+    .cart-dock .total{ font-size:16px; }
+    .cart-dock .cta{ margin-left:auto; background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.25); border-radius:10px; padding:8px 12px; color:#fff; }
+    @media (max-width:1024px){ .cart-dock{ display:flex; } }
   </style>
 </head>
 <body>
@@ -245,26 +245,16 @@ if (!$categories) {
             <?php
               $stock = (int)($p['stock'] ?? 0);
               $stockClass = ($stock <= 5) ? 'low' : (($stock <= 10) ? 'mid' : 'high');
-
               $prodCatId = isset($p['category_id']) ? (string)$p['category_id'] : '';
-
-              // Resolver nombre de categoría por código (category_id) o por id (PK)
               $catName = '';
               if ($prodCatId !== '') {
                 if (isset($catByCode[$prodCatId]))      $catName = $catByCode[$prodCatId];
                 elseif (isset($catByDbId[$prodCatId]))  $catName = $catByDbId[$prodCatId];
               }
-              // Fallback si tuvieses un campo de texto "category" en products
-              if ($catName === '' && isset($p['category'])) {
-                $catName = trim((string)$p['category']);
-              }
-
+              if ($catName === '' && isset($p['category'])) $catName = trim((string)$p['category']);
               $pillText = $catName !== '' ? $catName : 'Producto';
               $codigo = 'P' . str_pad((string)$p['id'], 5, '0', STR_PAD_LEFT);
-
-              // Sanitizar ruta de imagen (evitar esquemas peligrosos)
-              $img = (string)($p['image'] ?? '');
-              if (!preg_match('~^(uploads/|https?://)~i', $img)) { $img = ''; }
+              $img = (string)($p['image'] ?? ''); if (!preg_match('~^(uploads/|https?://)~i', $img)) { $img = ''; }
             ?>
             <div class="card"
                  data-id="<?= (int)$p['id'] ?>"
@@ -287,7 +277,7 @@ if (!$categories) {
       </div>
 
       <!-- ====== Panel Vender ====== -->
-      <aside class="panel">
+      <aside class="panel" id="sellPanel">
         <div class="panel-head">
           <div class="panel-title">Vender</div>
           <div class="items-count" id="cartCount">0 items</div>
@@ -322,6 +312,13 @@ if (!$categories) {
   </div>
 </section>
 
+<!-- ===== Barra flotante de carrito (mobile) ===== -->
+<div class="cart-dock" id="cartDock" style="display:none">
+  <div class="count">🛒 <span id="dockCount">0</span></div>
+  <div class="total" id="dockTotal"><?= htmlspecialchars($currencySymbol) ?> 0.00</div>
+  <a href="#sellPanel" class="cta" id="dockGo">Ir al carrito</a>
+</div>
+
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -349,6 +346,13 @@ const discountInput= document.getElementById('discountInput');
 const clearCartBtn = document.getElementById('clearCart');
 const toastEl      = document.getElementById('toast');
 
+/* Dock (barra flotante) */
+const dock      = document.getElementById('cartDock');
+const dockCount = document.getElementById('dockCount');
+const dockTotal = document.getElementById('dockTotal');
+const dockGo    = document.getElementById('dockGo');
+const sellPanel = document.getElementById('sellPanel');
+
 let cart = [];
 
 /* ====== batch ====== */
@@ -363,6 +367,12 @@ function getBatchFlag(){ return localStorage.getItem(LS_KEY_FLAG)==='1'; }
 function fmt(n){ return (CURRENCY ? (CURRENCY + ' ') : '') + Number(n || 0).toFixed(2); }
 function escapeHtml(str){ return str ? String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;') : ''; }
 function showToast(message, ms=2500){ if(!message) return; toastEl.textContent = message; toastEl.classList.add('show'); setTimeout(()=> toastEl.classList.remove('show'), ms); }
+function updateDock(total, count){
+  dockCount.textContent = String(count);
+  dockTotal.textContent = fmt(total).replace(/^(\S+)\s?/, '$1 ');
+  // Mostrar solo en móvil (CSS ya limita) y cuando hay items
+  dock.style.display = (count > 0) ? 'flex' : 'none';
+}
 
 /* ====== totals ====== */
 function recomputeTotals(){
@@ -376,6 +386,8 @@ function recomputeTotals(){
   subtotalText.textContent = fmt(subtotal);
   totalText.textContent    = fmt(total);
   totalsBox.style.display = cart.length ? 'block' : 'none';
+
+  updateDock(total, cart.length);
 }
 
 /* ====== render ====== */
@@ -388,6 +400,7 @@ function renderCart(){
     selectedProductId.value = '';
     unitPriceInput.value    = '';
     quantityInput.value     = 1;
+    updateDock(0, 0);
     return;
   }
   emptyMsg.style.display = 'none';
@@ -428,6 +441,8 @@ function renderCart(){
   subtotalText.textContent = fmt(subtotal);
   totalText.textContent = fmt(total);
   totalsBox.style.display = 'block';
+
+  updateDock(total, cart.length);
 }
 
 /* ====== add to cart ====== */
@@ -461,7 +476,7 @@ productsGrid.addEventListener('click', function(e){
 cartList.addEventListener('click', function(e){
   var targetBtn = e.target.closest ? e.target.closest('button') : null;
   if (!targetBtn) return;
-  e.preventDefault(); // evita submits
+  e.preventDefault();
 
   var rem = targetBtn.getAttribute('data-remove');
   var inc = targetBtn.getAttribute('data-inc');
@@ -493,14 +508,14 @@ cartList.addEventListener('click', function(e){
     var qtyEl2 = cartList.querySelector('.qty-val[data-qty="'+i2+'"]');
     if (qtyEl2) qtyEl2.textContent = String(cart[i2].quantity);
     var line2 = cartList.querySelector('.line-subtotal[data-sub="'+i2+'"]');
-    if (line2) line.textContent = fmt(cart[i2].unit_price * cart[i2].quantity);
+    if (line2) line2.textContent = fmt(cart[i2].unit_price * cart[i2].quantity);
 
     recomputeTotals();
     return;
   }
 });
 
-/* ====== price edit (no re-render) ====== */
+/* ====== price edit ====== */
 cartList.addEventListener('input', function(e){
   var iAttr = e.target.getAttribute ? e.target.getAttribute('data-price') : null;
   if(iAttr === null) return;
@@ -520,7 +535,6 @@ cartList.addEventListener('blur', function(e){
   e.target.value = Number(cart[i].unit_price||0).toFixed(2);
 }, true);
 
-/* Bloquear Enter en el input de precio (evita submit accidental) */
 cartList.addEventListener('keydown', function(e){
   if (e.key === 'Enter' && e.target && e.target.matches && e.target.matches('input.price-edit')) {
     e.preventDefault();
@@ -534,48 +548,44 @@ discountInput.addEventListener('input', recomputeTotals);
 /* ====== vaciar ====== */
 clearCartBtn.addEventListener('click', function(){ cart = []; renderCart(); });
 
-/* ====== Búsqueda + Filtro por categoría (ID/código O nombre) ====== */
+/* ====== Búsqueda + Filtro ====== */
+const searchInput = document.getElementById('productSearch');
+const categoryFilter = document.getElementById('categoryFilter');
 function applyFilters(){
   var term = (searchInput.value || '').trim().toLowerCase();
-
   var sel = categoryFilter.options[categoryFilter.selectedIndex] || null;
   var kind = sel ? (sel.getAttribute('data-kind') || '') : '';
-  var rawVal = (categoryFilter.value || '').trim();                // value = categories.category_id (código)
-  var optDbId = sel ? (sel.getAttribute('data-cat-id') || '') : ''; // data-cat-id = categories.id (PK)
+  var rawVal = (categoryFilter.value || '').trim();
+  var optDbId = sel ? (sel.getAttribute('data-cat-id') || '') : '';
   var optionName = sel ? (sel.textContent || '').replace(/\s+/g,' ').trim().toLowerCase() : '';
 
   var cards = document.querySelectorAll('#productsGrid .card');
   for (var k=0; k<cards.length; k++){
     var card = cards[k];
     var id = card.getAttribute('data-id');
-    var p = null;
-    for (var z=0; z<products.length; z++){ if (String(products[z].id) === String(id)) { p = products[z]; break; } }
-    p = p || {};
+    var p = products.find(x => String(x.id) === String(id)) || {};
     var txt = ((p.name||'')+' '+(p.size||'')+' '+(p.color||'')).toLowerCase();
     var matchesText = term === '' ? true : (txt.indexOf(term) !== -1);
 
     var matchesCat = true;
     if (rawVal !== '' || optDbId !== '') {
-      var cid   = (card.getAttribute('data-category-id') || '').trim();     // products.category_id (puede ser code o PK)
+      var cid   = (card.getAttribute('data-category-id') || '').trim();
       var cname = (card.getAttribute('data-category-name') || '').trim().toLowerCase();
 
       if (kind === 'id') {
         matchesCat = (cid !== '' && (String(cid) === String(rawVal) || String(cid) === String(optDbId)));
-        if (!matchesCat && optionName !== '') {
-          matchesCat = (cname !== '' && cname === optionName);
-        }
+        if (!matchesCat && optionName !== '') matchesCat = (cname !== '' && cname === optionName);
       } else if (kind === 'name') {
         matchesCat = (cname !== '' && cname === optionName);
       }
     }
-
     card.style.display = (matchesText && matchesCat) ? '' : 'none';
   }
 }
 searchInput.addEventListener('input', applyFilters);
 categoryFilter.addEventListener('change', applyFilters);
 
-/* ====== vender  ====== */
+/* ====== vender ====== */
 function validateForm(){
   if(cart.length === 0){ showToast('Agrega al menos un producto al carrito.'); return false; }
   for(var i=0;i<cart.length;i++){
@@ -602,7 +612,7 @@ function validateForm(){
   return true;
 }
 
-/* ====== continuar batch después de process_sale.php ====== */
+/* ====== continuar batch ====== */
 window.addEventListener('load', function(){
   var url = new URL(window.location.href);
   var urlMsg = url.searchParams.get('msg');
@@ -633,6 +643,13 @@ window.addEventListener('load', function(){
     url.searchParams.delete('msg');
     history.replaceState({}, '', url.pathname + (url.searchParams.toString()? '?'+url.searchParams.toString() : ''));
   }
+});
+
+/* ====== Dock: scroll al carrito ====== */
+dockGo.addEventListener('click', function(ev){
+  ev.preventDefault();
+  if (!sellPanel) return;
+  sellPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
 /* init */
