@@ -2,7 +2,6 @@
 // add_product.php
 require 'db.php';
 require_once __DIR__ . '/auth_check.php'; // protege login / verificación
-// Si por alguna razón no hay sesión iniciada aquí, descomenta la siguiente línea:
 // if (session_status() === PHP_SESSION_NONE) session_start();
 
 $user_id = $_SESSION['user_id']; // ID del usuario logueado
@@ -34,41 +33,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Validaciones mínimas
     if ($name === '') {
         $_SESSION['flash'] = ['type' => 'error', 'text' => 'El nombre es obligatorio'];
-        header('Location: add_product.php');
-        exit;
+        header('Location: add_product.php'); exit;
     }
     if ($category_id === 0) {
         $_SESSION['flash'] = ['type' => 'error', 'text' => 'Debe seleccionar una categoría'];
-        header('Location: add_product.php');
-        exit;
+        header('Location: add_product.php'); exit;
     }
 
-    // Procesar imagen si se sube
+    // Procesar imagen si se sube (tope 2 MB)
     $imagePath = null;
-    if (!empty($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
-        $tmpName = $_FILES['image']['tmp_name'];
-        $originalName = basename((string)$_FILES['image']['name']);
-        $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+    $MAX_IMAGE_BYTES = 2 * 1024 * 1024; // 2 MB
 
-        $allowed = ['jpg','jpeg','png','gif'];
-        if (!in_array($ext, $allowed, true)) {
-            $_SESSION['flash'] = ['type' => 'error', 'text' => 'Formato de imagen no permitido'];
-            header('Location: add_product.php');
-            exit;
+    if (!empty($_FILES['image']) && ($_FILES['image']['name'] ?? '') !== '') {
+        $err = (int)$_FILES['image']['error'];
+
+        // PHP ya pudo rechazar por tamaño (upload_max_filesize/post_max_size)
+        if ($err === UPLOAD_ERR_INI_SIZE || $err === UPLOAD_ERR_FORM_SIZE) {
+            $_SESSION['flash'] = ['type' => 'error', 'text' => 'La imagen no puede superar 2 MB.'];
+            header('Location: add_product.php'); exit;
         }
 
-        $uploadDir = 'uploads/';
-        if (!is_dir($uploadDir)) {
-            @mkdir($uploadDir, 0777, true);
+        if ($err === UPLOAD_ERR_OK) {
+            // Tope propio
+            if ((int)$_FILES['image']['size'] > $MAX_IMAGE_BYTES) {
+                $_SESSION['flash'] = ['type' => 'error', 'text' => 'La imagen no puede superar 2 MB.'];
+                header('Location: add_product.php'); exit;
+            }
+
+            $tmpName = $_FILES['image']['tmp_name'];
+            $originalName = basename((string)$_FILES['image']['name']);
+            $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+            $allowed = ['jpg','jpeg','png','gif'];
+            if (!in_array($ext, $allowed, true)) {
+                $_SESSION['flash'] = ['type' => 'error', 'text' => 'Formato de imagen no permitido (JPG, PNG o GIF).'];
+                header('Location: add_product.php'); exit;
+            }
+
+            $uploadDir = 'uploads/';
+            if (!is_dir($uploadDir)) @mkdir($uploadDir, 0777, true);
+
+            $newName = uniqid('prod_', true) . '.' . $ext;
+            $imagePath = $uploadDir . $newName;
+
+            if (!@move_uploaded_file($tmpName, $imagePath)) {
+                $_SESSION['flash'] = ['type' => 'error', 'text' => 'No se pudo guardar la imagen. Inténtalo de nuevo.'];
+                header('Location: add_product.php'); exit;
+            }
+        } elseif ($err !== UPLOAD_ERR_NO_FILE) {
+            $_SESSION['flash'] = ['type' => 'error', 'text' => 'No se pudo subir la imagen. Inténtalo de nuevo.'];
+            header('Location: add_product.php'); exit;
         }
-
-        $newName = uniqid('prod_', true) . '.' . $ext;
-        $imagePath = $uploadDir . $newName;
-
-        @move_uploaded_file($tmpName, $imagePath);
     }
 
-    // INSERT del producto incluyendo la imagen y el usuario logueado
+    // INSERT del producto
     $sql = 'INSERT INTO products (code, name, size, color, cost_price, sale_price, stock, category_id, image, user_id)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
     $stmt = $pdo->prepare($sql);
@@ -80,16 +97,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $imagePath, $user_id
         ]);
 
-        // Mensaje de éxito vía FLASH (sin querystring)
         $_SESSION['flash'] = ['type' => 'ok', 'text' => 'Producto agregado correctamente al inventario'];
-        header('Location: add_product.php');
-        exit;
+        header('Location: add_product.php'); exit;
 
     } catch (Throwable $e) {
-        // No exponemos SQL tal cual en producción; aquí lo enviamos a flash para visibilidad
-        
-        header('Location: add_product.php');
-        exit;
+        $_SESSION['flash'] = ['type' => 'error', 'text' => 'Error al guardar: ' . $e->getMessage()];
+        header('Location: add_product.php'); exit;
     }
 }
 ?>
@@ -106,18 +119,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <style>
         :root{
-            --bg:#f0f4f9;
-            --panel:#ffffff;
-            --panel-2:#f2f5f9;
-            --text:#0f172a;
-            --muted:#64748b;
-            --primary:#2563eb;
-            --primary-2:#60a5fa;
-            --success:#16a34a;
-            --danger:#dc2626;
-            --border:#e2e8f0;
-            --shadow:0 10px 24px rgba(15,23,42,.06);
-            --radius:16px;
+            --bg:#f0f4f9; --panel:#ffffff; --panel-2:#f2f5f9; --text:#0f172a; --muted:#64748b;
+            --primary:#2563eb; --primary-2:#60a5fa; --success:#16a34a; --danger:#dc2626;
+            --border:#e2e8f0; --shadow:0 10px 24px rgba(15,23,42,.06); --radius:16px;
         }
         *{box-sizing:border-box}
         body{margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text);}
@@ -125,9 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .page{ padding:24px 18px 64px; }
         .container{ max-width:1000px; margin:0 auto; }
 
-        .header{
-            display:flex; align-items:center; justify-content:space-between; gap:16px; margin:8px 0 18px;
-        }
+        .header{ display:flex; align-items:center; justify-content:space-between; gap:16px; margin:8px 0 18px; }
         .title{ display:flex; align-items:center; gap:14px; }
         .title .icon{
             width:48px;height:48px;border-radius:12px;
@@ -137,10 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .title h1{ margin:0; font-size:26px; font-weight:800; color:#0b1220; }
         .subtitle{ font-size:13px; color:var(--muted); margin-top:4px; }
 
-        .card{
-            background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
-            box-shadow:var(--shadow); overflow:hidden;
-        }
+        .card{ background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden; }
         .card-header{
             display:flex; align-items:center; justify-content:space-between; gap:12px;
             padding:14px 16px; background:linear-gradient(180deg,#ffffff,#f7fafc); border-bottom:1px solid var(--border);
@@ -148,9 +147,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .card-title{ font-size:14px; font-weight:800; }
         .card-body{ padding:16px; }
 
-        .form-grid{
-            display:grid; grid-template-columns:1fr 1fr; gap:14px;
-        }
+        .form-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
         .form-col-span-2{ grid-column: span 2; }
 
         label{font-weight:600; font-size:13px; color:#0f172a;}
@@ -164,14 +161,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .field select{
             border:none; outline:none; background:transparent; width:100%; color:var(--text); font-size:14px;
         }
-        .prefix{
-            font-size:12px; color:#475569; background:var(--panel-2); padding:4px 8px; border-radius:8px; border:1px solid var(--border);
-        }
+        .prefix{ font-size:12px; color:#475569; background:var(--panel-2); padding:4px 8px; border-radius:8px; border:1px solid var(--border); }
         .hint{ font-size:12px; color:var(--muted); margin-top:6px; }
 
-        .image-uploader{
-            display:flex; align-items:flex-start; gap:14px; flex-wrap:wrap;
-        }
+        .image-uploader{ display:flex; align-items:flex-start; gap:14px; flex-wrap:wrap; }
         .image-preview{
             width:140px; height:140px; border-radius:14px; background:#f1f5f9; border:1px solid var(--border);
             display:grid; place-items:center; overflow:hidden;
@@ -195,26 +188,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         .btn.danger{ background:linear-gradient(135deg,#ef4444,#f87171); color:#fff; border:none; }
 
-        .actions{
-            display:flex; align-items:center; gap:10px; justify-content:flex-end; margin-top:8px;
-        }
+        .actions{ display:flex; align-items:center; gap:10px; justify-content:flex-end; margin-top:8px; }
 
         /* Alertas (flash) */
-        .alert{
-            margin-bottom:12px; padding:10px 12px; border-radius:12px; font-weight:700;
-            border:1px solid transparent;
-        }
+        .alert{ margin-bottom:12px; padding:10px 12px; border-radius:12px; font-weight:700; border:1px solid transparent; }
         .alert.ok{ background:#ecfdf5; border-color:#d1fae5; color:#065f46; }
         .alert.err{ background:#fef2f2; border-color:#fee2e2; color:#991b1b; }
 
         /* Toast */
         #toast{
             position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
-            background:#ecfdf5; border:1px solid #d1fae5; color:#065f46;
             padding:12px 16px; border-radius:12px; box-shadow:var(--shadow);
             font-weight:800; opacity:0; pointer-events:none; transition:opacity .25s ease; z-index:2000;
+            border:1px solid transparent;
         }
         #toast.show{ opacity:1; pointer-events:auto; }
+        #toast.ok{ background:#ecfdf5; border-color:#d1fae5; color:#065f46; }
+        #toast.err{ background:#fef2f2; border-color:#fee2e2; color:#991b1b; }
 
         /* ====== Responsive ====== */
         @media (max-width: 1024px){
@@ -382,7 +372,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     </div>
                                     <div class="image-actions">
                                         <button type="button" class="btn ghost" id="btnRemoveImage" style="display:none;">Quitar imagen</button>
-                                        <div class="hint">Formatos permitidos: JPG, PNG, GIF. Tamaño razonable recomendado.</div>
+                                        <div class="hint">Formatos permitidos: JPG, PNG, GIF. <strong>Máx. 2 MB</strong>.</div>
                                     </div>
                                 </div>
                             </div>
@@ -410,34 +400,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       });
 
       // Toast helper
-      function showToast(msg){
+      function showToast(msg, type='ok'){
         const el = document.getElementById('toast');
         el.textContent = msg;
+        el.classList.remove('ok','err');
+        el.classList.add(type === 'ok' ? 'ok' : 'err');
         el.classList.add('show');
         setTimeout(() => el.classList.remove('show'), 2500);
       }
 
-      // Si vino flash del servidor y fue de éxito, dispara toast también
-      <?php if (!empty($flash) && $flash['type'] === 'ok'): ?>
-        showToast(<?= json_encode($flash['text']) ?>);
+      // Si vino flash del servidor, dispara toast (ok/err)
+      <?php if (!empty($flash)): ?>
+        showToast(<?= json_encode($flash['text']) ?>, <?= json_encode($flash['type'] === 'ok' ? 'ok' : 'err') ?>);
       <?php endif; ?>
 
-      // Fallback: si alguna vez envías ?message= o ?error= por query
-      (function(){
-        const p = new URLSearchParams(location.search);
-        const ok  = p.get('message') || p.get('msg');
-        const err = p.get('error');
-        if (ok)  showToast(ok);
-        // if (err) showToast(err); // si prefieres toast también para errores
-
-        if (ok || err) { // limpia la URL para no repetir
-          p.delete('message'); p.delete('msg'); p.delete('error');
-          const clean = location.pathname + (p.toString() ? '?' + p.toString() : '');
-          history.replaceState(null, '', clean);
-        }
-      })();
-
-      // Previsualización de imagen
+      // Previsualización + validación de tamaño (2 MB)
+      const MAX_MB = 2;
       const inputImage = document.getElementById('image');
       const preview = document.getElementById('imagePreview');
       const btnRemove = document.getElementById('btnRemoveImage');
@@ -445,6 +423,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       inputImage.addEventListener('change', (e) => {
         const file = e.target.files && e.target.files[0];
         if(!file){ resetPreview(); return; }
+        if (file.size > MAX_MB * 1024 * 1024) {
+          showToast('La imagen no puede superar ' + MAX_MB + ' MB.', 'err');
+          e.target.value = '';
+          resetPreview();
+          return;
+        }
         const url = URL.createObjectURL(file);
         renderPreview(url);
       });
@@ -472,31 +456,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         btnRemove.style.display = 'none';
       }
 
-      // Validación rápida en cliente
+      // Validación rápida en cliente (incluye límite 2 MB)
       const form = document.getElementById('productForm');
       form.addEventListener('submit', (e) => {
         const name = document.getElementById('name').value.trim();
         const cost = parseFloat(document.getElementById('cost_price').value || '0');
         const sale = parseFloat(document.getElementById('sale_price').value || '0');
         const cat  = document.getElementById('category_id').value;
+        const file = inputImage.files && inputImage.files[0];
 
+        if(file && file.size > MAX_MB * 1024 * 1024){
+          e.preventDefault();
+          showToast('La imagen no puede superar ' + MAX_MB + ' MB.', 'err');
+          return;
+        }
         if(!name){
-          e.preventDefault(); showToast('El nombre es obligatorio'); document.getElementById('name').focus(); return;
+          e.preventDefault(); showToast('El nombre es obligatorio', 'err'); document.getElementById('name').focus(); return;
         }
         if(!cat){
-          e.preventDefault(); showToast('Selecciona una categoría'); document.getElementById('category_id').focus(); return;
+          e.preventDefault(); showToast('Selecciona una categoría', 'err'); document.getElementById('category_id').focus(); return;
         }
         if(isNaN(cost) || isNaN(sale)){
-          e.preventDefault(); showToast('Verifica los precios'); return;
+          e.preventDefault(); showToast('Verifica los precios', 'err'); return;
         }
         if(cost < 0 || sale < 0){
-          e.preventDefault(); showToast('Los precios no pueden ser negativos'); return;
+          e.preventDefault(); showToast('Los precios no pueden ser negativos', 'err'); return;
         }
         if(parseInt(document.getElementById('stock').value || '0', 10) < 0){
-          e.preventDefault(); showToast('El stock no puede ser negativo'); return;
+          e.preventDefault(); showToast('El stock no puede ser negativo', 'err'); return;
         }
       });
     </script>
 </body>
 </html>
-
