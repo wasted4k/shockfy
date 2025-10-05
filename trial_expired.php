@@ -186,6 +186,51 @@ $next = $_GET['next'] ?? ($_SERVER['HTTP_REFERER'] ?? 'index.php');
       .btn, .btn:hover{ transition: none; transform:none; }
       .blob{ animation: none; }
     }
+
+
+/* ====== Trial Expired: responsive móvil ====== */
+
+/* 1) Quitar empuje de sidebar en móvil y evitar scroll lateral */
+@media (max-width:1024px){
+  .content.with-fixed-sidebar{ margin-left:0 !important; }
+  .app-shell{ overflow-x:hidden; }
+}
+
+/* 2) Contenedor/carta más cómodo en pantallas chicas */
+@media (max-width:720px){
+  .content{ padding:20px 14px 56px; }
+  .container{ max-width:100%; margin:0 auto; }
+  .wrap{ min-height:auto; padding:min(6vw,20px); }
+  .card{ padding:18px; border-radius:14px; }
+  .header{ gap:10px; }
+  .badge{ font-size:11px; padding:7px 10px; }
+  .lead{ font-size:14px; }
+}
+
+/* 3) Acciones en columna y a ancho completo en móvil */
+@media (max-width:720px){
+  .actions{ flex-direction:column; align-items:stretch; gap:10px; }
+  .btn{ width:100%; text-align:center; padding:12px 14px; }
+}
+
+/* 4) “Highlights” legibles sin desbordes */
+@media (max-width:720px){
+  .highlights{ justify-content:stretch; gap:8px; }
+  .highlights .pill{ width:100%; justify-content:center; font-size:12px; padding:8px 10px; }
+}
+
+/* 5) Blobs decorativos: reducir en móvil y ocultar en ultra-chico */
+@media (max-width:720px){
+  .blob.blue{ width:220px; height:220px; top:-50px; right:-10px; filter:blur(24px); }
+  .blob.yellow{ width:200px; height:200px; bottom:-60px; left:-14px; filter:blur(24px); }
+}
+@media (max-width:360px){
+  .blob{ display:none; }
+  .card{ padding:16px; }
+}
+
+
+
   </style>
 </head>
 <body>
