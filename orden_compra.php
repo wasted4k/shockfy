@@ -161,6 +161,59 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
       box-shadow: var(--success-shadow);
       outline: none;
     }
+
+/* ====== Otros métodos de pago: responsive móvil ====== */
+
+/* 0) Lista utilitaria que usas en "Estado de cuenta" */
+.ul{ list-style: disc; padding-left: 20px; margin: 12px 0 0; text-align: left; }
+.ul li{ margin: 6px 0; }
+
+/* 1) Quitar empuje de sidebar en móvil y evitar scroll lateral */
+@media (max-width:1024px){
+  .content.with-fixed-sidebar{ margin-left:0 !important; }
+  .app-shell{ overflow-x:hidden; }
+}
+
+/* 2) Contenedor, títulos y cards más compactos */
+@media (max-width:700px){
+  .content{ padding:20px 14px 56px; }
+  .container{ max-width:100%; margin:0 auto; }
+  .header-wrap{ margin-bottom:12px; }
+  .page-title{ font-size:22px; }
+  .page-sub{ font-size:12px; }
+
+  .card{ padding:16px; border-radius:14px; }
+}
+
+/* 3) Grid de opciones: 1 columna y targets grandes */
+@media (max-width:700px){
+  .opt-grid{ grid-template-columns: 1fr !important; gap: 10px; }
+  .opt{ padding:12px; font-size:14px; }
+  .opt img.icon{ width:18px; height:18px; }
+}
+
+/* 4) Panel/detalle: botones full-width, checkboxes alineados, QR fluido */
+@media (max-width:700px){
+  #methodDetail .btn{ width:100%; text-align:center; }
+
+  .checkbox-row{ align-items: flex-start; gap: 10px; }
+  .checkbox-row input{ margin-top: 3px; }
+
+  .qr-img{ width: 100%; max-width: 92vw; height: auto; }
+}
+
+/* 5) Modal en móvil: ancho fluido y tipografías */
+@media (max-width:700px){
+  .modal{ width: min(96vw, 640px) !important; padding: 12px !important; }
+  .modal-title{ font-size:16px; }
+}
+@media (max-width:380px){
+  .page-title{ font-size:20px; }
+  .opt{ font-size:13px; }
+  .modal{ width: 96vw !important; }
+}
+
+
   </style>
 </head>
 <body>
@@ -823,6 +876,64 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
                     });
                   })();
                 </script>
+
+
+<script>
+/* ===== Límite global de comprobantes: 2 MB ===== */
+(function(){
+  const MAX_MB = 2;
+  const MAX_BYTES = MAX_MB * 1024 * 1024;
+
+  // Mapea cada input con sus elementos de UI para limpiar
+  const MAP = {
+    'bn-file': { name: '#bn-file-name', confirm: '#bn-confirm' },
+    'pp-file': { name: '#pp-file-name', confirm: '#pp-confirm' },
+    'pe-file': { name: '#pe-file-name', confirm: '#pe-confirm' },
+    've-file': { name: '#ve-file-name', confirm: '#ve-confirm' },
+  };
+
+  // Delegación: los inputs se crean dinámicamente dentro de #mdBody
+  document.addEventListener('change', (e) => {
+    const input = e.target;
+    if (!input.matches('#bn-file, #pp-file, #pe-file, #ve-file')) return;
+
+    const file = input.files && input.files[0];
+    const ids  = MAP[input.id] || {};
+    const nameEl = ids.name ? document.querySelector(ids.name) : null;
+    const confirmEl = ids.confirm ? document.querySelector(ids.confirm) : null;
+
+    if (file && file.size > MAX_BYTES) {
+      alert('El comprobante no puede superar 2 MB.');
+      input.value = '';                 // vacía el archivo
+      if (nameEl)   nameEl.textContent = '';
+      if (confirmEl){                   // oculta el panel de confirmación
+        confirmEl.style.display = 'none';
+        confirmEl.classList.remove('stack');
+      }
+    }
+  }, false);
+
+  // Defensa extra: antes de enviar (por si alguien manipula el DOM)
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('#bn-done, #pp-done, #pe-done, #ve-done');
+    if (!btn) return;
+
+    const inputId = btn.id.replace('-done','-file');
+    const input   = document.getElementById(inputId);
+    const file    = input && input.files && input.files[0];
+
+    if (file && file.size > MAX_BYTES) {
+      e.preventDefault();
+      e.stopPropagation();
+      alert('El comprobante no puede superar 2 MB.');
+    }
+  }, true); // capturando, para correr antes del handler original
+})();
+</script>
+
+
+
+
               </div>
 
               <!-- Estado de cuenta -->
