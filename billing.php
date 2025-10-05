@@ -234,6 +234,63 @@ unset($_SESSION['billing_ok'], $_SESSION['billing_err']);
   filter:grayscale(.1);
 }
 
+
+/* ====== Billing 100% responsive en móviles ====== */
+
+/* 1) Quitar empuje de la sidebar en móvil */
+@media (max-width:1024px){
+  .content.with-fixed-sidebar{ margin-left: 0 !important; }
+  .app-shell{ overflow-x:hidden; } /* evita scroll lateral accidental */
+}
+
+/* 2) Contenedor y cabecera más compactos */
+@media (max-width:900px){
+  .container{ transform:none !important; max-width:100%; }
+}
+@media (max-width:700px){
+  .content{ padding:20px 14px 56px; }
+  .header-wrap{ margin-bottom:12px; }
+  .page-title{ font-size:22px; }
+  .page-sub{ font-size:12px; }
+}
+
+/* 3) Topbar/chips apilados y legibles */
+@media (max-width:700px){
+  .topbar{ flex-direction:column; align-items:stretch; gap:8px; }
+  .topbar .chip{ justify-content:center; }
+}
+
+/* 4) Tarjetas/planes en una columna y botones a ancho completo */
+@media (max-width:700px){
+  .plans{ grid-template-columns: 1fr !important; gap:12px; }
+  .card{ padding:16px; border-radius:14px; }
+  .card h3{ font-size:18px; }
+  .price{ font-size:20px; margin:6px 0 10px; }
+  .badge{ font-size:11px; padding:3px 8px; }
+  .btn{ width:100%; text-align:center; padding:12px; }
+}
+
+/* 5) Toasts cómodos en pantallas angostas */
+@media (max-width:700px){
+  .toast{ margin:0 12px; border-radius:12px; }
+}
+
+/* 6) Modal perfectamente usable en móviles */
+@media (max-width:700px){
+  .modal .panel{
+    width:auto; max-width:calc(100% - 20px);
+    padding:14px; border-radius:14px;
+  }
+  .modal .head{ margin-bottom:10px; }
+  .modal .title{ font-size:16px; }
+  .modal .choice{ grid-template-columns:1fr; }          /* botones grandes en 1 columna */
+  .modal .subgrid{ grid-template-columns: repeat(2,1fr);}/* 2 columnas para métodos */
+}
+@media (max-width:380px){
+  .modal .subgrid{ grid-template-columns: 1fr; }        /* 1 columna en pantallas muy pequeñas */
+}
+
+
   </style>
 </head>
 <body>
