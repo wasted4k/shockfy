@@ -87,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     } catch (Throwable $e) {
         // No exponemos SQL tal cual en producción; aquí lo enviamos a flash para visibilidad
-        $_SESSION['flash'] = ['type' => 'error', 'text' => 'Error al guardar: ' . $e->getMessage()];
+        
         header('Location: add_product.php');
         exit;
     }
