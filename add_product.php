@@ -64,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     try {
         $stmt->execute([$code ?: null, $name, $size, $color, $cost, $sale, $stock, $category_id, $imagePath, $user_id]);
-        header('Location: products.php?msg=Producto agregado correctamente');
+        header('Location: add_product.php?msg=Producto agregado correctamente');
         exit;
     } catch (Exception $e) {
         header('Location: add_product.php?error=' . urlencode($e->getMessage()));
