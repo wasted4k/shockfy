@@ -63,13 +63,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt = $pdo->prepare($sql);
 
     try {
-        $stmt->execute([$code ?: null, $name, $size, $color, $cost, $sale, $stock, $category_id, $imagePath, $user_id]);
-        header('Location: add_product.php?msg=Producto agregado correctamente al inventario');
-        exit;
-    } catch (Exception $e) {
-        header('Location: add_product.php?error=' . urlencode($e->getMessage()));
-        exit;
-    }
+    $stmt->execute([$code ?: null, $name, $size, $color, $cost, $sale, $stock, $category_id, $imagePath, $user_id]);
+    $ok = rawurlencode('Producto agregado correctamente al inventario');
+    header('Location: add_product.php?message=' . $ok);
+    exit;
+} catch (Exception $e) {
+    header('Location: add_product.php?error=' . rawurlencode($e->getMessage()));
+    exit;
+}
+
 }
 ?>
 <!doctype html>
