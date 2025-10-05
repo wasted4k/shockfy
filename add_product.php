@@ -1,60 +1,71 @@
 <?php
 // add_product.php
 require 'db.php';
-require_once __DIR__ . '/auth_check.php'; // proteger el login y mandarlo a welcome si la persona no ha verificado su email
-$user_id = $_SESSION['user_id']; // el ID del usuario que está logueado
+require_once __DIR__ . '/auth_check.php'; // protege login / verificación
+// Si por alguna razón no hay sesión iniciada aquí, descomenta la siguiente línea:
+// if (session_status() === PHP_SESSION_NONE) session_start();
+
+$user_id = $_SESSION['user_id']; // ID del usuario logueado
 
 // Traer todas las categorías
 $categories = $pdo->prepare("SELECT id, name FROM categories WHERE user_id = ? ORDER BY name");
 $categories->execute([$user_id]);
-$categories = $categories->fetchAll();
+$categories = $categories->fetchAll(PDO::FETCH_ASSOC);
 
-// traer moneda para solo mostrar símbolo (no cambia backend)
+// traer moneda para sólo mostrar símbolo (no cambia backend)
 $currencyStmt = $pdo->prepare('SELECT currency_pref FROM users WHERE id = ?');
 $currencyStmt->execute([$_SESSION['user_id']]);
 $currency = $currencyStmt->fetchColumn() ?: 'S/.';
+
+// Leer y limpiar flash (si existe)
+$flash = $_SESSION['flash'] ?? null;
+unset($_SESSION['flash']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $code  = trim($_POST['code'] ?? '');
     $name  = trim($_POST['name'] ?? '');
     $size  = trim($_POST['size'] ?? '');
     $color = trim($_POST['color'] ?? '');
-    $cost  = floatval($_POST['cost_price'] ?? 0);
-    $sale  = floatval($_POST['sale_price'] ?? 0);
-    $stock = intval($_POST['stock'] ?? 0);
-    $category_id = intval($_POST['category_id'] ?? 0);
+    $cost  = (float)($_POST['cost_price'] ?? 0);
+    $sale  = (float)($_POST['sale_price'] ?? 0);
+    $stock = (int)($_POST['stock'] ?? 0);
+    $category_id = (int)($_POST['category_id'] ?? 0);
 
+    // Validaciones mínimas
     if ($name === '') {
-        header('Location: add_product.php?error=El nombre es obligatorio');
+        $_SESSION['flash'] = ['type' => 'error', 'text' => 'El nombre es obligatorio'];
+        header('Location: add_product.php');
         exit;
     }
     if ($category_id === 0) {
-        header('Location: add_product.php?error=Debe seleccionar una categoría');
+        $_SESSION['flash'] = ['type' => 'error', 'text' => 'Debe seleccionar una categoría'];
+        header('Location: add_product.php');
         exit;
     }
 
     // Procesar imagen si se sube
     $imagePath = null;
-    if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+    if (!empty($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
         $tmpName = $_FILES['image']['tmp_name'];
-        $originalName = basename($_FILES['image']['name']);
+        $originalName = basename((string)$_FILES['image']['name']);
         $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
 
         $allowed = ['jpg','jpeg','png','gif'];
-        if (!in_array($ext, $allowed)) {
-            header('Location: add_product.php?error=Formato de imagen no permitido');
+        if (!in_array($ext, $allowed, true)) {
+            $_SESSION['flash'] = ['type' => 'error', 'text' => 'Formato de imagen no permitido'];
+            header('Location: add_product.php');
             exit;
         }
 
         $uploadDir = 'uploads/';
         if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0777, true);
+            @mkdir($uploadDir, 0777, true);
         }
 
         $newName = uniqid('prod_', true) . '.' . $ext;
         $imagePath = $uploadDir . $newName;
 
-        move_uploaded_file($tmpName, $imagePath);
+        @move_uploaded_file($tmpName, $imagePath);
     }
 
     // INSERT del producto incluyendo la imagen y el usuario logueado
@@ -63,15 +74,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt = $pdo->prepare($sql);
 
     try {
-    $stmt->execute([$code ?: null, $name, $size, $color, $cost, $sale, $stock, $category_id, $imagePath, $user_id]);
-    $ok = rawurlencode('Producto agregado correctamente al inventario');
-    header('Location: add_product.php?message=' . $ok);
-    exit;
-} catch (Exception $e) {
-    header('Location: add_product.php?error=' . rawurlencode($e->getMessage()));
-    exit;
-}
+        $stmt->execute([
+            $code ?: null, $name, $size, $color,
+            $cost, $sale, $stock, $category_id,
+            $imagePath, $user_id
+        ]);
 
+        // Mensaje de éxito vía FLASH (sin querystring)
+        $_SESSION['flash'] = ['type' => 'ok', 'text' => 'Producto agregado correctamente al inventario'];
+        header('Location: add_product.php');
+        exit;
+
+    } catch (Throwable $e) {
+        // No exponemos SQL tal cual en producción; aquí lo enviamos a flash para visibilidad
+        $_SESSION['flash'] = ['type' => 'error', 'text' => 'Error al guardar: ' . $e->getMessage()];
+        header('Location: add_product.php');
+        exit;
+    }
 }
 ?>
 <!doctype html>
@@ -169,7 +188,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .btn.primary{ background:linear-gradient(135deg,var(--primary),var(--primary-2)); color:#fff; border:none; }
         .btn.primary:hover{ filter:brightness(.98); }
 
-        /* Mejora contraste botones ghost */
         .btn.ghost{ background: var(--panel-2); border-color:#cfd7e3; color: var(--text); }
         .btn.ghost:hover{ background:#e8edf4; border-color:#b8c3d4; }
         body.dark .btn.ghost{ background:#0e1630; border-color:#1f2a4a; color:#e5e7eb; }
@@ -180,6 +198,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .actions{
             display:flex; align-items:center; gap:10px; justify-content:flex-end; margin-top:8px;
         }
+
+        /* Alertas (flash) */
+        .alert{
+            margin-bottom:12px; padding:10px 12px; border-radius:12px; font-weight:700;
+            border:1px solid transparent;
+        }
+        .alert.ok{ background:#ecfdf5; border-color:#d1fae5; color:#065f46; }
+        .alert.err{ background:#fef2f2; border-color:#fee2e2; color:#991b1b; }
 
         /* Toast */
         #toast{
@@ -235,7 +261,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="icon">
                     <!-- SVG etiqueta/producto -->
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                      <path d="M3 7v10a2 2 0 0 0 2 2h11l4-4V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2Z" stroke="#2563eb" stroke-width="2" />
+                      <path d="M3 7v10a2 2 0 0 0 2 2h11l4-4V7a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 2 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" stroke="#2563eb" stroke-width="2" />
                       <path d="M16 19v-4h4" stroke="#60a5fa" stroke-width="2" />
                       <circle cx="8" cy="10" r="1" fill="#2563eb"/>
                       <circle cx="12" cy="10" r="1" fill="#2563eb"/>
@@ -256,10 +282,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
             <div class="card-body">
 
-                <?php if(!empty($_GET['error'])): ?>
-                    <div id="errorBox" class="hint" style="background:#fef2f2;border:1px solid #fee2e2;color:#991b1b;padding:10px 12px;border-radius:12px;margin-bottom:12px;font-weight:700;">
-                        <?= htmlspecialchars($_GET['error']) ?>
-                    </div>
+                <?php if ($flash): ?>
+                  <div class="alert <?= $flash['type'] === 'ok' ? 'ok' : 'err' ?>">
+                    <?= htmlspecialchars($flash['text']) ?>
+                  </div>
                 <?php endif; ?>
 
                 <!-- IMPORTANTE: no cambiar names ni método/enctype -->
@@ -332,7 +358,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <select id="category_id" name="category_id" required>
                                     <option value="">-- Seleccione categoría --</option>
                                     <?php foreach($categories as $cat): ?>
-                                        <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?></option>
+                                        <option value="<?= (int)$cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
@@ -376,7 +402,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div id="toast" role="status" aria-live="polite"></div>
 
     <script>
-      // Prefiere la apariencia dark si ya está en localStorage (coherente con tu app)
+      // Dark coherente
       window.addEventListener('load', () => {
         if(localStorage.getItem('darkMode') === 'true'){
             document.body.classList.add('dark');
@@ -390,6 +416,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         el.classList.add('show');
         setTimeout(() => el.classList.remove('show'), 2500);
       }
+
+      // Si vino flash del servidor y fue de éxito, dispara toast también
+      <?php if (!empty($flash) && $flash['type'] === 'ok'): ?>
+        showToast(<?= json_encode($flash['text']) ?>);
+      <?php endif; ?>
+
+      // Fallback: si alguna vez envías ?message= o ?error= por query
+      (function(){
+        const p = new URLSearchParams(location.search);
+        const ok  = p.get('message') || p.get('msg');
+        const err = p.get('error');
+        if (ok)  showToast(ok);
+        // if (err) showToast(err); // si prefieres toast también para errores
+
+        if (ok || err) { // limpia la URL para no repetir
+          p.delete('message'); p.delete('msg'); p.delete('error');
+          const clean = location.pathname + (p.toString() ? '?' + p.toString() : '');
+          history.replaceState(null, '', clean);
+        }
+      })();
 
       // Previsualización de imagen
       const inputImage = document.getElementById('image');
@@ -426,7 +472,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         btnRemove.style.display = 'none';
       }
 
-      // Validación rápida de requeridos en cliente 
+      // Validación rápida en cliente
       const form = document.getElementById('productForm');
       form.addEventListener('submit', (e) => {
         const name = document.getElementById('name').value.trim();
