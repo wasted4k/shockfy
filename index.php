@@ -574,8 +574,8 @@ $totalMes = $stmt->fetchColumn();
             <div class="pill">
               <label for="rowsPerPage" style="font-size:12px;color:#64748b">Filas:</label>
               <select id="rowsPerPage">
-                <option>10</option>
-                <option selected>20</option>
+                <option selected>10</option>
+                <option>20</option>
                 <option>50</option>
                 <option>100</option>
               </select>
