@@ -157,8 +157,7 @@ try {
     if ($message === '' && !$filePath) {
       respond(400, ['ok'=>false,'error'=>'Mensaje vacío']);
     }
-echo $message;
-    die();
+
     // ticket y mensaje
     $ticket = ensureUserTicket($pdo, (int)$user_id);
     $pdo->beginTransaction();
