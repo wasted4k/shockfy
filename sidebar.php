@@ -426,15 +426,6 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
 })();
 </script>
 
-<script>
-// Configurar URL absoluta del endpoint del chat (sin fallbacks)
-(function(){
-  var slug = <?php echo json_encode(APP_SLUG); ?>;      // "/shockfy" o ""
-  var base = slug ? slug.replace(/\/$/, '') : '';       // "/shockfy" -> "/shockfy"
-  window.API_SUPPORT_URL = window.location.origin + '/api/support_chat.php?action=thread';
-})();
-</script>
-
 
 <!-- Chat -->
 <script>
