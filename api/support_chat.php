@@ -22,25 +22,83 @@ $user_id = $_SESSION['user_id'] ?? null;
 if (!$user_id) { respond(401, ['ok'=>false,'error'=>'No autenticado']); }
 
 // helpers
-function ensureUserTicket(PDO $pdo, int $userId): array {
-  // busca ticket abierto o pendiente
-  $q = $pdo->prepare("SELECT * FROM support_tickets WHERE user_id=? AND status IN('open','pending') ORDER BY id DESC LIMIT 1");
-  $q->execute([$userId]);
-  $t = $q->fetch(PDO::FETCH_ASSOC);
-  if ($t) return $t;
+function ensureUserTicket(PDO $pdo, int $userId): ?array {
+    // 1. Busca ticket abierto o pendiente
+    // ¡Consulta preparada correctamente!
+    $q = $pdo->prepare("SELECT * FROM support_tickets WHERE user_id = ? AND status IN('open','pending') ORDER BY id DESC LIMIT 1");
+    $q->execute([$userId]);
+    $existingTicket = $q->fetch(PDO::FETCH_ASSOC);
+    
+    if ($existingTicket) {
+        return $existingTicket;
+    }
 
-  // crea nuevo
-  $pdo->beginTransaction();
-  $pdo->exec("SET SESSION time_zone = '+00:00'");
-  $pdo->prepare("INSERT INTO support_tickets (user_id, status, unread_admin, last_message_at, created_at, updated_at) VALUES (?, 'open', 0, NOW(), NOW(), NOW())")->execute([$userId]);
-  $id = (int)$pdo->lastInsertId();
-  $public = sprintf('ST-%06d', $id);
-  $pdo->prepare("UPDATE support_tickets SET public_id=? WHERE id=?")->execute([$public, $id]);
-  $pdo->commit();
+    // ---
+    
+    // 2. Crea nuevo ticket
+    $pdo->beginTransaction();
+    try {
+        // Mejor pasar la hora desde PHP en UTC para consistencia
+        // o al menos mantener el exec dentro del try/catch.
+        $pdo->exec("SET SESSION time_zone = '+00:00'");
+        
+        $insertStmt = $pdo->prepare(
+            "INSERT INTO support_tickets (user_id, status, unread_admin, last_message_at, created_at, updated_at) 
+             VALUES (?, 'open', 0, NOW(), NOW(), NOW())"
+        );
+        
+        // Verifica la inserción
+        if (!$insertStmt->execute([$userId])) {
+            throw new \PDOException("Falló la inserción del ticket.");
+        }
+        
+        $id = (int)$pdo->lastInsertId();
+        
+        if ($id === 0) {
+            throw new \PDOException("No se pudo obtener el ID de la última inserción.");
+        }
+        
+        $publicId = sprintf('ST-%06d', $id);
+        
+        // Uso de consulta preparada para la actualización
+        $updateStmt = $pdo->prepare("UPDATE support_tickets SET public_id = ? WHERE id = ?");
+        
+        if (!$updateStmt->execute([$publicId, $id])) {
+            throw new \PDOException("Falló la actualización del public_id.");
+        }
 
-  $q = $pdo->prepare("SELECT * FROM support_tickets WHERE id=?");
-  $q->execute([$id]);
-  return $q->fetch(PDO::FETCH_ASSOC);
+        $pdo->commit();
+        
+        // Evita el SELECT final: Construye el array manualmente o haz la SELECT.
+        // Opción 1 (Más eficiente):
+        $now = date('Y-m-d H:i:s'); // O usa una hora más precisa de PHP en UTC
+
+        return [
+            'id' => $id,
+            'public_id' => $publicId,
+            'user_id' => $userId,
+            'status' => 'open',
+            'unread_admin' => 0,
+            'last_message_at' => $now,
+            'created_at' => $now,
+            'updated_at' => $now
+            // ... otros campos que necesites
+        ];
+
+        // Opción 2 (Tu SELECT original, pero dentro del try/catch):
+        /*
+        $q = $pdo->prepare("SELECT * FROM support_tickets WHERE id = ?");
+        $q->execute([$id]);
+        return $q->fetch(PDO::FETCH_ASSOC);
+        */
+        
+    } catch (\PDOException $e) {
+        // Si falló en cualquier punto, hace rollback
+        $pdo->rollBack();
+        // Loguea el error $e->getMessage()
+        // Devuelve null o lanza una excepción para que el llamador sepa que falló
+        return null; 
+    }
 }
 
 try {
