@@ -131,6 +131,9 @@ try {
     $message = trim($_POST['message'] ?? '');
     $filePath = null;
 
+    echo $message;
+    die();
+
     // adjunto opcional
     if (!empty($_FILES['file']) && $_FILES['file']['error'] !== UPLOAD_ERR_NO_FILE) {
       if ($_FILES['file']['error'] === UPLOAD_ERR_INI_SIZE || $_FILES['file']['error'] === UPLOAD_ERR_FORM_SIZE) {
