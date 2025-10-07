@@ -112,9 +112,6 @@ try {
     // trae (o crea) ticket del usuario
     $ticket = ensureUserTicket($pdo, (int)$user_id);
     
-    echo $action;
-  echo $method;
-    die();
     $m = $pdo->prepare("SELECT sender,message,file_path,created_at FROM support_messages WHERE ticket_id=? ORDER BY id ASC");
     $m->execute([(int)$ticket['id']]);
     $messages = $m->fetchAll(PDO::FETCH_ASSOC);
