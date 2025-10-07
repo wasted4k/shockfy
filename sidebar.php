@@ -421,7 +421,7 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
 (function(){
   var slug = <?php echo json_encode(APP_SLUG); ?>;      // "/shockfy" o ""
   var base = slug ? slug.replace(/\/$/, '') : '';       // "/shockfy" -> "/shockfy"
-  window.API_SUPPORT_URL = window.location.origin + base + '/api/support_chat.php';
+  window.API_SUPPORT_URL = window.location.origin + '/api/support_chat.php';
   // Ej.: "http://localhost/shockfy/api/support_chat.php"
 })();
 </script>
