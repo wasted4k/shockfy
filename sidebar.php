@@ -456,7 +456,7 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
   const state = {
     lastTs: null,     // ISO string del último mensaje mostrado (created_at)
     pollTimer: null,
-    POLL_MS: 4000,
+    POLL_MS: 1000,
     isOpen: false
   };
 
@@ -634,7 +634,7 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
       return;
     }
 
-    if (text){ addMsg({ who:'me', text }); }
+    
     input.value = '';
 
     const form = new FormData();

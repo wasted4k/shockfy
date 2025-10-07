@@ -1,11 +1,5 @@
 <?php
 // admin_orders.php — Panel admin para revisar solicitudes de pago manual + Soporte.
-//
-// Requisitos:
-// - db.php (PDO $pdo)
-// - auth_check.php (pobla $currentUser y sesión)
-// - APP_SLUG: si tu app vive en subcarpeta (p. ej. /shockfy)
-
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth_check.php';
 
@@ -501,6 +495,7 @@ async function parseJsonResponse(res){
 }
 </script>
 
+
 <script>
 (function(){
   const $  = s => document.querySelector(s);
@@ -510,7 +505,7 @@ async function parseJsonResponse(res){
   const emptyEl  = $('#sapEmptyList');
   const statusEl = $('#sapStatus');
   const refreshEl= $('#sapRefresh');
-  const autoEl   = $('#sapAuto');
+  const autoEl   = $('#sapAuto'); // quedará opcional; dejaremos nuestro polling automático siempre-encendido.
 
   const threadTitle = $('#sapThreadHeader .sap-thread-title');
   const threadMeta  = $('#sapThreadMeta');
@@ -540,17 +535,45 @@ async function parseJsonResponse(res){
     }
   };
 
-  let state = {
+  // ===== Estado y polling =====
+  const state = {
     status: 'open',
     tickets: [],
     selected: null,
-    pollTimer: null
+    lastTs: null,          // último created_at mostrado del hilo seleccionado
+    timers: { list: null, thread: null },
+    POLL_MS: 1000
   };
+
+  function startListPolling(){
+    stopListPolling();
+    state.timers.list = setInterval(async ()=>{
+      if (document.hidden) return;
+      await loadTickets(true); // true = mantener selección si existe
+    }, state.POLL_MS);
+  }
+  function stopListPolling(){
+    if (state.timers.list){ clearInterval(state.timers.list); state.timers.list = null; }
+  }
+  function startThreadPolling(){
+    stopThreadPolling();
+    if (!state.selected) return;
+    state.timers.thread = setInterval(async ()=>{
+      if (document.hidden) return;
+      await fetchAndAppendNew();
+    }, state.POLL_MS);
+  }
+  function stopThreadPolling(){
+    if (state.timers.thread){ clearInterval(state.timers.thread); state.timers.thread = null; }
+  }
+  document.addEventListener('visibilitychange', ()=>{
+    if (document.hidden){ stopListPolling(); stopThreadPolling(); }
+    else { startListPolling(); startThreadPolling(); }
+  });
 
   function fmtDate(iso){
     if (!iso) return '';
-    // Si tu DB guarda UTC, puedes añadir 'Z' para forzar parse como UTC:
-    const d = new Date(iso.replace(' ','T') + 'Z');
+    const d = new Date(iso.replace(' ','T') + 'Z'); // asumiendo UTC en DB
     return d.toLocaleString();
   }
 
@@ -582,12 +605,25 @@ async function parseJsonResponse(res){
     });
   }
 
-  async function loadTickets(){
+  async function loadTickets(keepSelection=false){
     try{
       const data = await API.list(state.status);
       if (!data.ok){ throw new Error(data.error || 'Error list'); }
+
+      // guardar seleccionado para reactivar la clase active al reordenar por last_message_at
+      const prevSel = keepSelection ? state.selected : null;
       state.tickets = data.tickets || [];
       renderTickets();
+      if (prevSel){
+        // re-activar la fila correcta si aún existe
+        const exists = state.tickets.some(t => t.id === prevSel);
+        if (exists){
+          $$('#sapTickets li').forEach(li => li.classList.toggle('active', Number(li.dataset.id) === prevSel));
+        } else {
+          // si ya no existe (p. ej. se resolvió), limpia hilo
+          if (state.selected === prevSel) clearThread();
+        }
+      }
     }catch(e){
       console.error(e);
       listEl.innerHTML = '<li>Error al cargar tickets</li>';
@@ -600,6 +636,8 @@ async function parseJsonResponse(res){
     msgsEl.innerHTML = '<div class="sap-placeholder">Selecciona un ticket a la izquierda para ver el chat.</div>';
     replyText.disabled = true; replyFile.disabled = true; sendBtn.disabled = true; resolveBtn.disabled = true;
     state.selected = null;
+    state.lastTs = null;
+    stopThreadPolling();
   }
 
   function renderThread(ticket, msgs){
@@ -607,41 +645,90 @@ async function parseJsonResponse(res){
     threadMeta.textContent  = `Estado: ${ticket.status} · Último mensaje: ${fmtDate(ticket.last_message_at)} · Creado: ${fmtDate(ticket.created_at)}`;
 
     msgsEl.innerHTML = '';
-    msgs.forEach(m=>{
-      const div = document.createElement('div');
-      div.className = 'msg ' + (m.sender === 'admin' ? 'admin' : '');
-      const who = (m.sender === 'admin') ? 'Admin' : 'Usuario';
-      const safe = (m.message || '').replace(/[&<>]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[s]));
-      const att = m.file_path ? `<div class="att">Adjunto: <a href="${m.file_path}" target="_blank" rel="noopener">Ver archivo</a></div>` : '';
-      div.innerHTML = `
-        <div class="who">${who} · <small>${fmtDate(m.created_at)}</small></div>
-        <div class="text">${safe}</div>
-        ${att}
-      `;
-      msgsEl.appendChild(div);
-    });
-    msgsEl.scrollTop = msgsEl.scrollHeight + 120;
+    msgs.forEach(m=> appendOne(m));
 
     const resolved = (ticket.status === 'resolved');
     replyText.disabled = resolved; replyFile.disabled = resolved; sendBtn.disabled = resolved;
     resolveBtn.disabled = resolved;
+
+    // set lastTs al máximo created_at mostrado
+    for (const m of msgs){
+      if (!m.created_at) continue;
+      if (!state.lastTs || new Date(m.created_at.replace(' ','T')+'Z') > new Date((state.lastTs||'').replace(' ','T')+'Z')){
+        state.lastTs = m.created_at;
+      }
+    }
+  }
+
+  function appendOne(m){
+    const div = document.createElement('div');
+    div.className = 'msg ' + (m.sender === 'admin' ? 'admin' : '');
+    const who = (m.sender === 'admin') ? 'Admin' : 'Usuario';
+    const safe = (m.message || '').replace(/[&<>]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[s]));
+    const att = m.file_path ? `<div class="att">Adjunto: <a href="${m.file_path}" target="_blank" rel="noopener">Ver archivo</a></div>` : '';
+    div.innerHTML = `
+      <div class="who">${who} · <small>${fmtDate(m.created_at)}</small></div>
+      <div class="text">${safe}</div>
+      ${att}
+    `;
+    msgsEl.appendChild(div);
+    msgsEl.scrollTop = msgsEl.scrollHeight + 120;
+
+    // actualizar lastTs
+    if (m.created_at){
+      const d = new Date(m.created_at.replace(' ','T')+'Z');
+      const ld = state.lastTs ? new Date(state.lastTs.replace(' ','T')+'Z') : null;
+      if (!ld || d > ld) state.lastTs = m.created_at;
+    }
   }
 
   async function selectTicket(id){
     state.selected = id;
+    state.lastTs = null;             // fuerza recálculo
     $$('#sapTickets li').forEach(li => li.classList.toggle('active', Number(li.dataset.id) === id));
     try{
       const data = await API.thread(id);
       if (!data.ok){ throw new Error(data.error || 'Error thread'); }
       renderThread(data.ticket, data.messages || []);
+
       // marcar como leído en UI
       const t = state.tickets.find(x => x.id === id);
       if (t){ t.unread_admin = 0; }
       renderTickets();
+
+      // arrancar polling del hilo
+      startThreadPolling();
     }catch(e){
       console.error(e);
       msgsEl.innerHTML = '<div class="sap-placeholder">No se pudo cargar el hilo.</div>';
     }
+  }
+
+  async function fetchAndAppendNew(){
+    if (!state.selected) return;
+    const data = await API.thread(state.selected);
+    if (!data.ok) return;
+    const msgs = Array.isArray(data.messages) ? data.messages : [];
+    const last = state.lastTs ? new Date(state.lastTs.replace(' ','T')+'Z') : null;
+
+    // filtra y agrega en orden cronológico
+    const news = msgs.filter(m => {
+      if (!m.created_at) return false;
+      if (!last) return true;
+      return new Date(m.created_at.replace(' ','T')+'Z') > last;
+    }).sort((a,b)=> new Date(a.created_at.replace(' ','T')+'Z') - new Date(b.created_at.replace(' ','T')+'Z'));
+
+    if (news.length){
+      news.forEach(appendOne);
+    }
+
+    // también refrescamos cabecera (last_message_at puede cambiar)
+    if (data.ticket){
+      threadMeta.textContent  = `Estado: ${data.ticket.status} · Último mensaje: ${fmtDate(data.ticket.last_message_at)} · Creado: ${fmtDate(data.ticket.created_at)}`;
+    }
+
+    // y lista para reordenar/badges
+    await loadTickets(true);
   }
 
   async function sendReply(e){
@@ -656,7 +743,6 @@ async function parseJsonResponse(res){
       alert('Escribe un mensaje o adjunta un archivo.');
       return;
     }
-    // Límite 2MB (refuerzo en front)
     if (file && file.size > 2 * 1024 * 1024){
       alert('Adjunto supera 2 MB.');
       return;
@@ -669,12 +755,8 @@ async function parseJsonResponse(res){
       replyText.value = '';
       if (replyFile) replyFile.value = '';
 
-      // refresca hilo
-      const data = await API.thread(id);
-      if (data.ok){ renderThread(data.ticket, data.messages || []); }
-
-      // mueve el ticket arriba por actividad
-      await loadTickets();
+      // tras enviar, trae SOLO lo nuevo (incluida tu respuesta con timestamp del servidor)
+      await fetchAndAppendNew();
     }catch(e){
       console.error(e);
       alert('No se pudo enviar la respuesta.');
@@ -693,16 +775,13 @@ async function parseJsonResponse(res){
       const res = await API.resolve(id);
       if (!res.ok){ throw new Error(res.error || 'Error resolve'); }
 
-      // refresca hilo (quedará como read-only)
-      const data = await API.thread(id);
-      if (data.ok){ renderThread(data.ticket, data.messages || []); }
+      // refresca hilo (quedará read-only) y lista
+      await fetchAndAppendNew();
+      await loadTickets(true);
 
-      // si estás en “Abiertos”, recarga y desaparecerá de la lista
+      // si estás en “Abiertos”, lo sacamos del panel
       if (state.status === 'open'){
-        await loadTickets();
         clearThread();
-      } else {
-        await loadTickets();
       }
     }catch(e){
       console.error(e);
@@ -718,32 +797,22 @@ async function parseJsonResponse(res){
     clearThread();
     await loadTickets();
   });
-  refreshEl.addEventListener('click', loadTickets);
+  refreshEl.addEventListener('click', ()=>loadTickets(true)); // manual si quieres
   replyForm.addEventListener('submit', sendReply);
   resolveBtn.addEventListener('click', resolveTicket);
 
-  // Autorefresco opcional
-  autoEl.addEventListener('change', ()=>{
-    if (state.pollTimer){ clearInterval(state.pollTimer); state.pollTimer = null; }
-    if (autoEl.checked){
-      state.pollTimer = setInterval(async ()=>{
-        const prevSel = state.selected;
-        await loadTickets();
-        if (prevSel){
-          try{
-            const data = await API.thread(prevSel);
-            if (data.ok){ renderThread(data.ticket, data.messages || []); }
-          }catch(e){}
-        }
-      }, 15000);
-    }
-  });
-
   // Inicial
   clearThread();
-  loadTickets();
+  loadTickets().then(()=>{
+    startListPolling();
+  });
+
+  // El checkbox de auto-refresh queda opcional; nuestro polling ya corre siempre
+  autoEl?.addEventListener('change', ()=>{ /* noop para mantener compat */ });
+
 })();
 </script>
+
 
           <?php
             $totalPages = (int)ceil($total / PAGE_SIZE);
