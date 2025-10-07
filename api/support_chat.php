@@ -166,9 +166,9 @@ try {
     $ticket = ensureUserTicket($pdo, (int)$user_id);
     $pdo->beginTransaction();
     $pdo->exec("SET SESSION time_zone = '+00:00'");
-    echo $message;
-    die();
     $ins = $pdo->prepare("INSERT INTO support_messages (ticket_id, sender, message, file_path, created_at) VALUES (?, 'user', ?, ?, NOW())");
+     echo $message;
+    die();
     $ins->execute([(int)$ticket['id'], $message ?: null, $filePath]);
 
     // marca para admin como no leído y actualiza last_message_at
