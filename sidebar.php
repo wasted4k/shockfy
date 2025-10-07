@@ -156,8 +156,96 @@ body.trial-locked { overflow: hidden; }
 .sidebar-mobile-toggle i{ font-size: 22px; line-height: 1; }
 @media (max-width:1024px){
   .sidebar-mobile-toggle{ display: inline-flex; }
-  /* (opcional) ocultarlo si el panel está abierto:
-     .sidebar.open ~ .sidebar-mobile-toggle{ opacity:.0; pointer-events:none; } */
+}
+
+/* ===== FAB Soporte (bottom-right) ===== */
+.support-fab{
+  position: fixed; right: 16px; bottom: 16px; z-index: 120;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 56px; height: 56px; border-radius: 16px;
+  background: linear-gradient(180deg,#1999bd 0%, #127a95 100%);
+  border: 1px solid rgba(255,255,255,.22);
+  color: #fff; box-shadow: 0 12px 28px rgba(2,6,23,.35);
+  cursor: pointer;
+}
+.support-fab i{ font-size: 24px; line-height: 1; }
+.support-fab .label{ display:none; margin-left:8px; font-weight:600; }
+@media (min-width:768px){
+  .support-fab{ width:auto; padding:0 14px; gap:8px; }
+  .support-fab .label{ display:inline; }
+}
+
+/* Overlay del chat */
+.support-overlay{
+  position: fixed; inset: 0; background: rgba(2,6,23,.45);
+  backdrop-filter: blur(2px); z-index: 119;
+  opacity: 0; visibility: hidden; transition: opacity .2s ease, visibility .2s ease;
+}
+.support-overlay.show{ opacity:1; visibility:visible; }
+
+/* Ventana del chat */
+.support-chat{
+  position: fixed; right: 12px; bottom: 84px; z-index: 121;
+  width: min(92vw, 360px); max-height: min(72vh, 640px);
+  display: grid; grid-template-rows: auto 1fr auto; gap: 0;
+  background: #11101D; color: #fff; border: 1px solid rgba(255,255,255,.15);
+  border-radius: 16px; box-shadow: 0 20px 50px rgba(0,0,0,.35);
+  transform: translateY(8px); opacity: 0; visibility: hidden;
+  transition: transform .18s ease, opacity .18s ease, visibility .18s ease;
+}
+.support-chat.open{ transform: translateY(0); opacity: 1; visibility: visible; }
+
+.support-chat .chat-header{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:12px 14px; border-bottom: 1px solid rgba(255,255,255,.12);
+}
+.support-chat .chat-title{ font-weight: 700; font-size: 15px; }
+.support-chat .chat-actions{ display:flex; gap:6px; }
+.support-chat .icon-btn{
+  width:34px; height:34px; display:grid; place-items:center;
+  border-radius:10px; border:1px solid rgba(255,255,255,.18);
+  background: rgba(255,255,255,.08); color:#fff; cursor:pointer;
+}
+
+.support-chat .chat-body{
+  padding:10px 12px; overflow:auto; display:flex; flex-direction:column; gap:10px;
+}
+.support-msg{
+  display:grid; gap:6px; max-width:90%;
+  background: rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.14);
+  color:#e5e7eb; padding:8px 10px; border-radius:12px;
+}
+.support-msg.me{ margin-left:auto; background: rgba(32, 181, 151, .18); border-color: rgba(32,181,151,.35); }
+
+.support-chat .row-tools{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:8px 10px; gap:8px; border-top: 1px solid rgba(255,255,255,.12);
+}
+.support-chat .chat-input{
+  display:grid; grid-template-columns: 1fr auto; gap:8px;
+  padding:10px; border-top: 1px solid rgba(255,255,255,.12);
+}
+.support-chat textarea{
+  width:100%; min-height:44px; max-height:120px; resize:vertical;
+  padding:.6rem .7rem; border-radius:12px; border:1px solid rgba(255,255,255,.18);
+  background: rgba(255,255,255,.04); color:#fff; outline:none;
+}
+.support-chat .send-btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  padding:0 14px; border-radius:12px; border:1px solid rgba(255,255,255,.22);
+  background: linear-gradient(180deg,#22c55e .0%, #16a34a 100%); color:#fff; font-weight:700;
+}
+.support-chat .row-tools input[type="file"]{ display:none; }
+.support-chat .attach-label{
+  display:inline-flex; align-items:center; gap:6px; padding:6px 10px;
+  border-radius:10px; border:1px solid rgba(255,255,255,.18);
+  background: rgba(255,255,255,.06); color:#e5e7eb; cursor:pointer;
+}
+
+/* Evitar que el FAB tape el footer del sidebar móvil */
+@media (max-width:1024px){
+  .support-chat{ bottom: 92px; right: 10px; }
+  .support-fab{ right: 12px; bottom: 12px; }
 }
 </style>
 
@@ -281,6 +369,46 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
   <script> document.body.classList.add('trial-locked'); </script>
 <?php endif; ?>
 
+<!-- ===== FAB Soporte + Chat ===== -->
+<button class="support-fab" id="supportFab" aria-label="Abrir chat de soporte" title="Soporte">
+  <i class="bx bx-message-dots" aria-hidden="true"></i>
+  <span class="label">Soporte</span>
+</button>
+
+<div class="support-overlay" id="supportOverlay" aria-hidden="true"></div>
+
+<section class="support-chat" id="supportChat" role="dialog" aria-modal="true" aria-labelledby="supportChatTitle">
+  <header class="chat-header">
+    <div class="chat-title" id="supportChatTitle">Soporte en línea</div>
+    <div class="chat-actions">
+      <button class="icon-btn" id="supportMin" title="Minimizar" aria-label="Minimizar chat"><i class="bx bx-chevron-down"></i></button>
+      <button class="icon-btn" id="supportClose" title="Cerrar" aria-label="Cerrar chat"><i class="bx bx-x"></i></button>
+    </div>
+  </header>
+
+  <div class="chat-body" id="supportBody" aria-live="polite">
+    <div class="support-msg">
+      <div><strong>Agente</strong></div>
+      <div>¡Hola <?= htmlspecialchars($__display_name) ?>! ¿En qué puede ayudar hoy?</div>
+    </div>
+  </div>
+
+  <div class="row-tools">
+    <label class="attach-label" for="supportFile">
+      <i class="bx bx-paperclip" aria-hidden="true"></i> Adjuntar
+    </label>
+    <input type="file" id="supportFile" data-max-mb="2" accept=".png,.jpg,.jpeg,.pdf">
+    <small style="color:#9ca3af">Máx. 2&nbsp;MB</small>
+  </div>
+
+  <div class="chat-input">
+    <textarea id="supportText" placeholder="Escribe tu mensaje…"></textarea>
+    <button class="send-btn" id="supportSend">
+      <i class="bx bx-send" aria-hidden="true"></i> Enviar
+    </button>
+  </div>
+</section>
+
 <script>
 (function(){
   const sidebar  = document.querySelector('.sidebar');
@@ -341,3 +469,141 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
   else mq.addListener(onBPChange); // fallback Safari/iOS viejos
 })();
 </script>
+
+<!-- JS del chat de soporte -->
+<script>
+(function(){
+  const $ = (s, r=document)=>r.querySelector(s);
+  const body = document.body;
+  const fab = $('#supportFab');
+  const chat = $('#supportChat');
+  const overlay = $('#supportOverlay');
+  const sendBtn = $('#supportSend');
+  const input = $('#supportText');
+  const file = $('#supportFile');
+  const btnClose = $('#supportClose');
+  const btnMin = $('#supportMin');
+  const bodyMsgs = $('#supportBody');
+
+  const KEY = 'supportChatOpen';
+  const API_BASE = '/api'; // ajusta si tu proyecto vive en subcarpeta
+
+  function openChat(){
+    chat.classList.add('open');
+    overlay.classList.add('show');
+    body.style.overflow = 'hidden';
+    try{ localStorage.setItem(KEY,'1'); }catch(e){}
+    // Cargar historial al abrir
+    loadThread().then(()=> input?.focus());
+  }
+  function closeChat(){
+    chat.classList.remove('open');
+    overlay.classList.remove('show');
+    body.style.overflow = '';
+    try{ localStorage.setItem(KEY,'0'); }catch(e){}
+  }
+  function toggleChat(){ (chat.classList.contains('open')) ? closeChat() : openChat(); }
+
+  // Persistencia de estado
+  try{ if (localStorage.getItem(KEY)==='1') openChat(); }catch(e){}
+
+  fab?.addEventListener('click', toggleChat);
+  btnClose?.addEventListener('click', closeChat);
+  overlay?.addEventListener('click', closeChat);
+  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ closeChat(); }});
+  btnMin?.addEventListener('click', ()=>{
+    chat.classList.remove('open'); overlay.classList.remove('show'); body.style.overflow = '';
+    try{ localStorage.setItem(KEY,'0'); }catch(e){}
+  });
+
+  // Utilidades
+  function esc(str){ return (str||'').replace(/[&<>]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[s])); }
+  function addMsg({who, text, att, ts}){
+    const wrap = document.createElement('div');
+    wrap.className = 'support-msg' + (who==='me' ? ' me' : '');
+    wrap.innerHTML = `
+      <div><strong>${who==='me'?'Tú':'Agente'}</strong> ${ts ? `<small style="opacity:.7">· ${ts}</small>`:''}</div>
+      <div>${esc(text)}</div>
+      ${att ? `<div style="margin-top:6px"><a href="${att}" target="_blank" rel="noopener">Ver adjunto</a></div>` : ''}
+    `;
+    bodyMsgs.appendChild(wrap);
+    bodyMsgs.scrollTop = bodyMsgs.scrollHeight + 120;
+  }
+  function clearMsgs(){
+    bodyMsgs.innerHTML = `
+      <div class="support-msg">
+        <div><strong>Agente</strong></div>
+        <div>¡Hola! ¿En qué podemos ayudar?</div>
+      </div>`;
+  }
+
+  // Cargar hilo desde backend
+  async function loadThread(){
+    try{
+      const res = await fetch(`${API_BASE}/support_chat.php?action=thread`, { method:'GET', headers:{'Accept':'application/json'} });
+      if (!res.ok){ throw new Error('HTTP '+res.status); }
+      const data = await res.json();
+      clearMsgs();
+      if (data && data.ticket && Array.isArray(data.messages)){
+        // pintar historial
+        data.messages.forEach(m=>{
+          addMsg({
+            who: m.sender === 'user' ? 'me' : 'agent',
+            text: m.message || '',
+            att: m.file_path || '',
+            ts: m.created_at || ''
+          });
+        });
+      }
+    }catch(err){
+      console.warn('No se pudo cargar el historial:', err);
+    }
+  }
+
+  // Enviar mensaje
+  async function sendMessage(){
+    const text = (input.value || '').trim();
+    const f = file.files && file.files[0];
+
+    if (!text && !f){
+      window.showToast ? showToast('Escribe un mensaje o adjunta un archivo', 'warn') : alert('Escribe un mensaje o adjunta un archivo');
+      return;
+    }
+    // pinta inmediato localmente (optimista)
+    if (text){ addMsg({ who:'me', text }); }
+    input.value = '';
+
+    const form = new FormData();
+    form.append('message', text);
+    if (f) form.append('file', f);
+
+    try{
+      const res = await fetch(`${API_BASE}/support_chat.php`, { method:'POST', body: form });
+      const isJson = res.headers.get('content-type')?.includes('application/json');
+      let data = isJson ? await res.json() : null;
+
+      if (!res.ok || !data?.ok){
+        const msg = data?.error || `Fallo al enviar (HTTP ${res.status})`;
+        window.showToast ? showToast(msg, 'err') : alert(msg);
+        return;
+      }
+
+      // Éxito: recarga hilo desde la BD para no perder consistencia
+      await loadThread();
+      window.showToast && showToast('Mensaje enviado', 'ok');
+      file.value = '';
+    }catch(err){
+      console.error(err);
+      window.showToast ? showToast('Error de red al enviar', 'err') : alert('Error de red al enviar');
+    }
+  }
+
+  // Listeners
+  document.getElementById('supportSend')?.addEventListener('click', sendMessage);
+  document.getElementById('supportText')?.addEventListener('keydown', (e)=>{
+    if ((e.key === 'Enter' && (e.metaKey || e.ctrlKey))){ e.preventDefault(); sendMessage(); }
+  });
+
+})();
+</script>
+

@@ -187,6 +187,65 @@ function chip($status){
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="assets/img/favicon.png" type="image/png">
   <link rel="stylesheet" href="style.css">
+
+<style>
+/* ========== Estilos mínimos del panel de soporte (admin) ========== */
+.sap{ margin-top:22px; background:#0f172a; border:1px solid #1f2937; border-radius:14px; color:#e5e7eb; }
+.sap-header{ display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-bottom:1px solid #1f2937; }
+.sap-header h2{ margin:0; font-size:18px; }
+.sap-controls{ display:flex; gap:10px; align-items:center; }
+.sap-btn{ padding:8px 12px; border-radius:10px; border:1px solid #374151; background:#1f2937; color:#e5e7eb; cursor:pointer; }
+.sap-btn:hover{ filter:brightness(1.08); }
+.sap-btn.brand{ background:#16a34a; border-color:#22c55e; color:#fff; }
+.sap-btn.danger{ background:#b91c1c; border-color:#dc2626; color:#fff; }
+.sap-autorefresh{ font-size:13px; color:#9ca3af; display:flex; align-items:center; gap:6px; }
+
+.sap-grid{ display:grid; grid-template-columns: 320px 1fr; gap:0; min-height:420px; }
+@media (max-width: 980px){ .sap-grid{ grid-template-columns: 1fr; } }
+
+.sap-list{ border-right:1px solid #1f2937; max-height:60vh; overflow:auto; }
+@media (max-width: 980px){ .sap-list{ max-height:unset; } }
+
+#sapTickets{ list-style:none; margin:0; padding:0; }
+#sapTickets li{ border-bottom:1px solid #1f2937; padding:10px 12px; display:flex; gap:10px; align-items:center; cursor:pointer; }
+#sapTickets li:hover{ background:#111827; }
+#sapTickets li.active{ background:#0b1220; box-shadow: inset 0 0 0 1px #22c55e33; }
+.ticket-main{ display:flex; flex-direction:column; gap:3px; min-width:0; }
+.ticket-title{ font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ticket-meta{ font-size:12px; color:#9ca3af; display:flex; gap:8px; flex-wrap:wrap; }
+.ticket-badges{ margin-left:auto; display:flex; gap:8px; align-items:center; }
+.badge{ font-size:11px; padding:2px 6px; border-radius:999px; border:1px solid #374151; color:#e5e7eb; }
+.badge.unread{ background:#14532d; border-color:#16a34a; }
+
+.sap-empty{ padding:12px; text-align:center; color:#9ca3af; }
+
+.sap-thread{ display:flex; flex-direction:column; min-height:420px; }
+.sap-thread-header{ display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border-bottom:1px solid #1f2937; }
+.sap-thread-title{ font-weight:700; }
+.sap-thread-meta{ font-size:12px; color:#9ca3af; }
+
+.sap-messages{ padding:12px; display:flex; flex-direction:column; gap:10px; height:48vh; overflow:auto; }
+@media (max-width: 980px){ .sap-messages{ height:40vh; } }
+.sap-placeholder{ color:#9ca3af; }
+
+.msg{ max-width:78%; padding:8px 10px; border-radius:12px; border:1px solid #374151; background:#111827; }
+.msg.admin{ margin-left:auto; background:#0b3b2f; border-color:#16a34a66; }
+.msg .who{ font-weight:600; font-size:13px; margin-bottom:2px; }
+.msg .text{ white-space:pre-wrap; word-break:break-word; }
+.msg .att{ margin-top:6px; font-size:13px; }
+.msg .att a{ color:#93c5fd; }
+
+.sap-reply{ display:grid; gap:8px; border-top:1px solid #1f2937; padding:10px; }
+.sap-reply textarea{ min-height:70px; padding:.6rem .7rem; border-radius:12px; border:1px solid #374151; background:#0b1220; color:#fff; outline:none; resize:vertical; }
+.sap-reply-tools{ display:flex; align-items:center; gap:10px; }
+.sap-attach{ padding:6px 10px; border:1px solid #374151; border-radius:10px; background:#111827; color:#e5e7eb; cursor:pointer; }
+.sap-attach input{ display:none; }
+.sap-hint{ font-size:12px; color:#9ca3af; }
+</style>
+
+
+
+
   <style>
     :root{
       --sidebar-w:260px; --bg:#f5f7fb; --card:#ffffff; --text:#0f172a; --muted:#6b7280; --primary:#2563eb; --border:#e5e7eb; --shadow:0 16px 32px rgba(2,6,23,.08); --radius:16px;
@@ -362,6 +421,312 @@ function chip($status){
               </tbody>
             </table>
           </div>
+
+
+
+<!-- ========== Panel de Soporte (Admin) ========== -->
+<section id="supportAdminPanel" class="sap">
+  <header class="sap-header">
+    <h2>Soporte (Chats de usuarios)</h2>
+    <div class="sap-controls">
+      <select id="sapStatus">
+        <option value="open" selected>Abiertos</option>
+        <option value="resolved">Resueltos</option>
+      </select>
+      <button class="sap-btn" id="sapRefresh" title="Recargar">⟲</button>
+      <label class="sap-autorefresh">
+        <input type="checkbox" id="sapAuto"> Autorefresco (15s)
+      </label>
+    </div>
+  </header>
+
+  <div class="sap-grid">
+    <!-- Columna izquierda: lista de tickets -->
+    <aside class="sap-list">
+      <ul id="sapTickets"></ul>
+      <div class="sap-empty" id="sapEmptyList" style="display:none;">No hay tickets.</div>
+    </aside>
+
+    <!-- Columna derecha: hilo y acciones -->
+    <main class="sap-thread">
+      <div id="sapThreadHeader" class="sap-thread-header">
+        <div>
+          <div class="sap-thread-title">Selecciona un ticket</div>
+          <div class="sap-thread-meta" id="sapThreadMeta"></div>
+        </div>
+        <div class="sap-thread-actions">
+          <button class="sap-btn danger" id="sapResolve" disabled>Finalizar caso</button>
+        </div>
+      </div>
+
+      <div id="sapMessages" class="sap-messages">
+        <div class="sap-placeholder">Selecciona un ticket a la izquierda para ver el chat.</div>
+      </div>
+
+      <form id="sapReplyForm" class="sap-reply" enctype="multipart/form-data">
+        <textarea id="sapReplyText" placeholder="Escribe una respuesta para el usuario..." disabled></textarea>
+        <div class="sap-reply-tools">
+          <label class="sap-attach">
+            📎 Adjuntar
+            <input type="file" id="sapReplyFile" accept=".png,.jpg,.jpeg,.pdf">
+          </label>
+          <span class="sap-hint">Máx. 2&nbsp;MB</span>
+          <button class="sap-btn brand" id="sapSend" disabled>Enviar</button>
+        </div>
+      </form>
+    </main>
+  </div>
+</section>
+<!-- ========== /Panel de Soporte (Admin) ========== -->
+
+
+<script>
+(function(){
+  const $ = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+
+  const listEl   = $('#sapTickets');
+  const emptyEl  = $('#sapEmptyList');
+  const statusEl = $('#sapStatus');
+  const refreshEl= $('#sapRefresh');
+  const autoEl   = $('#sapAuto');
+
+  const threadTitle = $('#sapThreadHeader .sap-thread-title');
+  const threadMeta  = $('#sapThreadMeta');
+  const msgsEl      = $('#sapMessages');
+  const replyForm   = $('#sapReplyForm');
+  const replyText   = $('#sapReplyText');
+  const replyFile   = $('#sapReplyFile');
+  const sendBtn     = $('#sapSend');
+  const resolveBtn  = $('#sapResolve');
+
+  const API = {
+    list:   (status='open') => fetch(`/api/support_admin.php?action=list&status=${encodeURIComponent(status)}`).then(r=>r.json()),
+    thread: (ticketId)      => fetch(`/api/support_admin.php?action=thread&ticket_id=${ticketId}`).then(r=>r.json()),
+    reply:  (ticketId, text, file) => {
+      const fd = new FormData();
+      fd.append('action','reply');
+      fd.append('ticket_id', String(ticketId));
+      fd.append('message', text);
+      if (file) fd.append('file', file);
+      return fetch('/api/support_admin.php', { method:'POST', body: fd }).then(r=>r.json());
+    },
+    resolve:(ticketId) => {
+      const fd = new FormData();
+      fd.append('action','resolve');
+      fd.append('ticket_id', String(ticketId));
+      return fetch('/api/support_admin.php', { method:'POST', body: fd }).then(r=>r.json());
+    }
+  };
+
+  let state = {
+    status: 'open',
+    tickets: [],
+    selected: null, // ticket.id
+    pollTimer: null
+  };
+
+  function fmtDate(iso){
+    if (!iso) return '';
+    const d = new Date(iso.replace(' ','T')+'Z'); // si tu server está en UTC quita la 'Z' si ya viene local
+    return d.toLocaleString();
+  }
+
+  function renderTickets(){
+    listEl.innerHTML = '';
+    if (!state.tickets.length){
+      emptyEl.style.display = 'block';
+      return;
+    }
+    emptyEl.style.display = 'none';
+    state.tickets.forEach(t=>{
+      const li = document.createElement('li');
+      li.dataset.id = t.id;
+      li.className = (state.selected === t.id ? 'active' : '');
+      li.innerHTML = `
+        <div class="ticket-main">
+          <div class="ticket-title">${t.public_id} · ${t.full_name ?? ('Usuario #'+t.user_id)}</div>
+          <div class="ticket-meta">
+            <span>${t.status}</span>
+            <span>Último: ${fmtDate(t.last_message_at)}</span>
+          </div>
+        </div>
+        <div class="ticket-badges">
+          ${t.unread_admin ? '<span class="badge unread">Nuevo</span>' : ''}
+        </div>
+      `;
+      li.addEventListener('click', ()=> selectTicket(t.id));
+      listEl.appendChild(li);
+    });
+  }
+
+  async function loadTickets(){
+    try{
+      const data = await API.list(state.status);
+      if (!data.ok){ throw new Error(data.error || 'Error list'); }
+      state.tickets = data.tickets || [];
+      renderTickets();
+    }catch(e){
+      console.error(e);
+      listEl.innerHTML = '<li>Error al cargar tickets</li>';
+    }
+  }
+
+  function clearThread(){
+    threadTitle.textContent = 'Selecciona un ticket';
+    threadMeta.textContent = '';
+    msgsEl.innerHTML = '<div class="sap-placeholder">Selecciona un ticket a la izquierda para ver el chat.</div>';
+    replyText.disabled = true; replyFile.disabled = true; sendBtn.disabled = true; resolveBtn.disabled = true;
+  }
+
+  function renderThread(ticket, msgs){
+    threadTitle.textContent = `${ticket.public_id} — ${ticket.full_name ?? ('Usuario #'+ticket.user_id)}`;
+    threadMeta.textContent  = `Estado: ${ticket.status} · Último mensaje: ${fmtDate(ticket.last_message_at)} · Creado: ${fmtDate(ticket.created_at)}`;
+
+    msgsEl.innerHTML = '';
+    msgs.forEach(m=>{
+      const div = document.createElement('div');
+      div.className = 'msg ' + (m.sender === 'admin' ? 'admin' : '');
+      const who = (m.sender === 'admin') ? 'Admin' : 'Usuario';
+      const att = m.file_path ? `<div class="att">Adjunto: <a href="${m.file_path}" target="_blank" rel="noopener">Ver archivo</a></div>` : '';
+      div.innerHTML = `
+        <div class="who">${who} · <small>${fmtDate(m.created_at)}</small></div>
+        <div class="text">${(m.message || '').replace(/[&<>]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[s]))}</div>
+        ${att}
+      `;
+      msgsEl.appendChild(div);
+    });
+    msgsEl.scrollTop = msgsEl.scrollHeight + 120;
+
+    const resolved = (ticket.status === 'resolved');
+    replyText.disabled = resolved; replyFile.disabled = resolved; sendBtn.disabled = resolved;
+    resolveBtn.disabled = resolved;
+  }
+
+  async function selectTicket(id){
+    state.selected = id;
+    // marca activo en lista
+    $$('#sapTickets li').forEach(li => li.classList.toggle('active', Number(li.dataset.id) === id));
+    try{
+      const data = await API.thread(id);
+      if (!data.ok){ throw new Error(data.error || 'Error thread'); }
+      renderThread(data.ticket, data.messages || []);
+      // actualiza badges en lista (ya se marcó como leído por admin en el backend)
+      const t = state.tickets.find(x => x.id === id);
+      if (t){ t.unread_admin = 0; }
+      renderTickets();
+    }catch(e){
+      console.error(e);
+      msgsEl.innerHTML = '<div class="sap-placeholder">No se pudo cargar el hilo.</div>';
+    }
+  }
+
+  async function sendReply(e){
+    e.preventDefault();
+    const id = state.selected;
+    if (!id) return;
+
+    const text = (replyText.value || '').trim();
+    const file = replyFile.files && replyFile.files[0];
+
+    if (!text && !file){
+      alert('Escribe un mensaje o adjunta un archivo.');
+      return;
+    }
+    // Límite 2MB (refuerzo en front)
+    if (file && file.size > 2 * 1024 * 1024){
+      alert('Adjunto supera 2 MB.');
+      return;
+    }
+
+    sendBtn.disabled = true;
+    try{
+      const res = await API.reply(id, text, file || null);
+      if (!res.ok){ throw new Error(res.error || 'Error reply'); }
+      replyText.value = '';
+      if (replyFile) replyFile.value = '';
+
+      // refresca hilo
+      const data = await API.thread(id);
+      if (data.ok){ renderThread(data.ticket, data.messages || []); }
+
+      // mueve el ticket arriba por actividad
+      await loadTickets();
+    }catch(e){
+      console.error(e);
+      alert('No se pudo enviar la respuesta.');
+    }finally{
+      sendBtn.disabled = false;
+    }
+  }
+
+  async function resolveTicket(){
+    const id = state.selected;
+    if (!id) return;
+    if (!confirm('¿Finalizar este caso?')) return;
+
+    resolveBtn.disabled = true;
+    try{
+      const res = await API.resolve(id);
+      if (!res.ok){ throw new Error(res.error || 'Error resolve'); }
+
+      // refresca hilo (quedará como read-only)
+      const data = await API.thread(id);
+      if (data.ok){ renderThread(data.ticket, data.messages || []); }
+
+      // si estás en “Abiertos”, recarga y desaparecerá de la lista
+      if (state.status === 'open'){
+        await loadTickets();
+        clearThread();
+      } else {
+        await loadTickets();
+      }
+    }catch(e){
+      console.error(e);
+      alert('No se pudo finalizar el caso.');
+    }finally{
+      resolveBtn.disabled = false;
+    }
+  }
+
+  // Eventos UI
+  statusEl.addEventListener('change', async ()=>{
+    state.status = statusEl.value;
+    state.selected = null;
+    clearThread();
+    await loadTickets();
+  });
+  refreshEl.addEventListener('click', loadTickets);
+  replyForm.addEventListener('submit', sendReply);
+  resolveBtn.addEventListener('click', resolveTicket);
+
+  // Autorefresco opcional
+  autoEl.addEventListener('change', ()=>{
+    if (state.pollTimer){ clearInterval(state.pollTimer); state.pollTimer = null; }
+    if (autoEl.checked){
+      state.pollTimer = setInterval(async ()=>{
+        const prevSel = state.selected;
+        await loadTickets();
+        // Si hay un ticket seleccionado, refresca su hilo también
+        if (prevSel){
+          try{
+            const data = await API.thread(prevSel);
+            if (data.ok){ renderThread(data.ticket, data.messages || []); }
+          }catch(e){}
+        }
+      }, 15000);
+    }
+  });
+
+  // Inicial
+  clearThread();
+  loadTickets();
+})();
+</script>
+
+
+
+
 
           <?php
             $totalPages = (int)ceil($total / PAGE_SIZE);
