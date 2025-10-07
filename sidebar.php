@@ -30,6 +30,13 @@ if (!$avatarUrl && !empty($_SESSION['user_id'] ?? null) && isset($pdo) && $pdo i
 $__display_name = $_SESSION['full_name'] ?? $_SESSION['username'] ?? 'Usuario';
 $__currency = $_SESSION['currency_pref'] ?? 'S/.';
 $__tz = $_SESSION['timezone'] ?? 'America/New_York';
+
+// ---- CONFIGURACIÓN BASE DEL PROYECTO ----
+// Si tu app vive en /shockfy, deja así. Si algún día la mueves a raíz, cambia a ''.
+if (!defined('APP_SLUG')) {
+  define('APP_SLUG', '/shockfy');
+}
+
 ?>
 <link rel="icon" type="image/png" href="assets/img/favicon.png">
 
@@ -410,102 +417,92 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
 </section>
 
 <script>
+// Configurar URL absoluta del endpoint del chat (sin fallbacks)
 (function(){
-  const sidebar  = document.querySelector('.sidebar');
-  const btnInside= document.getElementById('btn');                 // botón interno
-  const overlay  = document.querySelector('.sidebar-overlay');      // overlay móvil
-  const btnFloat = document.getElementById('sidebarMobileToggle');  // botón flotante
-  const mq       = window.matchMedia('(max-width:1024px)');
-
-  if (!sidebar) return;
-
-  const isMobile = () => mq.matches;
-
-  function persist(state){
-    try { localStorage.setItem('sidebarOpen', state ? 'true' : 'false'); } catch(e){}
-  }
-  function isOpen(){ return sidebar.classList.contains('open'); }
-  function open(){ sidebar.classList.add('open'); persist(true); }
-  function close(){ sidebar.classList.remove('open'); persist(false); }
-  function toggle(){ isOpen() ? close() : open(); }
-
-  // 1) Estado inicial: en móvil SIEMPRE cerrada; en desktop respeta lo guardado
-  try {
-    const saved = localStorage.getItem('sidebarOpen');
-    if (isMobile()){
-      close();                 // fuerza cerrada y persiste 'false'
-    } else {
-      (saved === 'true') ? open() : close();
-    }
-  } catch(e){ close(); }
-
-  // 2) Toggles normales
-  btnInside?.addEventListener('click', toggle);
-  btnInside?.addEventListener('keydown', (e)=>{ if (e.key==='Enter'||e.key===' '){ e.preventDefault(); toggle(); }});
-  btnFloat?.addEventListener('click', toggle);
-  overlay?.addEventListener('click', (e)=>{ e.preventDefault(); close(); });
-  document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape' && isOpen()) close(); });
-
-  // 3) Cerrar automáticamente al navegar con cualquier link del sidebar en móvil
-  sidebar.querySelectorAll('a[href]').forEach(a=>{
-    a.addEventListener('click', ()=>{
-      if (isMobile()){
-        persist(false);  // para que la PRÓXIMA página cargue ya cerrada
-        close();         // feedback inmediato
-      }
-    });
-  });
-
-  // 4) Si cambia el breakpoint en vivo, ajusta el estado
-  const onBPChange = (e)=>{
-    if (e.matches){  // entró a móvil
-      close();       // siempre cerrada en móvil
-    } else {         // volvió a desktop: respeta lo guardado
-      const saved = localStorage.getItem('sidebarOpen');
-      (saved === 'true') ? open() : close();
-    }
-  };
-  if (mq.addEventListener) mq.addEventListener('change', onBPChange);
-  else mq.addListener(onBPChange); // fallback Safari/iOS viejos
+  var slug = <?php echo json_encode(APP_SLUG); ?>;      // "/shockfy" o ""
+  var base = slug ? slug.replace(/\/$/, '') : '';       // "/shockfy" -> "/shockfy"
+  window.API_SUPPORT_URL = window.location.origin + base + '/api/support_chat.php';
+  // Ej.: "http://localhost/shockfy/api/support_chat.php"
 })();
 </script>
 
-<!-- JS del chat de soporte -->
+<script>
+// Configurar URL absoluta del endpoint del chat (sin fallbacks)
+(function(){
+  var slug = <?php echo json_encode(APP_SLUG); ?>;      // "/shockfy" o ""
+  var base = slug ? slug.replace(/\/$/, '') : '';       // "/shockfy" -> "/shockfy"
+  window.API_SUPPORT_URL = window.location.origin + base + '/api/support_chat.php';
+})();
+</script>
+
 <script>
 (function(){
   const $ = (s, r=document)=>r.querySelector(s);
-  const body = document.body;
-  const fab = $('#supportFab');
-  const chat = $('#supportChat');
-  const overlay = $('#supportOverlay');
-  const sendBtn = $('#supportSend');
-  const input = $('#supportText');
-  const file = $('#supportFile');
-  const btnClose = $('#supportClose');
-  const btnMin = $('#supportMin');
-  const bodyMsgs = $('#supportBody');
+
+  const body      = document.body;
+  const fab       = $('#supportFab');
+  const chat      = $('#supportChat');
+  const overlay   = $('#supportOverlay');
+  const btnClose  = $('#supportClose');
+  const btnMin    = $('#supportMin');
+  const bodyMsgs  = $('#supportBody');
+  const inputOrig = $('#supportText');
+  const file      = $('#supportFile');
 
   const KEY = 'supportChatOpen';
-  const API_BASE = '/api'; // ajusta si tu proyecto vive en subcarpeta
+  const API_SUPPORT_URL = window.API_SUPPORT_URL;
+
+  // --- Estado del hilo (para render incremental) ---
+  const state = {
+    lastTs: null,     // ISO string del último mensaje mostrado (created_at)
+    pollTimer: null,
+    POLL_MS: 4000,
+    isOpen: false
+  };
+
+  // ---------- Limpia listeners previos que otros scripts hayan puesto ----------
+  function replaceNodeWithClone(el){
+    if (!el) return el;
+    const clone = el.cloneNode(true);
+    el.replaceWith(clone);
+    return clone;
+  }
+  const sendBtn   = replaceNodeWithClone(document.getElementById('supportSend'));
+  const input     = replaceNodeWithClone(inputOrig);
+
+  // ---------- UI abrir/cerrar ----------
+  function startPolling(){
+    stopPolling();
+    if (!state.isOpen) return;
+    if (document.hidden) return;
+    state.pollTimer = setInterval(async ()=>{
+      try { await fetchAndAppendNew(); } catch (e) { /*silencio*/ }
+    }, state.POLL_MS);
+  }
+  function stopPolling(){
+    if (state.pollTimer){ clearInterval(state.pollTimer); state.pollTimer = null; }
+  }
 
   function openChat(){
     chat.classList.add('open');
     overlay.classList.add('show');
     body.style.overflow = 'hidden';
+    state.isOpen = true;
     try{ localStorage.setItem(KEY,'1'); }catch(e){}
-    // Cargar historial al abrir
-    loadThread().then(()=> input?.focus());
+    // Cargar completo y empezar polling
+    loadThread(true).then(()=> input?.focus());
   }
   function closeChat(){
     chat.classList.remove('open');
     overlay.classList.remove('show');
     body.style.overflow = '';
+    state.isOpen = false;
     try{ localStorage.setItem(KEY,'0'); }catch(e){}
+    stopPolling();
   }
   function toggleChat(){ (chat.classList.contains('open')) ? closeChat() : openChat(); }
 
-  // Persistencia de estado
-  try{ if (localStorage.getItem(KEY)==='1') openChat(); }catch(e){}
+  try{ if (localStorage.getItem(KEY)==='1') { openChat(); } }catch(e){}
 
   fab?.addEventListener('click', toggleChat);
   btnClose?.addEventListener('click', closeChat);
@@ -513,10 +510,17 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
   document.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ closeChat(); }});
   btnMin?.addEventListener('click', ()=>{
     chat.classList.remove('open'); overlay.classList.remove('show'); body.style.overflow = '';
+    state.isOpen = false; stopPolling();
     try{ localStorage.setItem(KEY,'0'); }catch(e){}
   });
 
-  // Utilidades
+  // Pausar/reanudar al (des)enfocar pestaña
+  document.addEventListener('visibilitychange', ()=>{
+    if (document.hidden) stopPolling();
+    else if (state.isOpen) startPolling();
+  });
+
+  // ---------- helpers ----------
   function esc(str){ return (str||'').replace(/[&<>]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[s])); }
   function addMsg({who, text, att, ts}){
     const wrap = document.createElement('div');
@@ -536,31 +540,91 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
         <div>¡Hola! ¿En qué podemos ayudar?</div>
       </div>`;
   }
+  const toDate = (iso) => (iso ? new Date(iso.replace(' ','T') + 'Z') : null); // asume fechas DB en UTC
 
-  // Cargar hilo desde backend
-  async function loadThread(){
-    try{
-      const res = await fetch(`${API_BASE}/support_chat.php?action=thread`, { method:'GET', headers:{'Accept':'application/json'} });
-      if (!res.ok){ throw new Error('HTTP '+res.status); }
-      const data = await res.json();
+  // ---------- fetch helpers ----------
+  async function parseJsonResponse(res){
+    const raw = await res.text();
+    let data = null;
+    try { data = raw ? JSON.parse(raw) : null; }
+    catch (e) {
+      console.error('Respuesta no JSON:', (raw||'').slice(0,400));
+      throw new Error('Respuesta no válida del servidor');
+    }
+    if (!res.ok) {
+      const msg = data?.error || `HTTP ${res.status}`;
+      throw new Error(msg);
+    }
+    return data;
+  }
+
+  // ---------- cargar hilo completo (reset=true) o solo actualizar ----------
+  async function loadThread(reset=false){
+    const res = await fetch(API_SUPPORT_URL + '?action=thread', { method:'GET', headers:{'Accept':'application/json'} });
+    const data = await parseJsonResponse(res);
+
+    if (reset){
       clearMsgs();
-      if (data && data.ticket && Array.isArray(data.messages)){
-        // pintar historial
-        data.messages.forEach(m=>{
+      state.lastTs = null;
+    }
+
+    if (data && Array.isArray(data.messages)){
+      // pintar todo (solo una vez al abrir/reset)
+      if (reset){
+        for (const m of data.messages){
           addMsg({
             who: m.sender === 'user' ? 'me' : 'agent',
             text: m.message || '',
             att: m.file_path || '',
             ts: m.created_at || ''
           });
-        });
+        }
       }
-    }catch(err){
-      console.warn('No se pudo cargar el historial:', err);
+      // actualizar lastTs con el máximo created_at recibido
+      for (const m of data.messages){
+        if (!m.created_at) continue;
+        if (!state.lastTs || toDate(m.created_at) > toDate(state.lastTs)){
+          state.lastTs = m.created_at;
+        }
+      }
+    }
+
+    // Iniciar polling tras la primera carga completa
+    if (reset) startPolling();
+  }
+
+  // ---------- obtener y anexar SOLO los nuevos desde lastTs ----------
+  async function fetchAndAppendNew(){
+    // Pedimos todo y filtramos en cliente (sin tocar backend por ahora)
+    const res = await fetch(API_SUPPORT_URL + '?action=thread', { method:'GET', headers:{'Accept':'application/json'} });
+    const data = await parseJsonResponse(res);
+    if (!data || !Array.isArray(data.messages)) return;
+
+    const news = [];
+    for (const m of data.messages){
+      if (!state.lastTs) { news.push(m); continue; }
+      if (!m.created_at) continue;
+      if (toDate(m.created_at) > toDate(state.lastTs)) news.push(m);
+    }
+    if (!news.length) return;
+
+    // Ordena por fecha asc por si acaso y agrega
+    news.sort((a,b)=> (toDate(a.created_at) - toDate(b.created_at)));
+
+    for (const m of news){
+      addMsg({
+        who: m.sender === 'user' ? 'me' : 'agent',
+        text: m.message || '',
+        att: m.file_path || '',
+        ts: m.created_at || ''
+      });
+      if (!state.lastTs || toDate(m.created_at) > toDate(state.lastTs)){
+        state.lastTs = m.created_at;
+      }
     }
   }
 
-  // Enviar mensaje
+  // ---------- enviar ----------
   async function sendMessage(){
     const text = (input.value || '').trim();
     const f = file.files && file.files[0];
@@ -569,7 +633,7 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
       window.showToast ? showToast('Escribe un mensaje o adjunta un archivo', 'warn') : alert('Escribe un mensaje o adjunta un archivo');
       return;
     }
-    // pinta inmediato localmente (optimista)
+
     if (text){ addMsg({ who:'me', text }); }
     input.value = '';
 
@@ -578,32 +642,75 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
     if (f) form.append('file', f);
 
     try{
-      const res = await fetch(`${API_BASE}/support_chat.php`, { method:'POST', body: form });
-      const isJson = res.headers.get('content-type')?.includes('application/json');
-      let data = isJson ? await res.json() : null;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(()=>controller.abort(), 15000);
+      const res  = await fetch(API_SUPPORT_URL, { method:'POST', body: form, signal: controller.signal });
+      clearTimeout(timeoutId);
 
-      if (!res.ok || !data?.ok){
-        const msg = data?.error || `Fallo al enviar (HTTP ${res.status})`;
-        window.showToast ? showToast(msg, 'err') : alert(msg);
-        return;
-      }
+      const data = await parseJsonResponse(res);
 
-      // Éxito: recarga hilo desde la BD para no perder consistencia
-      await loadThread();
+      // Tras enviar, pedimos y anexamos solo lo nuevo (por si admin respondió)
+      await fetchAndAppendNew();
       window.showToast && showToast('Mensaje enviado', 'ok');
-      file.value = '';
+      if (file) file.value = '';
     }catch(err){
-      console.error(err);
-      window.showToast ? showToast('Error de red al enviar', 'err') : alert('Error de red al enviar');
+      console.error('Network/JSON error →', err);
+      window.showToast ? showToast(err.message || 'Error de red al enviar', 'err') : alert(err.message || 'Error de red al enviar');
     }
   }
 
-  // Listeners
-  document.getElementById('supportSend')?.addEventListener('click', sendMessage);
-  document.getElementById('supportText')?.addEventListener('keydown', (e)=>{
+  // ---------- listeners exclusivos ----------
+  sendBtn?.addEventListener('click', sendMessage);
+  input?.addEventListener('keydown', (e)=>{
     if ((e.key === 'Enter' && (e.metaKey || e.ctrlKey))){ e.preventDefault(); sendMessage(); }
   });
 
+})();
+</script>
+
+
+<script>
+/* Toggle de la barra lateral (desktop y móvil) */
+(function(){
+  const sidebar   = document.querySelector('.sidebar');
+  const btnInside = document.getElementById('btn');                 // botón ☰ dentro del sidebar
+  const overlay   = document.querySelector('.sidebar-overlay');     // overlay para móvil
+  const btnFloat  = document.getElementById('sidebarMobileToggle'); // botón flotante en móvil
+  const mq        = window.matchMedia('(max-width:1024px)');
+  const KEY       = 'sidebarOpen';
+
+  if (!sidebar) return;
+
+  const isMobile = () => mq.matches;
+
+  function persist(open){ try{ localStorage.setItem(KEY, open ? 'true' : 'false'); }catch(e){} }
+  function open(){ sidebar.classList.add('open');  persist(true);  }
+  function close(){ sidebar.classList.remove('open'); persist(false); }
+  function toggle(){ sidebar.classList.contains('open') ? close() : open(); }
+
+  // Estado inicial: en móvil siempre cerrada; en desktop respeta lo guardado
+  function applyInitial() {
+    let saved = null;
+    try { saved = localStorage.getItem(KEY); } catch(e){}
+    if (isMobile()) {
+      close(); // forzar cerrada en móvil
+    } else {
+      (saved === 'true') ? open() : close();
+    }
+  }
+  applyInitial();
+
+  // Listeners
+  btnInside?.addEventListener('click', toggle);
+  btnInside?.addEventListener('keydown', (e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); toggle(); }});
+  btnFloat?.addEventListener('click', toggle);
+  overlay?.addEventListener('click', (e)=>{ e.preventDefault(); close(); });
+  document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') close(); });
+
+  // Si cambias entre móvil/desktop, re-aplica la regla
+  const onBP = ()=>applyInitial();
+  if (mq.addEventListener) mq.addEventListener('change', onBP);
+  else mq.addListener(onBP); // fallback Safari viejo
 })();
 </script>
 

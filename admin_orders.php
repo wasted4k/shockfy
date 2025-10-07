@@ -1,9 +1,10 @@
 <?php
-// admin_orders.php — Panel admin para revisar solicitudes de pago manual.
-// Acciones:
-// - Aprobar:  payment_requests.status='approved', users.account_state='active', users.plan='starter',
-//             users.premium_started_at=UTC_TIMESTAMP(), users.premium_expires_at=UTC_TIMESTAMP()+30d
-// - Rechazar: payment_requests.status='rejected', users.account_state='active'
+// admin_orders.php — Panel admin para revisar solicitudes de pago manual + Soporte.
+//
+// Requisitos:
+// - db.php (PDO $pdo)
+// - auth_check.php (pobla $currentUser y sesión)
+// - APP_SLUG: si tu app vive en subcarpeta (p. ej. /shockfy)
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth_check.php';
@@ -17,6 +18,12 @@ if (empty($currentUser['role']) || strtolower($currentUser['role']) !== 'admin')
   http_response_code(403);
   echo 'Acceso denegado';
   exit;
+}
+
+// ----- Config base del proyecto (usado por el panel de soporte) -----
+if (!defined('APP_SLUG')) {
+  // Si tu app vive en /shockfy deja así. Si la movieras a raíz, pon ''.
+  define('APP_SLUG', '/shockfy');
 }
 
 const PAGE_SIZE = 15;
@@ -87,8 +94,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
           $pdo->commit();
           $flash = ['type'=>'success','msg'=>"Solicitud #{$pr_id} aprobada. Plan ".PREMIUM_PLAN_CODE." activo por 30 días."];
-
-          // (Emails desactivados)
 
         } elseif ($action === 'reject') {
           // Rechazar solicitud
@@ -242,9 +247,6 @@ function chip($status){
 .sap-attach input{ display:none; }
 .sap-hint{ font-size:12px; color:#9ca3af; }
 </style>
-
-
-
 
   <style>
     :root{
@@ -422,8 +424,6 @@ function chip($status){
             </table>
           </div>
 
-
-
 <!-- ========== Panel de Soporte (Admin) ========== -->
 <section id="supportAdminPanel" class="sap">
   <header class="sap-header">
@@ -479,10 +479,31 @@ function chip($status){
 </section>
 <!-- ========== /Panel de Soporte (Admin) ========== -->
 
+<script>
+// Exponer APP_SLUG a JS para construir URLs absolutas al API admin
+window.APP_SLUG = <?php echo json_encode(APP_SLUG); ?>;
+window.API_ADMIN_SUPPORT = window.location.origin + (window.APP_SLUG ? window.APP_SLUG.replace(/\/$/,'') : '') + '/api/support_admin.php';
+
+// Helper robusto para parsear JSON (evita "Unexpected end of JSON input")
+async function parseJsonResponse(res){
+  const raw = await res.text();
+  let data = null;
+  try { data = raw ? JSON.parse(raw) : null; }
+  catch {
+    console.error('Respuesta no JSON:', raw?.slice(0,400));
+    throw new Error('Respuesta no válida del servidor');
+  }
+  if (!res.ok) {
+    const msg = data?.error || `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+  return data;
+}
+</script>
 
 <script>
 (function(){
-  const $ = s => document.querySelector(s);
+  const $  = s => document.querySelector(s);
   const $$ = s => Array.from(document.querySelectorAll(s));
 
   const listEl   = $('#sapTickets');
@@ -501,34 +522,35 @@ function chip($status){
   const resolveBtn  = $('#sapResolve');
 
   const API = {
-    list:   (status='open') => fetch(`/api/support_admin.php?action=list&status=${encodeURIComponent(status)}`).then(r=>r.json()),
-    thread: (ticketId)      => fetch(`/api/support_admin.php?action=thread&ticket_id=${ticketId}`).then(r=>r.json()),
+    list:   (status='open') => fetch(`${window.API_ADMIN_SUPPORT}?action=list&status=${encodeURIComponent(status)}`).then(parseJsonResponse),
+    thread: (ticketId)      => fetch(`${window.API_ADMIN_SUPPORT}?action=thread&ticket_id=${ticketId}`).then(parseJsonResponse),
     reply:  (ticketId, text, file) => {
       const fd = new FormData();
       fd.append('action','reply');
       fd.append('ticket_id', String(ticketId));
       fd.append('message', text);
       if (file) fd.append('file', file);
-      return fetch('/api/support_admin.php', { method:'POST', body: fd }).then(r=>r.json());
+      return fetch(window.API_ADMIN_SUPPORT, { method:'POST', body: fd }).then(parseJsonResponse);
     },
     resolve:(ticketId) => {
       const fd = new FormData();
       fd.append('action','resolve');
       fd.append('ticket_id', String(ticketId));
-      return fetch('/api/support_admin.php', { method:'POST', body: fd }).then(r=>r.json());
+      return fetch(window.API_ADMIN_SUPPORT, { method:'POST', body: fd }).then(parseJsonResponse);
     }
   };
 
   let state = {
     status: 'open',
     tickets: [],
-    selected: null, // ticket.id
+    selected: null,
     pollTimer: null
   };
 
   function fmtDate(iso){
     if (!iso) return '';
-    const d = new Date(iso.replace(' ','T')+'Z'); // si tu server está en UTC quita la 'Z' si ya viene local
+    // Si tu DB guarda UTC, puedes añadir 'Z' para forzar parse como UTC:
+    const d = new Date(iso.replace(' ','T') + 'Z');
     return d.toLocaleString();
   }
 
@@ -552,7 +574,7 @@ function chip($status){
           </div>
         </div>
         <div class="ticket-badges">
-          ${t.unread_admin ? '<span class="badge unread">Nuevo</span>' : ''}
+          ${Number(t.unread_admin) ? '<span class="badge unread">Nuevo</span>' : ''}
         </div>
       `;
       li.addEventListener('click', ()=> selectTicket(t.id));
@@ -577,6 +599,7 @@ function chip($status){
     threadMeta.textContent = '';
     msgsEl.innerHTML = '<div class="sap-placeholder">Selecciona un ticket a la izquierda para ver el chat.</div>';
     replyText.disabled = true; replyFile.disabled = true; sendBtn.disabled = true; resolveBtn.disabled = true;
+    state.selected = null;
   }
 
   function renderThread(ticket, msgs){
@@ -588,10 +611,11 @@ function chip($status){
       const div = document.createElement('div');
       div.className = 'msg ' + (m.sender === 'admin' ? 'admin' : '');
       const who = (m.sender === 'admin') ? 'Admin' : 'Usuario';
+      const safe = (m.message || '').replace(/[&<>]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[s]));
       const att = m.file_path ? `<div class="att">Adjunto: <a href="${m.file_path}" target="_blank" rel="noopener">Ver archivo</a></div>` : '';
       div.innerHTML = `
         <div class="who">${who} · <small>${fmtDate(m.created_at)}</small></div>
-        <div class="text">${(m.message || '').replace(/[&<>]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[s]))}</div>
+        <div class="text">${safe}</div>
         ${att}
       `;
       msgsEl.appendChild(div);
@@ -605,13 +629,12 @@ function chip($status){
 
   async function selectTicket(id){
     state.selected = id;
-    // marca activo en lista
     $$('#sapTickets li').forEach(li => li.classList.toggle('active', Number(li.dataset.id) === id));
     try{
       const data = await API.thread(id);
       if (!data.ok){ throw new Error(data.error || 'Error thread'); }
       renderThread(data.ticket, data.messages || []);
-      // actualiza badges en lista (ya se marcó como leído por admin en el backend)
+      // marcar como leído en UI
       const t = state.tickets.find(x => x.id === id);
       if (t){ t.unread_admin = 0; }
       renderTickets();
@@ -692,7 +715,6 @@ function chip($status){
   // Eventos UI
   statusEl.addEventListener('change', async ()=>{
     state.status = statusEl.value;
-    state.selected = null;
     clearThread();
     await loadTickets();
   });
@@ -707,7 +729,6 @@ function chip($status){
       state.pollTimer = setInterval(async ()=>{
         const prevSel = state.selected;
         await loadTickets();
-        // Si hay un ticket seleccionado, refresca su hilo también
         if (prevSel){
           try{
             const data = await API.thread(prevSel);
@@ -723,10 +744,6 @@ function chip($status){
   loadTickets();
 })();
 </script>
-
-
-
-
 
           <?php
             $totalPages = (int)ceil($total / PAGE_SIZE);
