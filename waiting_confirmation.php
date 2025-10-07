@@ -74,6 +74,58 @@ $pr = $stmt2->fetch(PDO::FETCH_ASSOC);
       display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px;
       background:#fff7ed; border:1px solid #fed7aa; color:#92400e; font-weight:800; font-size:12px;
     }
+
+
+/* ===== Waiting Confirmation: responsive móvil ===== */
+
+/* 0) Seguridad: evita scroll lateral y medios fluidos */
+html, body { overflow-x: hidden; }
+img, svg, video { max-width: 100%; height: auto; }
+
+/* 1) Quitar el “push” de la sidebar en móvil */
+@media (max-width:1024px){
+  .content.with-fixed-sidebar{ margin-left: 0 !important; }
+  .app-shell{ overflow-x:hidden; }
+}
+
+/* 2) Contenedor y tarjetas cómodas en pantallas chicas */
+@media (max-width:700px){
+  .content{ padding: 20px 14px 60px; }
+  .container{ max-width: 100%; margin: 0 auto; }
+  .card{ padding: 16px; border-radius: 14px; }
+  h1{ font-size: 22px; }
+  .grid{ gap: 12px; }
+  .row{ gap: 12px; } /* ya es 1 columna en <860px */
+  .badge{ font-size: 11px; padding: 6px 10px; }
+  .tips{ font-size: 14px; }
+}
+
+/* 3) Pares clave–valor: que no se corten ni desborden */
+@media (max-width:700px){
+  .kvs{ gap: 10px; }
+  .kv{ display: grid; grid-template-columns: auto 1fr; column-gap: 8px; row-gap: 2px; }
+  .kv .k{ width: auto; font-weight: 600; color:#6b7280; }
+  .kv .v{ min-width: 0; overflow-wrap: anywhere; }
+}
+@media (max-width:380px){
+  .kv{ grid-template-columns: 1fr; }
+}
+
+/* 4) Vista del comprobante y enlaces largos */
+@media (max-width:700px){
+  .receipt-preview{ min-height: 96px; padding: 10px; }
+  .receipt-preview a{ word-break: break-word; }
+}
+
+/* 5) Botones a ancho completo en móvil */
+@media (max-width:700px){
+  .btn{ width: 100%; text-align: center; }
+  /* si hay varios botones en la misma fila, que se apilen con respiro */
+  .card .btn + .btn{ margin-top: 8px; }
+}
+
+
+
   </style>
 </head>
 <body>
