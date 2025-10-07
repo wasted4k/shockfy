@@ -1,7 +1,9 @@
 <?php
 // api/support_chat.php — chat del lado usuario
 declare(strict_types=1);
-ini_set('display_errors','0'); ini_set('html_errors','0');
+ini_set('display_errors',1);
+ini_set('display_startup_errors', 1);
+ini_set('html_errors','0');
 header('Content-Type: application/json; charset=utf-8');
 ob_start();
 
