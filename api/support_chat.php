@@ -47,14 +47,15 @@ try {
   $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
   $action = $_GET['action'] ?? '';
 
-  return $action;
-
   if ($method === 'GET' && $action === 'thread') {
     // trae (o crea) ticket del usuario
     $ticket = ensureUserTicket($pdo, (int)$user_id);
     $m = $pdo->prepare("SELECT sender,message,file_path,created_at FROM support_messages WHERE ticket_id=? ORDER BY id ASC");
     $m->execute([(int)$ticket['id']]);
     $messages = $m->fetchAll(PDO::FETCH_ASSOC);
+
+    echo $action;
+    return;
 
     // al leer, marca como leído para usuario
     $pdo->prepare("UPDATE support_tickets SET unread_user=0 WHERE id=?")->execute([(int)$ticket['id']]);
