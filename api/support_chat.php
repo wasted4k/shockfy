@@ -134,30 +134,31 @@ try {
     
 
     // adjunto opcional
-    // if (!empty($_FILES['file']) && $_FILES['file']['error'] !== UPLOAD_ERR_NO_FILE) {
-    //   if ($_FILES['file']['error'] === UPLOAD_ERR_INI_SIZE || $_FILES['file']['error'] === UPLOAD_ERR_FORM_SIZE) {
-    //     respond(413, ['ok'=>false,'error'=>'Adjunto excede el límite']);
-    //   }
-    //   if ($_FILES['file']['error'] !== UPLOAD_ERR_OK) {
-    //     respond(400, ['ok'=>false,'error'=>'Error al subir archivo']);
-    //   }
-    //   $ext = strtolower(pathinfo($_FILES['file']['name'], PATHINFO_EXTENSION));
-    //   if (!in_array($ext, ['png','jpg','jpeg','pdf'], true)) {
-    //     respond(400, ['ok'=>false,'error'=>'Extensión no permitida']);
-    //   }
-    //   $dir = __DIR__ . '/../uploads/support/';
-    //   if (!is_dir($dir)) @mkdir($dir, 0777, true);
-    //   $dest = $dir . uniqid('att_', true) . '.' . $ext;
-    //   if (!@move_uploaded_file($_FILES['file']['tmp_name'], $dest)) {
-    //     respond(500, ['ok'=>false,'error'=>'No se pudo guardar el adjunto']);
-    //   }
-    //   $filePath = 'uploads/support/' . basename($dest);
-    // }
+    if (!empty($_FILES['file']) && $_FILES['file']['error'] !== UPLOAD_ERR_NO_FILE) {
+      if ($_FILES['file']['error'] === UPLOAD_ERR_INI_SIZE || $_FILES['file']['error'] === UPLOAD_ERR_FORM_SIZE) {
+        respond(413, ['ok'=>false,'error'=>'Adjunto excede el límite']);
+      }
+      if ($_FILES['file']['error'] !== UPLOAD_ERR_OK) {
+        respond(400, ['ok'=>false,'error'=>'Error al subir archivo']);
+      }
+      $ext = strtolower(pathinfo($_FILES['file']['name'], PATHINFO_EXTENSION));
+      if (!in_array($ext, ['png','jpg','jpeg','pdf'], true)) {
+        respond(400, ['ok'=>false,'error'=>'Extensión no permitida']);
+      }
+      $dir = __DIR__ . '/../uploads/support/';
+      if (!is_dir($dir)) @mkdir($dir, 0777, true);
+      $dest = $dir . uniqid('att_', true) . '.' . $ext;
+      if (!@move_uploaded_file($_FILES['file']['tmp_name'], $dest)) {
+        respond(500, ['ok'=>false,'error'=>'No se pudo guardar el adjunto']);
+      }
+      $filePath = 'uploads/support/' . basename($dest);
+    }
 
     if ($message === '' && !$filePath) {
       respond(400, ['ok'=>false,'error'=>'Mensaje vacío']);
     }
-
+echo $message;
+    die();
     // ticket y mensaje
     $ticket = ensureUserTicket($pdo, (int)$user_id);
     $pdo->beginTransaction();
