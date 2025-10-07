@@ -105,7 +105,7 @@ try {
   $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
   $action = $_GET['action'] ?? '';
 
-  if ($method == 'GET' || $method == 'POST') {
+  if ($method == 'GET' && $action == 'thread') {
     
     // trae (o crea) ticket del usuario
     $ticket = ensureUserTicket($pdo, (int)$user_id);
