@@ -495,7 +495,6 @@ async function parseJsonResponse(res){
 }
 </script>
 
-
 <script>
 (function(){
   const $  = s => document.querySelector(s);
@@ -505,7 +504,7 @@ async function parseJsonResponse(res){
   const emptyEl  = $('#sapEmptyList');
   const statusEl = $('#sapStatus');
   const refreshEl= $('#sapRefresh');
-  const autoEl   = $('#sapAuto'); // quedará opcional; dejaremos nuestro polling automático siempre-encendido.
+  const autoEl   = $('#sapAuto'); // opcional
 
   const threadTitle = $('#sapThreadHeader .sap-thread-title');
   const threadMeta  = $('#sapThreadMeta');
@@ -516,63 +515,62 @@ async function parseJsonResponse(res){
   const sendBtn     = $('#sapSend');
   const resolveBtn  = $('#sapResolve');
 
-  
   const API = {
-  list: (status='open') =>
-    fetch(`${window.API_ADMIN_SUPPORT}?action=list&status=${encodeURIComponent(status)}`, {
-      credentials: 'include',
-      headers: { 'Accept': 'application/json' }
-    }).then(parseJsonResponse),
+    list: (status='open') =>
+      fetch(`${window.API_ADMIN_SUPPORT}?action=list&status=${encodeURIComponent(status)}`, {
+        credentials: 'include',
+        headers: { 'Accept': 'application/json' }
+      }).then(parseJsonResponse),
 
-  thread: (ticketId) =>
-    fetch(`${window.API_ADMIN_SUPPORT}?action=thread&ticket_id=${ticketId}`, {
-      credentials: 'include',
-      headers: { 'Accept': 'application/json' }
-    }).then(parseJsonResponse),
+    thread: (ticketId) =>
+      fetch(`${window.API_ADMIN_SUPPORT}?action=thread&ticket_id=${ticketId}`, {
+        credentials: 'include',
+        headers: { 'Accept': 'application/json' }
+      }).then(parseJsonResponse),
 
-  reply: (ticketId, text, file) => {
-    const fd = new FormData();
-    fd.append('action','reply');
-    fd.append('ticket_id', String(ticketId));
-    fd.append('message', text);
-    if (file) fd.append('file', file);
-    return fetch(window.API_ADMIN_SUPPORT, {
-      method:'POST',
-      body: fd,
-      credentials: 'include',
-      headers: { 'Accept': 'application/json' }
-    }).then(parseJsonResponse);
-  },
+    reply: (ticketId, text, file) => {
+      const fd = new FormData();
+      fd.append('action','reply');
+      fd.append('ticket_id', String(ticketId));
+      fd.append('message', text);
+      if (file) fd.append('file', file);
+      return fetch(window.API_ADMIN_SUPPORT, {
+        method:'POST',
+        body: fd,
+        credentials: 'include',
+        headers: { 'Accept': 'application/json' }
+      }).then(parseJsonResponse);
+    },
 
-  resolve: (ticketId) => {
-    const fd = new FormData();
-    fd.append('action','resolve');
-    fd.append('ticket_id', String(ticketId));
-    return fetch(window.API_ADMIN_SUPPORT, {
-      method:'POST',
-      body: fd,
-      credentials: 'include',
-      headers: { 'Accept': 'application/json' }
-    }).then(parseJsonResponse);
-  }
-};
-
+    resolve: (ticketId) => {
+      const fd = new FormData();
+      fd.append('action','resolve');
+      fd.append('ticket_id', String(ticketId));
+      return fetch(window.API_ADMIN_SUPPORT, {
+        method:'POST',
+        body: fd,
+        credentials: 'include',
+        headers: { 'Accept': 'application/json' }
+      }).then(parseJsonResponse);
+    }
+  };
 
   // ===== Estado y polling =====
   const state = {
     status: 'open',
     tickets: [],
     selected: null,
-    lastTs: null,          // último created_at mostrado del hilo seleccionado
+    lastTs: null,                // último created_at mostrado del hilo seleccionado
+    paintedIds: new Set(),       // anti-duplicados por id
     timers: { list: null, thread: null },
-    POLL_MS: 1000
+    POLL_MS: 4000
   };
 
   function startListPolling(){
     stopListPolling();
     state.timers.list = setInterval(async ()=>{
       if (document.hidden) return;
-      await loadTickets(true); // true = mantener selección si existe
+      await loadTickets(true); // mantener selección si existe
     }, state.POLL_MS);
   }
   function stopListPolling(){
@@ -595,12 +593,11 @@ async function parseJsonResponse(res){
   });
 
   function fmtDate(iso){
-  if (!iso) return '';
-  // Trátalo como “hora local” sin añadir Z (UTC).
-  const d = new Date(iso.replace(' ','T'));
-  return isNaN(d) ? iso : d.toLocaleString();
-}
-
+    if (!iso) return '';
+    // Trátalo como “hora local” sin añadir Z (UTC).
+    const d = new Date(iso.replace(' ','T'));
+    return isNaN(d) ? iso : d.toLocaleString();
+  }
 
   function renderTickets(){
     listEl.innerHTML = '';
@@ -615,7 +612,7 @@ async function parseJsonResponse(res){
       li.className = (state.selected === t.id ? 'active' : '');
       li.innerHTML = `
         <div class="ticket-main">
-          <div class="ticket-title">${t.public_id} · ${t.full_name ?? ('Usuario #'+t.user_id)}</div>
+          <div class="ticket-title">${(t.public_id || ('#'+t.id))} · ${t.full_name ?? ('Usuario #'+t.user_id)}</div>
           <div class="ticket-meta">
             <span>${t.status}</span>
             <span>Último: ${fmtDate(t.last_message_at)}</span>
@@ -635,17 +632,14 @@ async function parseJsonResponse(res){
       const data = await API.list(state.status);
       if (!data.ok){ throw new Error(data.error || 'Error list'); }
 
-      // guardar seleccionado para reactivar la clase active al reordenar por last_message_at
       const prevSel = keepSelection ? state.selected : null;
       state.tickets = data.tickets || [];
       renderTickets();
       if (prevSel){
-        // re-activar la fila correcta si aún existe
         const exists = state.tickets.some(t => t.id === prevSel);
         if (exists){
           $$('#sapTickets li').forEach(li => li.classList.toggle('active', Number(li.dataset.id) === prevSel));
         } else {
-          // si ya no existe (p. ej. se resolvió), limpia hilo
           if (state.selected === prevSel) clearThread();
         }
       }
@@ -662,31 +656,35 @@ async function parseJsonResponse(res){
     replyText.disabled = true; replyFile.disabled = true; sendBtn.disabled = true; resolveBtn.disabled = true;
     state.selected = null;
     state.lastTs = null;
+    state.paintedIds.clear();
     stopThreadPolling();
   }
 
   function renderThread(ticket, msgs){
-    threadTitle.textContent = `${ticket.public_id} — ${ticket.full_name ?? ('Usuario #'+ticket.user_id)}`;
+    threadTitle.textContent = `${(ticket.public_id || ('#'+ticket.id))} — ${ticket.full_name ?? ('Usuario #'+ticket.user_id)}`;
     threadMeta.textContent  = `Estado: ${ticket.status} · Último mensaje: ${fmtDate(ticket.last_message_at)} · Creado: ${fmtDate(ticket.created_at)}`;
 
     msgsEl.innerHTML = '';
+    state.paintedIds.clear();
     msgs.forEach(m=> appendOne(m));
 
     const resolved = (ticket.status === 'resolved');
     replyText.disabled = resolved; replyFile.disabled = resolved; sendBtn.disabled = resolved;
     resolveBtn.disabled = resolved;
 
-    // set lastTs al máximo created_at mostrado
+    // set lastTs al máximo created_at mostrado (lexicográfico)
     for (const m of msgs){
       if (!m.created_at) continue;
       if (!state.lastTs || m.created_at > state.lastTs) {
-  state.lastTs = m.created_at;
-}
-
+        state.lastTs = m.created_at;
+      }
     }
   }
 
   function appendOne(m){
+    // anti-duplicados por id
+    if (m.id && state.paintedIds.has(m.id)) return;
+
     const div = document.createElement('div');
     div.className = 'msg ' + (m.sender === 'admin' ? 'admin' : '');
     const who = (m.sender === 'admin') ? 'Admin' : 'Usuario';
@@ -697,20 +695,21 @@ async function parseJsonResponse(res){
       <div class="text">${safe}</div>
       ${att}
     `;
+    if (m.id) div.dataset.mid = m.id;
     msgsEl.appendChild(div);
     msgsEl.scrollTop = msgsEl.scrollHeight + 120;
 
-    // actualizar lastTs
-    if (m.created_at){
-      const d = new Date(m.created_at.replace(' ','T')+'Z');
-      const ld = state.lastTs ? new Date(state.lastTs.replace(' ','T')+'Z') : null;
-      if (!ld || d > ld) state.lastTs = m.created_at;
+    // actualizar lastTs (lexicográfico)
+    if (m.created_at && (!state.lastTs || m.created_at > state.lastTs)) {
+      state.lastTs = m.created_at;
     }
+    if (m.id) state.paintedIds.add(m.id);
   }
 
   async function selectTicket(id){
     state.selected = id;
-    state.lastTs = null;             // fuerza recálculo
+    state.lastTs = null;            // fuerza recálculo
+    state.paintedIds.clear();
     $$('#sapTickets li').forEach(li => li.classList.toggle('active', Number(li.dataset.id) === id));
     try{
       const data = await API.thread(id);
@@ -734,30 +733,25 @@ async function parseJsonResponse(res){
     if (!state.selected) return;
     const data = await API.thread(state.selected);
     if (!data.ok) return;
+
     const msgs = Array.isArray(data.messages) ? data.messages : [];
     const last = state.lastTs || null;
-const news = msgs
-  .filter(m => m.created_at && (!last || m.created_at > last))
-  .sort((a,b)=> a.created_at.localeCompare(b.created_at));
 
-
-    // filtra y agrega en orden cronológico
-    const news = msgs.filter(m => {
-      if (!m.created_at) return false;
-      if (!last) return true;
-      return new Date(m.created_at.replace(' ','T')+'Z') > last;
-    }).sort((a,b)=> new Date(a.created_at.replace(' ','T')+'Z') - new Date(b.created_at.replace(' ','T')+'Z'));
+    // SOLO esta versión (lexicográfica). No redeclarar "const news" más adelante.
+    const news = msgs
+      .filter(m => m.created_at && (!last || m.created_at > last))
+      .sort((a,b)=> a.created_at.localeCompare(b.created_at));
 
     if (news.length){
       news.forEach(appendOne);
     }
 
-    // también refrescamos cabecera (last_message_at puede cambiar)
+    // refrescar cabecera por si cambió last_message_at
     if (data.ticket){
       threadMeta.textContent  = `Estado: ${data.ticket.status} · Último mensaje: ${fmtDate(data.ticket.last_message_at)} · Creado: ${fmtDate(data.ticket.created_at)}`;
     }
 
-    // y lista para reordenar/badges
+    // reordenar lista/badges sin perder selección
     await loadTickets(true);
   }
 
@@ -833,16 +827,13 @@ const news = msgs
 
   // Inicial
   clearThread();
-  loadTickets().then(()=>{
-    startListPolling();
-  });
+  loadTickets().then(()=>{ startListPolling(); });
 
   // El checkbox de auto-refresh queda opcional; nuestro polling ya corre siempre
-  autoEl?.addEventListener('change', ()=>{ /* noop para mantener compat */ });
+  autoEl?.addEventListener('change', ()=>{ /* noop */ });
 
 })();
 </script>
-
 
           <?php
             $totalPages = (int)ceil($total / PAGE_SIZE);
