@@ -34,7 +34,7 @@ $__tz = $_SESSION['timezone'] ?? 'America/New_York';
 // ---- CONFIGURACIÓN BASE DEL PROYECTO ----
 // Si tu app vive en /shockfy, deja así. Si algún día la mueves a raíz, cambia a ''.
 if (!defined('APP_SLUG')) {
-  define('APP_SLUG', '/shockfy');
+  define('APP_SLUG', '/');
 }
 
 ?>
@@ -435,6 +435,8 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
 })();
 </script>
 
+
+<!-- Chat -->
 <script>
 (function(){
   const $ = (s, r=document)=>r.querySelector(s);
