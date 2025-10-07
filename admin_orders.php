@@ -516,24 +516,47 @@ async function parseJsonResponse(res){
   const sendBtn     = $('#sapSend');
   const resolveBtn  = $('#sapResolve');
 
+  
   const API = {
-    list:   (status='open') => fetch(`${window.API_ADMIN_SUPPORT}?action=list&status=${encodeURIComponent(status)}`).then(parseJsonResponse),
-    thread: (ticketId)      => fetch(`${window.API_ADMIN_SUPPORT}?action=thread&ticket_id=${ticketId}`).then(parseJsonResponse),
-    reply:  (ticketId, text, file) => {
-      const fd = new FormData();
-      fd.append('action','reply');
-      fd.append('ticket_id', String(ticketId));
-      fd.append('message', text);
-      if (file) fd.append('file', file);
-      return fetch(window.API_ADMIN_SUPPORT, { method:'POST', body: fd }).then(parseJsonResponse);
-    },
-    resolve:(ticketId) => {
-      const fd = new FormData();
-      fd.append('action','resolve');
-      fd.append('ticket_id', String(ticketId));
-      return fetch(window.API_ADMIN_SUPPORT, { method:'POST', body: fd }).then(parseJsonResponse);
-    }
-  };
+  list: (status='open') =>
+    fetch(`${window.API_ADMIN_SUPPORT}?action=list&status=${encodeURIComponent(status)}`, {
+      credentials: 'include',
+      headers: { 'Accept': 'application/json' }
+    }).then(parseJsonResponse),
+
+  thread: (ticketId) =>
+    fetch(`${window.API_ADMIN_SUPPORT}?action=thread&ticket_id=${ticketId}`, {
+      credentials: 'include',
+      headers: { 'Accept': 'application/json' }
+    }).then(parseJsonResponse),
+
+  reply: (ticketId, text, file) => {
+    const fd = new FormData();
+    fd.append('action','reply');
+    fd.append('ticket_id', String(ticketId));
+    fd.append('message', text);
+    if (file) fd.append('file', file);
+    return fetch(window.API_ADMIN_SUPPORT, {
+      method:'POST',
+      body: fd,
+      credentials: 'include',
+      headers: { 'Accept': 'application/json' }
+    }).then(parseJsonResponse);
+  },
+
+  resolve: (ticketId) => {
+    const fd = new FormData();
+    fd.append('action','resolve');
+    fd.append('ticket_id', String(ticketId));
+    return fetch(window.API_ADMIN_SUPPORT, {
+      method:'POST',
+      body: fd,
+      credentials: 'include',
+      headers: { 'Accept': 'application/json' }
+    }).then(parseJsonResponse);
+  }
+};
+
 
   // ===== Estado y polling =====
   const state = {
@@ -572,10 +595,12 @@ async function parseJsonResponse(res){
   });
 
   function fmtDate(iso){
-    if (!iso) return '';
-    const d = new Date(iso.replace(' ','T') + 'Z'); // asumiendo UTC en DB
-    return d.toLocaleString();
-  }
+  if (!iso) return '';
+  // Trátalo como “hora local” sin añadir Z (UTC).
+  const d = new Date(iso.replace(' ','T'));
+  return isNaN(d) ? iso : d.toLocaleString();
+}
+
 
   function renderTickets(){
     listEl.innerHTML = '';
@@ -654,9 +679,10 @@ async function parseJsonResponse(res){
     // set lastTs al máximo created_at mostrado
     for (const m of msgs){
       if (!m.created_at) continue;
-      if (!state.lastTs || new Date(m.created_at.replace(' ','T')+'Z') > new Date((state.lastTs||'').replace(' ','T')+'Z')){
-        state.lastTs = m.created_at;
-      }
+      if (!state.lastTs || m.created_at > state.lastTs) {
+  state.lastTs = m.created_at;
+}
+
     }
   }
 
@@ -709,7 +735,11 @@ async function parseJsonResponse(res){
     const data = await API.thread(state.selected);
     if (!data.ok) return;
     const msgs = Array.isArray(data.messages) ? data.messages : [];
-    const last = state.lastTs ? new Date(state.lastTs.replace(' ','T')+'Z') : null;
+    const last = state.lastTs || null;
+const news = msgs
+  .filter(m => m.created_at && (!last || m.created_at > last))
+  .sort((a,b)=> a.created_at.localeCompare(b.created_at));
+
 
     // filtra y agrega en orden cronológico
     const news = msgs.filter(m => {

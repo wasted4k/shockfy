@@ -449,7 +449,7 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
   const state = {
     lastTs: null,     // ISO string del último mensaje mostrado (created_at)
     pollTimer: null,
-    POLL_MS: 1000,
+    POLL_MS: 5000,
     isOpen: false
   };
 
