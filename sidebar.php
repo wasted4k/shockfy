@@ -33,8 +33,7 @@ $__tz = $_SESSION['timezone'] ?? 'America/New_York';
 
 // ---- CONFIGURACIÓN BASE DEL PROYECTO ----
 // Si tu app vive en /shockfy, deja así. Si algún día la mueves a raíz, cambia a ''.
-if (!defined('APP_SLUG')) { define('APP_SLUG', '/shockfy'); 
-
+if (!defined('APP_SLUG')) {
   define('APP_SLUG', '/shockfy');
 }
 
