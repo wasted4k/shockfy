@@ -1,9 +1,13 @@
 <?php
 // admin_orders.php — Panel admin para revisar solicitudes de pago manual + Soporte.
+
+// 1) Sesión primero (para que auth_check.php vea $_SESSION)
+if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
+
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth_check.php';
 
-if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
+// Usuario y rol
 $user_id = $_SESSION['user_id'] ?? null;
 if (!$user_id) { header('Location: login.php'); exit; }
 
@@ -38,7 +42,7 @@ $offset = ($page - 1) * PAGE_SIZE;
 $validStatuses = ['pending','approved','rejected','all'];
 if (!in_array($status, $validStatuses, true)) { $status = 'pending'; }
 
-// POST acciones
+// POST acciones (aprobación/rechazo pagos)
 $flash = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $action = $_POST['action'] ?? '';
@@ -478,20 +482,55 @@ function chip($status){
 window.APP_SLUG = <?php echo json_encode(APP_SLUG); ?>;
 window.API_ADMIN_SUPPORT = window.location.origin + (window.APP_SLUG ? window.APP_SLUG.replace(/\/$/,'') : '') + '/api/support_admin.php';
 
-// Helper robusto para parsear JSON (evita "Unexpected end of JSON input")
-async function parseJsonResponse(res){
-  const raw = await res.text();
-  let data = null;
-  try { data = raw ? JSON.parse(raw) : null; }
-  catch {
-    console.error('Respuesta no JSON:', raw?.slice(0,400));
-    throw new Error('Respuesta no válida del servidor');
+// Helper robusto para parsear JSON: detecta HTML, BOM, warnings y extrae JSON si viene "contaminado".
+async function parseJsonResponse(res, reqUrl=''){
+  const ct = (res.headers.get('content-type') || '').toLowerCase();
+  let raw = await res.text();
+
+  const debug = {
+    url: reqUrl,
+    status: res.status,
+    contentType: ct,
+    preview: raw ? raw.slice(0, 400) : ''
+  };
+
+  const tryParse = (txt) => {
+    if (!txt) return null;
+    txt = txt.replace(/^\uFEFF/, '').trim();        // quita BOM/espacios
+    return JSON.parse(txt);
+  };
+
+  try {
+    // Camino feliz: JSON declarado
+    if (ct.includes('application/json')) {
+      const data = tryParse(raw);
+      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+      return data;
+    }
+
+    // Si no viene como JSON, intentamos extraer un bloque {...} por si hay warnings/HTML alrededor
+    const i = raw.indexOf('{');
+    const j = raw.lastIndexOf('}');
+    if (i !== -1 && j !== -1 && j > i) {
+      const sub = raw.slice(i, j + 1);
+      const data = tryParse(sub);
+      if (data && typeof data === 'object') {
+        if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+        console.warn('Se extrajo JSON desde una respuesta no-JSON. Revisa el backend.', debug);
+        return data;
+      }
+    }
+
+    // Detección clara de HTML/login/redirect
+    if (/<!doctype|<html|<body|<form[^>]*login|window\.location|http-equiv=['"]refresh/i.test(raw)) {
+      throw new Error('El API devolvió HTML (posible redirect o sesión expirada).');
+    }
+
+    throw new Error('Respuesta no JSON del servidor.');
+  } catch (e) {
+    console.error('Respuesta no JSON:', debug);
+    throw new Error(e.message || 'Respuesta no válida del servidor');
   }
-  if (!res.ok) {
-    const msg = data?.error || `HTTP ${res.status}`;
-    throw new Error(msg);
-  }
-  return data;
 }
 </script>
 
@@ -515,43 +554,47 @@ async function parseJsonResponse(res){
   const sendBtn     = $('#sapSend');
   const resolveBtn  = $('#sapResolve');
 
+  function escapeHTML(s){
+    return (s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  const commonGetOpts = {
+    credentials: 'include',
+    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'Cache-Control': 'no-cache' },
+    cache: 'no-store',
+    redirect: 'follow'
+  };
+  const commonPostOpts = {
+    credentials: 'include',
+    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'Cache-Control': 'no-cache' },
+    cache: 'no-store',
+    redirect: 'follow'
+  };
+
   const API = {
-    list: (status='open') =>
-      fetch(`${window.API_ADMIN_SUPPORT}?action=list&status=${encodeURIComponent(status)}`, {
-        credentials: 'include',
-        headers: { 'Accept': 'application/json' }
-      }).then(parseJsonResponse),
-
-    thread: (ticketId) =>
-      fetch(`${window.API_ADMIN_SUPPORT}?action=thread&ticket_id=${ticketId}`, {
-        credentials: 'include',
-        headers: { 'Accept': 'application/json' }
-      }).then(parseJsonResponse),
-
+    list: (status='open') => {
+      const url = `${window.API_ADMIN_SUPPORT}?action=list&status=${encodeURIComponent(status)}`;
+      return fetch(url, commonGetOpts).then(r => parseJsonResponse(r, url));
+    },
+    thread: (ticketId) => {
+      const url = `${window.API_ADMIN_SUPPORT}?action=thread&ticket_id=${ticketId}`;
+      return fetch(url, commonGetOpts).then(r => parseJsonResponse(r, url));
+    },
     reply: (ticketId, text, file) => {
       const fd = new FormData();
       fd.append('action','reply');
       fd.append('ticket_id', String(ticketId));
       fd.append('message', text);
       if (file) fd.append('file', file);
-      return fetch(window.API_ADMIN_SUPPORT, {
-        method:'POST',
-        body: fd,
-        credentials: 'include',
-        headers: { 'Accept': 'application/json' }
-      }).then(parseJsonResponse);
+      const opts = { method:'POST', body: fd, ...commonPostOpts };
+      return fetch(window.API_ADMIN_SUPPORT, opts).then(r => parseJsonResponse(r, window.API_ADMIN_SUPPORT + ' [reply]'));
     },
-
     resolve: (ticketId) => {
       const fd = new FormData();
       fd.append('action','resolve');
       fd.append('ticket_id', String(ticketId));
-      return fetch(window.API_ADMIN_SUPPORT, {
-        method:'POST',
-        body: fd,
-        credentials: 'include',
-        headers: { 'Accept': 'application/json' }
-      }).then(parseJsonResponse);
+      const opts = { method:'POST', body: fd, ...commonPostOpts };
+      return fetch(window.API_ADMIN_SUPPORT, opts).then(r => parseJsonResponse(r, window.API_ADMIN_SUPPORT + ' [resolve]'));
     }
   };
 
@@ -612,9 +655,9 @@ async function parseJsonResponse(res){
       li.className = (state.selected === t.id ? 'active' : '');
       li.innerHTML = `
         <div class="ticket-main">
-          <div class="ticket-title">${(t.public_id || ('#'+t.id))} · ${t.full_name ?? ('Usuario #'+t.user_id)}</div>
+          <div class="ticket-title">${escapeHTML(t.public_id || ('#'+t.id))} · ${escapeHTML(t.full_name ?? ('Usuario #'+t.user_id))}</div>
           <div class="ticket-meta">
-            <span>${t.status}</span>
+            <span>${escapeHTML(t.status)}</span>
             <span>Último: ${fmtDate(t.last_message_at)}</span>
           </div>
         </div>
@@ -630,10 +673,10 @@ async function parseJsonResponse(res){
   async function loadTickets(keepSelection=false){
     try{
       const data = await API.list(state.status);
-      if (!data.ok){ throw new Error(data.error || 'Error list'); }
+      if (!data || data.ok !== true) { throw new Error(data?.error || 'Error list'); }
 
       const prevSel = keepSelection ? state.selected : null;
-      state.tickets = data.tickets || [];
+      state.tickets = Array.isArray(data.tickets) ? data.tickets : [];
       renderTickets();
       if (prevSel){
         const exists = state.tickets.some(t => t.id === prevSel);
@@ -644,8 +687,9 @@ async function parseJsonResponse(res){
         }
       }
     }catch(e){
-      console.error(e);
-      listEl.innerHTML = '<li>Error al cargar tickets</li>';
+      console.error('Error en loadTickets:', e?.message || e);
+      listEl.innerHTML = '<li>⚠️ Error al cargar tickets (abre la consola para detalles)</li>';
+      emptyEl.style.display = 'none';
     }
   }
 
@@ -666,14 +710,14 @@ async function parseJsonResponse(res){
 
     msgsEl.innerHTML = '';
     state.paintedIds.clear();
-    msgs.forEach(m=> appendOne(m));
+    (msgs || []).forEach(m=> appendOne(m));
 
     const resolved = (ticket.status === 'resolved');
     replyText.disabled = resolved; replyFile.disabled = resolved; sendBtn.disabled = resolved;
     resolveBtn.disabled = resolved;
 
     // set lastTs al máximo created_at mostrado (lexicográfico)
-    for (const m of msgs){
+    for (const m of (msgs || [])){
       if (!m.created_at) continue;
       if (!state.lastTs || m.created_at > state.lastTs) {
         state.lastTs = m.created_at;
@@ -688,8 +732,8 @@ async function parseJsonResponse(res){
     const div = document.createElement('div');
     div.className = 'msg ' + (m.sender === 'admin' ? 'admin' : '');
     const who = (m.sender === 'admin') ? 'Admin' : 'Usuario';
-    const safe = (m.message || '').replace(/[&<>]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[s]));
-    const att = m.file_path ? `<div class="att">Adjunto: <a href="${m.file_path}" target="_blank" rel="noopener">Ver archivo</a></div>` : '';
+    const safe = escapeHTML(m.message || '');
+    const att = m.file_path ? `<div class="att">Adjunto: <a href="${m.file_path}" target="_blank" rel="noopener noreferrer">Ver archivo</a></div>` : '';
     div.innerHTML = `
       <div class="who">${who} · <small>${fmtDate(m.created_at)}</small></div>
       <div class="text">${safe}</div>
@@ -713,7 +757,7 @@ async function parseJsonResponse(res){
     $$('#sapTickets li').forEach(li => li.classList.toggle('active', Number(li.dataset.id) === id));
     try{
       const data = await API.thread(id);
-      if (!data.ok){ throw new Error(data.error || 'Error thread'); }
+      if (!data || data.ok !== true){ throw new Error(data?.error || 'Error thread'); }
       renderThread(data.ticket, data.messages || []);
 
       // marcar como leído en UI
@@ -724,20 +768,20 @@ async function parseJsonResponse(res){
       // arrancar polling del hilo
       startThreadPolling();
     }catch(e){
-      console.error(e);
-      msgsEl.innerHTML = '<div class="sap-placeholder">No se pudo cargar el hilo.</div>';
+      console.error('Error en selectTicket:', e?.message || e);
+      msgsEl.innerHTML = '<div class="sap-placeholder">No se pudo cargar el hilo (ver consola).</div>';
     }
   }
 
   async function fetchAndAppendNew(){
     if (!state.selected) return;
     const data = await API.thread(state.selected);
-    if (!data.ok) return;
+    if (!data || data.ok !== true) return;
 
     const msgs = Array.isArray(data.messages) ? data.messages : [];
     const last = state.lastTs || null;
 
-    // SOLO esta versión (lexicográfica). No redeclarar "const news" más adelante.
+    // SOLO versión lexicográfica
     const news = msgs
       .filter(m => m.created_at && (!last || m.created_at > last))
       .sort((a,b)=> a.created_at.localeCompare(b.created_at));
@@ -775,15 +819,15 @@ async function parseJsonResponse(res){
     sendBtn.disabled = true;
     try{
       const res = await API.reply(id, text, file || null);
-      if (!res.ok){ throw new Error(res.error || 'Error reply'); }
+      if (!res || res.ok !== true){ throw new Error(res?.error || 'Error reply'); }
       replyText.value = '';
       if (replyFile) replyFile.value = '';
 
       // tras enviar, trae SOLO lo nuevo (incluida tu respuesta con timestamp del servidor)
       await fetchAndAppendNew();
     }catch(e){
-      console.error(e);
-      alert('No se pudo enviar la respuesta.');
+      console.error('Error al enviar respuesta:', e?.message || e);
+      alert('No se pudo enviar la respuesta (ver consola).');
     }finally{
       sendBtn.disabled = false;
     }
@@ -797,7 +841,7 @@ async function parseJsonResponse(res){
     resolveBtn.disabled = true;
     try{
       const res = await API.resolve(id);
-      if (!res.ok){ throw new Error(res.error || 'Error resolve'); }
+      if (!res || res.ok !== true){ throw new Error(res?.error || 'Error resolve'); }
 
       // refresca hilo (quedará read-only) y lista
       await fetchAndAppendNew();
@@ -808,8 +852,8 @@ async function parseJsonResponse(res){
         clearThread();
       }
     }catch(e){
-      console.error(e);
-      alert('No se pudo finalizar el caso.');
+      console.error('Error al finalizar caso:', e?.message || e);
+      alert('No se pudo finalizar el caso (ver consola).');
     }finally{
       resolveBtn.disabled = false;
     }
