@@ -429,7 +429,7 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
 
 <!-- Chat -->
 <script>
-(function(){
+document.addEventListener('DOMContentLoaded', function(){
   const $ = (s, r=document)=>r.querySelector(s);
 
   const body      = document.body;
@@ -445,15 +445,16 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
   const KEY = 'supportChatOpen';
   const API_SUPPORT_URL = window.API_SUPPORT_URL;
 
-  // --- Estado del hilo (para render incremental) ---
+  // --- Estado ---
   const state = {
-    lastTs: null,     // ISO string del último mensaje mostrado (created_at)
+    lastTs: null,
     pollTimer: null,
     POLL_MS: 5000,
-    isOpen: false
+    isOpen: false,
+    ticketId: null
   };
 
-  // ---------- Limpia listeners previos que otros scripts hayan puesto ----------
+  // ---------- helpers ----------
   function replaceNodeWithClone(el){
     if (!el) return el;
     const clone = el.cloneNode(true);
@@ -463,58 +464,11 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
   const sendBtn   = replaceNodeWithClone(document.getElementById('supportSend'));
   const input     = replaceNodeWithClone(inputOrig);
 
-  // ---------- UI abrir/cerrar ----------
-  function startPolling(){
-    stopPolling();
-    if (!state.isOpen) return;
-    if (document.hidden) return;
-    state.pollTimer = setInterval(async ()=>{
-      try { await fetchAndAppendNew(); } catch (e) { /*silencio*/ }
-    }, state.POLL_MS);
-  }
-  function stopPolling(){
-    if (state.pollTimer){ clearInterval(state.pollTimer); state.pollTimer = null; }
+  // ✅ FIX: esc ahora está bien cerrada (antes faltaba paréntesis/cierre)
+  function esc(str){
+    return (str||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
   }
 
-  function openChat(){
-    chat.classList.add('open');
-    overlay.classList.add('show');
-    body.style.overflow = 'hidden';
-    state.isOpen = true;
-    try{ localStorage.setItem(KEY,'1'); }catch(e){}
-    // Cargar completo y empezar polling
-    loadThread(true).then(()=> input?.focus());
-  }
-  function closeChat(){
-    chat.classList.remove('open');
-    overlay.classList.remove('show');
-    body.style.overflow = '';
-    state.isOpen = false;
-    try{ localStorage.setItem(KEY,'0'); }catch(e){}
-    stopPolling();
-  }
-  function toggleChat(){ (chat.classList.contains('open')) ? closeChat() : openChat(); }
-
-  try{ if (localStorage.getItem(KEY)==='1') { openChat(); } }catch(e){}
-
-  fab?.addEventListener('click', toggleChat);
-  btnClose?.addEventListener('click', closeChat);
-  overlay?.addEventListener('click', closeChat);
-  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ closeChat(); }});
-  btnMin?.addEventListener('click', ()=>{
-    chat.classList.remove('open'); overlay.classList.remove('show'); body.style.overflow = '';
-    state.isOpen = false; stopPolling();
-    try{ localStorage.setItem(KEY,'0'); }catch(e){}
-  });
-
-  // Pausar/reanudar al (des)enfocar pestaña
-  document.addEventListener('visibilitychange', ()=>{
-    if (document.hidden) stopPolling();
-    else if (state.isOpen) startPolling();
-  });
-
-  // ---------- helpers ----------
-  function esc(str){ return (str||'').replace(/[&<>]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[s])); }
   function addMsg({who, text, att, ts}){
     const wrap = document.createElement('div');
     wrap.className = 'support-msg' + (who==='me' ? ' me' : '');
@@ -526,16 +480,23 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
     bodyMsgs.appendChild(wrap);
     bodyMsgs.scrollTop = bodyMsgs.scrollHeight + 120;
   }
+
   function clearMsgs(){
+    if (!bodyMsgs) return;
     bodyMsgs.innerHTML = `
       <div class="support-msg">
         <div><strong>Agente</strong></div>
         <div>¡Hola! ¿En qué podemos ayudar?</div>
       </div>`;
+    // contenedor para el widget de rating (si aplica)
+    const ratingWrap = document.createElement('div');
+    ratingWrap.id = 'supportRatingWrap';
+    ratingWrap.style.margin = '12px 0';
+    bodyMsgs.appendChild(ratingWrap);
   }
-  const toDate = (iso) => (iso ? new Date(iso.replace(' ','T') + 'Z') : null); // asume fechas DB en UTC
 
-  // ---------- fetch helpers ----------
+  const toDate = (iso) => (iso ? new Date(iso.replace(' ','T') + 'Z') : null);
+
   async function parseJsonResponse(res){
     const raw = await res.text();
     let data = null;
@@ -551,7 +512,103 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
     return data;
   }
 
-  // ---------- cargar hilo completo (reset=true) o solo actualizar ----------
+  // ---------- Rating widget ----------
+  function renderRatingWidgetIfNeeded(messages){
+    const wrap = document.getElementById('supportRatingWrap');
+    if (!wrap || !state.ticketId) return;
+
+    const key = 'ticketRated_' + state.ticketId;
+    if (localStorage.getItem(key) === '1') { wrap.innerHTML=''; return; }
+
+    const hasReq = Array.isArray(messages) && messages.some(m => (m.message||'').includes('[RATING_REQUEST]'));
+    if (!hasReq) { wrap.innerHTML=''; return; }
+
+    wrap.innerHTML = `
+      <div style="padding:10px; border:1px solid #1f2937; border-radius:10px; background:#0b1220">
+        <div style="margin-bottom:6px">¿Cómo calificarías la atención?</div>
+        <div id="supportStars" style="display:flex; gap:8px; font-size:20px; cursor:pointer;">
+          <span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span><span data-v="4">★</span><span data-v="5">★</span>
+        </div>
+        <div id="supportStarsMsg" style="margin-top:6px; opacity:.8;"></div>
+      </div>
+    `;
+    const stars = $('#supportStars');
+    const starsMsg = $('#supportStarsMsg');
+    if (stars){
+      stars.addEventListener('click', async (e)=>{
+        const el = e.target.closest('span[data-v]'); if (!el) return;
+        const v = parseInt(el.getAttribute('data-v')||'0',10); if (!(v>=1 && v<=5)) return;
+        try{
+          const form = new FormData();
+          form.append('ticket_id', String(state.ticketId));
+          form.append('rating', String(v));
+          const res = await fetch('/api/support_rating.php', { method:'POST', body: form, credentials:'same-origin' });
+          const data = await res.json();
+          if (!data || !data.ok) {
+            starsMsg.textContent = (data && data.error) ? data.error : 'No se pudo registrar tu calificación';
+          } else {
+            starsMsg.textContent = '¡Gracias por tu calificación!';
+            try{ localStorage.setItem(key, '1'); }catch(e){}
+            setTimeout(()=>{ wrap.innerHTML=''; }, 1200);
+            try { await fetchAndAppendNew(); } catch(e){}
+          }
+        }catch(err){ starsMsg.textContent = 'Error de red'; }
+      });
+    }
+  }
+
+  // ---------- Polling control ----------
+  function startPolling(){
+    stopPolling();
+    if (!state.isOpen) return;
+    if (document.hidden) return;
+    state.pollTimer = setInterval(async ()=>{ try { await fetchAndAppendNew(); } catch (e) {} }, state.POLL_MS);
+  }
+  function stopPolling(){
+    if (state.pollTimer){ clearInterval(state.pollTimer); state.pollTimer = null; }
+  }
+
+  // ---------- Abrir/cerrar chat ----------
+  function openChat(){
+    if (!chat || !overlay) return;
+    chat.classList.add('open');
+    overlay.classList.add('show');
+    body.style.overflow = 'hidden';
+    state.isOpen = true;
+    try{ localStorage.setItem(KEY,'1'); }catch(e){}
+    loadThread(true).then(()=> input?.focus());
+  }
+  function closeChat(){
+    if (!chat || !overlay) return;
+    chat.classList.remove('open');
+    overlay.classList.remove('show');
+    body.style.overflow = '';
+    state.isOpen = false;
+    try{ localStorage.setItem(KEY,'0'); }catch(e){}
+    stopPolling();
+  }
+  function toggleChat(){ (chat && chat.classList.contains('open')) ? closeChat() : openChat(); }
+
+  // restaurar estado
+  try{ if (localStorage.getItem(KEY)==='1') { openChat(); } }catch(e){}
+
+  fab?.addEventListener('click', toggleChat);
+  btnClose?.addEventListener('click', closeChat);
+  overlay?.addEventListener('click', closeChat);
+  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ closeChat(); }});
+  btnMin?.addEventListener('click', ()=>{
+    if (!chat || !overlay) return;
+    chat.classList.remove('open');
+    overlay.classList.remove('show');
+    body.style.overflow = '';
+    state.isOpen = false;
+    stopPolling();
+    try{ localStorage.setItem(KEY,'0'); }catch(e){}
+  });
+
+  document.addEventListener('visibilitychange', ()=>{ if (document.hidden) stopPolling(); else if (state.isOpen) startPolling(); });
+
+  // ---------- Cargar hilo ----------
   async function loadThread(reset=false){
     const res = await fetch(API_SUPPORT_URL + '?action=thread', { method:'GET', headers:{'Accept':'application/json'} });
     const data = await parseJsonResponse(res);
@@ -561,37 +618,35 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
       state.lastTs = null;
     }
 
+    if (data && typeof data.ticket !== 'undefined') {
+      state.ticketId = data.ticket;
+    }
+
     if (data && Array.isArray(data.messages)){
-      // pintar todo (solo una vez al abrir/reset)
       if (reset){
         for (const m of data.messages){
-          addMsg({
-            who: m.sender === 'user' ? 'me' : 'agent',
-            text: m.message || '',
-            att: m.file_path || '',
-            ts: m.created_at || ''
-          });
+          addMsg({ who: m.sender === 'user' ? 'me' : 'agent', text: m.message || '', att: m.file_path || '', ts: m.created_at || '' });
         }
       }
-      // actualizar lastTs con el máximo created_at recibido
       for (const m of data.messages){
         if (!m.created_at) continue;
         if (!state.lastTs || toDate(m.created_at) > toDate(state.lastTs)){
           state.lastTs = m.created_at;
         }
       }
+      renderRatingWidgetIfNeeded(data.messages);
     }
 
-    // Iniciar polling tras la primera carga completa
     if (reset) startPolling();
   }
 
-  // ---------- obtener y anexar SOLO los nuevos desde lastTs ----------
+  // ---------- Obtener y anexar nuevos ----------
   async function fetchAndAppendNew(){
-    // Pedimos todo y filtramos en cliente (sin tocar backend por ahora)
     const res = await fetch(API_SUPPORT_URL + '?action=thread', { method:'GET', headers:{'Accept':'application/json'} });
     const data = await parseJsonResponse(res);
     if (!data || !Array.isArray(data.messages)) return;
+
+    if (typeof data.ticket !== 'undefined') state.ticketId = data.ticket;
 
     const news = [];
     for (const m of data.messages){
@@ -601,34 +656,26 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
     }
     if (!news.length) return;
 
-    // Ordena por fecha asc por si acaso y agrega
     news.sort((a,b)=> (toDate(a.created_at) - toDate(b.created_at)));
-
     for (const m of news){
-      addMsg({
-        who: m.sender === 'user' ? 'me' : 'agent',
-        text: m.message || '',
-        att: m.file_path || '',
-        ts: m.created_at || ''
-      });
+      addMsg({ who: m.sender === 'user' ? 'me' : 'agent', text: m.message || '', att: m.file_path || '', ts: m.created_at || '' });
       if (!state.lastTs || toDate(m.created_at) > toDate(state.lastTs)){
         state.lastTs = m.created_at;
       }
     }
+    renderRatingWidgetIfNeeded(data.messages);
   }
 
-  // ---------- enviar ----------
+  // ---------- Enviar mensaje (usuario) ----------
   async function sendMessage(){
-    const text = (input.value || '').trim();
-    const f = file.files && file.files[0];
-
+    const text = (input?.value || '').trim();
+    const f = file?.files && file.files[0];
     if (!text && !f){
       window.showToast ? showToast('Escribe un mensaje o adjunta un archivo', 'warn') : alert('Escribe un mensaje o adjunta un archivo');
       return;
     }
 
-    
-    input.value = '';
+    if (input) input.value = '';
 
     const form = new FormData();
     form.append('message', text);
@@ -639,10 +686,8 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
       const timeoutId = setTimeout(()=>controller.abort(), 15000);
       const res  = await fetch(API_SUPPORT_URL, { method:'POST', body: form, signal: controller.signal });
       clearTimeout(timeoutId);
+      await parseJsonResponse(res);
 
-      const data = await parseJsonResponse(res);
-
-      // Tras enviar, pedimos y anexamos solo lo nuevo (por si admin respondió)
       await fetchAndAppendNew();
       window.showToast && showToast('Mensaje enviado', 'ok');
       if (file) file.value = '';
@@ -652,14 +697,15 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
     }
   }
 
-  // ---------- listeners exclusivos ----------
-  sendBtn?.addEventListener('click', sendMessage);
+  // Listeners de envío y atajo
+  sendBtn?.addEventListener('click', (e)=>{ e.preventDefault(); sendMessage(); });
   input?.addEventListener('keydown', (e)=>{
     if ((e.key === 'Enter' && (e.metaKey || e.ctrlKey))){ e.preventDefault(); sendMessage(); }
   });
 
-})();
+});
 </script>
+
 
 
 <script>
