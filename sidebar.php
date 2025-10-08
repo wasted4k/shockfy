@@ -445,7 +445,6 @@ document.addEventListener('DOMContentLoaded', function(){
   const KEY = 'supportChatOpen';
   const API_SUPPORT_URL = window.API_SUPPORT_URL;
 
-  // --- Estado ---
   const state = {
     lastTs: null,
     pollTimer: null,
@@ -454,17 +453,15 @@ document.addEventListener('DOMContentLoaded', function(){
     ticketId: null
   };
 
-  // ---------- helpers ----------
   function replaceNodeWithClone(el){
     if (!el) return el;
     const clone = el.cloneNode(true);
     el.replaceWith(clone);
     return clone;
   }
-  const sendBtn   = replaceNodeWithClone(document.getElementById('supportSend'));
-  const input     = replaceNodeWithClone(inputOrig);
+  const sendBtn = replaceNodeWithClone(document.getElementById('supportSend'));
+  const input   = replaceNodeWithClone(inputOrig);
 
-  // ✅ FIX: esc ahora está bien cerrada (antes faltaba paréntesis/cierre)
   function esc(str){
     return (str||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
   }
@@ -488,11 +485,6 @@ document.addEventListener('DOMContentLoaded', function(){
         <div><strong>Agente</strong></div>
         <div>¡Hola! ¿En qué podemos ayudar?</div>
       </div>`;
-    // contenedor para el widget de rating (si aplica)
-    const ratingWrap = document.createElement('div');
-    ratingWrap.id = 'supportRatingWrap';
-    ratingWrap.style.margin = '12px 0';
-    bodyMsgs.appendChild(ratingWrap);
   }
 
   const toDate = (iso) => (iso ? new Date(iso.replace(' ','T') + 'Z') : null);
@@ -512,52 +504,6 @@ document.addEventListener('DOMContentLoaded', function(){
     return data;
   }
 
-  // ---------- Rating widget ----------
-  function renderRatingWidgetIfNeeded(messages){
-    const wrap = document.getElementById('supportRatingWrap');
-    if (!wrap || !state.ticketId) return;
-
-    const key = 'ticketRated_' + state.ticketId;
-    if (localStorage.getItem(key) === '1') { wrap.innerHTML=''; return; }
-
-    const hasReq = Array.isArray(messages) && messages.some(m => (m.message||'').includes('[RATING_REQUEST]'));
-    if (!hasReq) { wrap.innerHTML=''; return; }
-
-    wrap.innerHTML = `
-      <div style="padding:10px; border:1px solid #1f2937; border-radius:10px; background:#0b1220">
-        <div style="margin-bottom:6px">¿Cómo calificarías la atención?</div>
-        <div id="supportStars" style="display:flex; gap:8px; font-size:20px; cursor:pointer;">
-          <span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span><span data-v="4">★</span><span data-v="5">★</span>
-        </div>
-        <div id="supportStarsMsg" style="margin-top:6px; opacity:.8;"></div>
-      </div>
-    `;
-    const stars = $('#supportStars');
-    const starsMsg = $('#supportStarsMsg');
-    if (stars){
-      stars.addEventListener('click', async (e)=>{
-        const el = e.target.closest('span[data-v]'); if (!el) return;
-        const v = parseInt(el.getAttribute('data-v')||'0',10); if (!(v>=1 && v<=5)) return;
-        try{
-          const form = new FormData();
-          form.append('ticket_id', String(state.ticketId));
-          form.append('rating', String(v));
-          const res = await fetch('/api/support_rating.php', { method:'POST', body: form, credentials:'same-origin' });
-          const data = await res.json();
-          if (!data || !data.ok) {
-            starsMsg.textContent = (data && data.error) ? data.error : 'No se pudo registrar tu calificación';
-          } else {
-            starsMsg.textContent = '¡Gracias por tu calificación!';
-            try{ localStorage.setItem(key, '1'); }catch(e){}
-            setTimeout(()=>{ wrap.innerHTML=''; }, 1200);
-            try { await fetchAndAppendNew(); } catch(e){}
-          }
-        }catch(err){ starsMsg.textContent = 'Error de red'; }
-      });
-    }
-  }
-
-  // ---------- Polling control ----------
   function startPolling(){
     stopPolling();
     if (!state.isOpen) return;
@@ -568,7 +514,6 @@ document.addEventListener('DOMContentLoaded', function(){
     if (state.pollTimer){ clearInterval(state.pollTimer); state.pollTimer = null; }
   }
 
-  // ---------- Abrir/cerrar chat ----------
   function openChat(){
     if (!chat || !overlay) return;
     chat.classList.add('open');
@@ -589,7 +534,6 @@ document.addEventListener('DOMContentLoaded', function(){
   }
   function toggleChat(){ (chat && chat.classList.contains('open')) ? closeChat() : openChat(); }
 
-  // restaurar estado
   try{ if (localStorage.getItem(KEY)==='1') { openChat(); } }catch(e){}
 
   fab?.addEventListener('click', toggleChat);
@@ -608,7 +552,6 @@ document.addEventListener('DOMContentLoaded', function(){
 
   document.addEventListener('visibilitychange', ()=>{ if (document.hidden) stopPolling(); else if (state.isOpen) startPolling(); });
 
-  // ---------- Cargar hilo ----------
   async function loadThread(reset=false){
     const res = await fetch(API_SUPPORT_URL + '?action=thread', { method:'GET', headers:{'Accept':'application/json'} });
     const data = await parseJsonResponse(res);
@@ -625,7 +568,12 @@ document.addEventListener('DOMContentLoaded', function(){
     if (data && Array.isArray(data.messages)){
       if (reset){
         for (const m of data.messages){
-          addMsg({ who: m.sender === 'user' ? 'me' : 'agent', text: m.message || '', att: m.file_path || '', ts: m.created_at || '' });
+          addMsg({
+            who: m.sender === 'user' ? 'me' : 'agent',
+            text: m.message || '',
+            att: m.file_path || '',
+            ts: m.created_at || ''
+          });
         }
       }
       for (const m of data.messages){
@@ -634,13 +582,11 @@ document.addEventListener('DOMContentLoaded', function(){
           state.lastTs = m.created_at;
         }
       }
-      renderRatingWidgetIfNeeded(data.messages);
     }
 
     if (reset) startPolling();
   }
 
-  // ---------- Obtener y anexar nuevos ----------
   async function fetchAndAppendNew(){
     const res = await fetch(API_SUPPORT_URL + '?action=thread', { method:'GET', headers:{'Accept':'application/json'} });
     const data = await parseJsonResponse(res);
@@ -658,15 +604,18 @@ document.addEventListener('DOMContentLoaded', function(){
 
     news.sort((a,b)=> (toDate(a.created_at) - toDate(b.created_at)));
     for (const m of news){
-      addMsg({ who: m.sender === 'user' ? 'me' : 'agent', text: m.message || '', att: m.file_path || '', ts: m.created_at || '' });
+      addMsg({
+        who: m.sender === 'user' ? 'me' : 'agent',
+        text: m.message || '',
+        att: m.file_path || '',
+        ts: m.created_at || ''
+      });
       if (!state.lastTs || toDate(m.created_at) > toDate(state.lastTs)){
         state.lastTs = m.created_at;
       }
     }
-    renderRatingWidgetIfNeeded(data.messages);
   }
 
-  // ---------- Enviar mensaje (usuario) ----------
   async function sendMessage(){
     const text = (input?.value || '').trim();
     const f = file?.files && file.files[0];
@@ -697,14 +646,11 @@ document.addEventListener('DOMContentLoaded', function(){
     }
   }
 
-  // Listeners de envío y atajo
   sendBtn?.addEventListener('click', (e)=>{ e.preventDefault(); sendMessage(); });
-  input?.addEventListener('keydown', (e)=>{
-    if ((e.key === 'Enter' && (e.metaKey || e.ctrlKey))){ e.preventDefault(); sendMessage(); }
-  });
-
+  input?.addEventListener('keydown', (e)=>{ if ((e.key === 'Enter' && (e.metaKey || e.ctrlKey))){ e.preventDefault(); sendMessage(); } });
 });
 </script>
+
 
 
 
