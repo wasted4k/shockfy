@@ -59,9 +59,13 @@ function is_admin(): bool {
   return false;
 }
 
-/* ===== Auth ===== */
-if (!isset($_SESSION['user_id'])) fail(401, 'No autenticado');
-if (!is_admin()) fail(403, 'Acceso restringido');
+// ----------- Guard de seguridad -----------
+if (!is_admin()) {
+  http_response_code(403);
+  echo '<h1>Acceso restringido</h1><p>Solo administradores.</p>';
+  exit;
+}
+
 
 /* ===== Router (solo POST) ===== */
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
