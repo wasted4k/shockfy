@@ -1,5 +1,5 @@
 <?php
-// admin_chat.php — Vista simple SOLO LECTURA para administradores (con full_name + auto-refresh)
+// admin_chat.php — Vista simple SOLO LECTURA para administradores (full_name + auto-refresh + unread badges)
 declare(strict_types=1);
 
 header('Content-Type: text/html; charset=utf-8');
@@ -12,7 +12,6 @@ if (session_status() !== PHP_SESSION_ACTIVE) session_start();
 require_once __DIR__ . '/db.php';   // Debe definir $pdo (PDO conectado)
 
 function is_admin(): bool {
-  // Mantén esta lógica flexible como la venías usando
   if (!empty($_SESSION['is_admin'])) return true;
   if (($_SESSION['role'] ?? null) === 'admin') return true;
   return false;
@@ -84,6 +83,12 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'messages') {
     exit;
   }
   $ticketUserNameAjax = $usersHasFullName ? (string)($tk['user_full_name'] ?? '') : '';
+
+  // Si nos piden marcar como leído y existe unread_admin, lo limpiamos
+  if ($hasUnreadAdm && (isset($_GET['markread']) && $_GET['markread'] === '1')) {
+    $upd = $pdo->prepare("UPDATE support_tickets SET unread_admin=0, updated_at=NOW() WHERE id=?");
+    try { $upd->execute([$ticketAjax]); } catch (\Throwable $e) { /* ignore */ }
+  }
 
   // Campos de mensajes
   $msgFields = "m.sender, m.message, m.file_path, m.created_at";
@@ -199,6 +204,12 @@ if ($ticketId > 0) {
     $ticketUserName = (string)($ticketSel['user_full_name'] ?? '');
   }
 
+  // Al abrir el ticket, si existe unread_admin, marcar como leído
+  if ($ticketSel && $hasUnreadAdm && !empty($ticketSel['unread_admin'])) {
+    $upd = $pdo->prepare("UPDATE support_tickets SET unread_admin=0, updated_at=NOW() WHERE id=?");
+    try { $upd->execute([$ticketId]); $ticketSel['unread_admin'] = 0; } catch (\Throwable $e) { /* ignore */ }
+  }
+
   if ($ticketSel) {
     $msgFields = "m.sender, m.message, m.file_path, m.created_at";
     if ($msgHasFullName) $msgFields .= ", m.full_name AS msg_full_name";
@@ -233,16 +244,30 @@ if ($ticketId > 0) {
     .col-left{ width:420px; max-width:100%; border-right:1px solid #1f2937; background:var(--panel); }
     .col-right{ flex:1; min-width:0; }
     .tools{ padding:12px; border-bottom:1px solid #1f2937; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    input[type="text"], select{ background:#0b1220; border:1px solid #1f2937; color:var(--text); padding:8px 10px; border-radius:8px; }
+    input[type="text"], select{ background:#0b1220; border:1px solid #1f2937; color:#e5e7eb; padding:8px 10px; border-radius:8px; }
     button{ border:0; padding:8px 12px; border-radius:8px; cursor:pointer; background:var(--accent); color:#0b1220; font-weight:600; }
     a{ color:var(--link); text-decoration:none; } a:hover{ text-decoration:underline; }
     .list{ max-height:calc(100vh - 58px - 56px); overflow:auto; padding:6px; }
-    .ticket{ padding:10px; border-radius:10px; margin:6px; background:#0b1220; border:1px solid #1f2937; display:block; color:var(--text); }
+    .ticket{ padding:10px; border-radius:10px; margin:6px; background:#0b1220; border:1px solid #1f2937; display:block; color:var(--text); position:relative; }
     .ticket.active{ outline:2px solid var(--accent); }
     .muted{ color:var(--muted); font-size:12px; }
     .row{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
     .chip{ display:inline-block; padding:2px 8px; border-radius:999px; background:var(--chip); font-size:12px; }
     .chip.red{ background:#3b0f15; color:#fca5a5; } .chip.green{ background:#0b2b1a; color:#86efac; } .chip.yellow{ background:#2b230b; color:#fde68a; }
+
+    /* Dot de no leído (parpadeo) */
+    .dot{
+      width:10px; height:10px; border-radius:999px; background:#f43f5e; /* rosa/rojo */
+      box-shadow:0 0 0 0 rgba(244,63,94,0.7);
+      animation: pulse 1.5s infinite;
+      display:inline-block; vertical-align:middle; margin-left:8px;
+    }
+    @keyframes pulse{
+      0%{ box-shadow:0 0 0 0 rgba(244,63,94,0.7); transform:scale(1); }
+      70%{ box-shadow:0 0 0 10px rgba(244,63,94,0); transform:scale(1.08); }
+      100%{ box-shadow:0 0 0 0 rgba(244,63,94,0); transform:scale(1); }
+    }
+
     .messages{ padding:14px; max-height:calc(100vh - 58px - 56px); overflow:auto; }
     .msg{ margin-bottom:12px; background:#0b1220; border:1px solid #1f2937; padding:10px; border-radius:12px; }
     .msg .head{ font-weight:700; margin-bottom:6px; }
@@ -288,13 +313,15 @@ if ($ticketId > 0) {
         ?>
           <a class="ticket <?= $isActive?'active':'' ?>" href="?ticket=<?= $tid ?>&status=<?= h($status) ?>&q=<?= urlencode($q) ?>&limit=<?= (int)$limit ?>">
             <div class="row">
-              <div><strong><?= h($title) ?></strong></div>
+              <div>
+                <strong><?= h($title) ?></strong>
+                <?php if ($hasUnreadAdm && $unadm): ?>
+                  <span class="dot" title="Mensajes sin leer"></span>
+                <?php endif; ?>
+              </div>
               <div class="chip <?= $chipClass ?>"><?= h($t['status']) ?></div>
             </div>
             <div class="muted">user_id: <?= (int)$t['user_id'] ?><?= $name!=='' ? " · ".h($name) : "" ?></div>
-            <?php if ($hasUnreadAdm): ?>
-              <div class="muted">unread_admin: <?= $unadm ? 'sí' : 'no' ?></div>
-            <?php endif; ?>
             <div class="muted">últ. msg: <?= h((string)$t['last_message_at']) ?></div>
           </a>
         <?php endforeach; ?>
@@ -405,6 +432,8 @@ if ($ticketId > 0) {
       const u = new URL(window.location.href);
       u.searchParams.set('ajax','messages');
       u.searchParams.set('ticket', String(ticketId));
+      // Marcamos como leído cuando el hilo está abierto en pantalla
+      u.searchParams.set('markread','1');
       const res = await fetch(u.toString(), { headers: { 'Accept':'application/json' }});
       const data = await res.json();
       if (!data || !data.ok || !Array.isArray(data.messages)) return;
