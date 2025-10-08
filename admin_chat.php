@@ -461,7 +461,7 @@ if ($ticketId > 0) {
   fetchList().then(startList);
   document.addEventListener('visibilitychange', ()=>{ if (document.hidden) stopList(); else startList(); });
 
-  // -------- Cerrar (resolved) + ENVIAR SIEMPRE RATING_REQUEST --------
+  // -------- Cerrar (resolved) + ENVIAR NOTIFICACIÓN AL USUARIO --------
   const btnClose = document.getElementById('btnCloseTicket');
   if (btnClose && box){
     const ticketId = parseInt(box.getAttribute('data-ticket')||'0',10);
@@ -478,15 +478,15 @@ if ($ticketId > 0) {
         const data = await res.json();
         if (!data || !data.ok){ alert(data && data.error ? data.error : 'No se pudo cerrar el ticket'); return; }
 
-        // 2) Enviar SIEMPRE el RATING_REQUEST como mensaje del admin
-        const form2 = new FormData();
-        form2.append('ticket_id', String(ticketId));
-        form2.append('message', '[RATING_REQUEST] Tu ticket fue marcado como resuelto. Por favor califica el servicio con 1 a 5 estrellas ⭐.');
+        // 2) Enviar SIEMPRE la notificación simple al usuario
+        const notify = new FormData();
+        notify.append('ticket_id', String(ticketId));
+        notify.append('message', 'Tu ticket fue marcado como RESUELTO. ¡Gracias por contactarnos!');
         try {
-          const postReq = await fetch('api/admin_support.php?debug=1', { method:'POST', body: form2, credentials:'same-origin' });
+          const postReq = await fetch('api/admin_support.php?debug=1', { method:'POST', body: notify, credentials:'same-origin' });
           const postData = await postReq.json();
-          if (!postData || !postData.ok) { console.warn('No se pudo insertar RATING_REQUEST'); }
-        } catch(e){ console.warn('Error de red al insertar RATING_REQUEST'); }
+          if (!postData || !postData.ok) { console.warn('No se pudo insertar la notificación de cierre'); }
+        } catch(e){ console.warn('Error de red al insertar notificación de cierre'); }
 
         // 3) Actualizar UI
         const reply = document.querySelector('.replybar'); if (reply) reply.style.display='none';
@@ -499,5 +499,6 @@ if ($ticketId > 0) {
   }
 })();
 </script>
+
 </body>
 </html>
