@@ -1,5 +1,5 @@
 <?php
-// api/admin_support.php — Envío de mensajes como "agent" (JSON only)
+// api/admin_support.php — Envío de mensajes como "agent" (JSON only, con debug)
 declare(strict_types=1);
 
 header('Content-Type: application/json; charset=utf-8');
@@ -12,15 +12,23 @@ ob_start();
 if (session_status() !== PHP_SESSION_ACTIVE) session_start();
 require_once __DIR__ . '/../db.php';
 
-/* ===== Helpers ===== */
+/* ===== Debug helpers (igual filosofía que support_chat.php) ===== */
+function is_debug(): bool {
+  if (!empty($_GET['debug']) && $_GET['debug'] === '1') return true;
+  $v = $_ENV['APP_DEBUG'] ?? '0';
+  return (string)$v === '1';
+}
 function respond(int $code, array $payload): void {
   http_response_code($code);
   if (ob_get_length() !== false) { @ob_clean(); }
   echo json_encode($payload, JSON_UNESCAPED_UNICODE|JSON_PARTIAL_OUTPUT_ON_ERROR);
   exit;
 }
-function fail(int $code, string $msg): void {
-  respond($code, ['ok'=>false, 'error'=>$msg]);
+function fail(int $code, string $msg, ?string $detail=null): void {
+  if ($detail) error_log('[admin_support] '.$msg.' — '.$detail);
+  $out = ['ok'=>false,'error'=>$msg];
+  if (is_debug() && $detail) $out['detail'] = $detail; // muestra detalle si ?debug=1
+  respond($code, $out);
 }
 function hasColumn(PDO $pdo, string $table, string $col): bool {
   $sql = "SELECT 1
@@ -34,7 +42,6 @@ function hasColumn(PDO $pdo, string $table, string $col): bool {
   return (bool)$st->fetchColumn();
 }
 function is_admin(): bool {
-  // Ajusta a tu lógica real; mantenemos la misma convención del admin_chat.php
   if (!empty($_SESSION['is_admin'])) return true;
   if (($_SESSION['role'] ?? null) === 'admin') return true;
   return false;
@@ -44,7 +51,7 @@ function is_admin(): bool {
 if (!isset($_SESSION['user_id'])) fail(401, 'No autenticado');
 if (!is_admin()) fail(403, 'Acceso restringido');
 
-/* ===== Router (solo POST: enviar mensaje) ===== */
+/* ===== Router (solo POST) ===== */
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 if ($method !== 'POST') fail(405, 'Method not allowed');
 
@@ -58,33 +65,39 @@ $filePath = null;
 
 if ($ticketId <= 0) fail(400, 'ticket_id inválido');
 
-// Adjuntos opcionales (mismas reglas que el lado usuario)
+/* ===== Adjuntos (opcionales) ===== */
 if (!empty($_FILES['file']) && $_FILES['file']['error'] !== UPLOAD_ERR_NO_FILE) {
-  if ($_FILES['file']['error'] === UPLOAD_ERR_INI_SIZE || $_FILES['file']['error'] === UPLOAD_ERR_FORM_SIZE) {
-    fail(413, 'Adjunto excede el límite');
+  $err = (int)$_FILES['file']['error'];
+  if ($err === UPLOAD_ERR_INI_SIZE || $err === UPLOAD_ERR_FORM_SIZE) {
+    fail(413, 'Adjunto excede el límite', 'PHP upload error='.$err);
   }
-  if ($_FILES['file']['error'] !== UPLOAD_ERR_OK) {
-    fail(400, 'Error al subir archivo');
+  if ($err !== UPLOAD_ERR_OK) {
+    fail(400, 'Error al subir archivo', 'PHP upload error='.$err);
   }
-  if (!empty($_FILES['file']['size']) && (int)$_FILES['file']['size'] > 2*1024*1024) {
-    fail(413, 'Adjunto excede 2 MB');
-  }
-  $ext = strtolower(pathinfo($_FILES['file']['name'], PATHINFO_EXTENSION));
+  $size = (int)($_FILES['file']['size'] ?? 0);
+  if ($size > 2*1024*1024) fail(413, 'Adjunto excede 2 MB', 'size='.$size);
+
+  $ext = strtolower(pathinfo($_FILES['file']['name'] ?? '', PATHINFO_EXTENSION));
   if (!in_array($ext, ['png','jpg','jpeg','pdf'], true)) {
-    fail(400, 'Extensión no permitida');
+    fail(400, 'Extensión no permitida', 'ext='.$ext);
   }
+
   $dir = __DIR__ . '/../uploads/support/';
-  if (!is_dir($dir) && !@mkdir($dir, 0777, true)) {
-    fail(500, 'No se pudo preparar el directorio de adjuntos');
+  if (!is_dir($dir)) {
+    if (!@mkdir($dir, 0777, true)) fail(500, 'No se pudo preparar el directorio de adjuntos', 'mkdir failed');
   }
+  if (!is_writable($dir)) {
+    fail(500, 'Directorio de adjuntos no escribible', 'not writable: '.$dir);
+  }
+
   $dest = $dir . uniqid('att_', true) . '.' . $ext;
   if (!@move_uploaded_file($_FILES['file']['tmp_name'], $dest)) {
-    fail(500, 'No se pudo guardar el adjunto');
+    fail(500, 'No se pudo guardar el adjunto', 'move_uploaded_file failed');
   }
   $filePath = 'uploads/support/' . basename($dest);
 }
 
-// No permitir ambos vacíos
+/* ===== No permitir ambos vacíos ===== */
 if ($message === '' && !$filePath) fail(400, 'Mensaje vacío');
 
 /* ===== Inserción ===== */
@@ -92,12 +105,15 @@ try {
   $pdo->beginTransaction();
   try { $pdo->exec("SET time_zone = '+00:00'"); } catch (\Throwable $tz) { /* ignore */ }
 
-  // Verificar que el ticket exista
   $hasUnreadUser = hasColumn($pdo, 'support_tickets', 'unread_user');
   $hasUnreadAdm  = hasColumn($pdo, 'support_tickets', 'unread_admin');
 
+  // Verificar que el ticket exista
   $chk = $pdo->prepare("SELECT id, status FROM support_tickets WHERE id=? LIMIT 1");
-  $chk->execute([$ticketId]);
+  if (!$chk->execute([$ticketId])) {
+    $ei = $chk->errorInfo();
+    throw new \PDOException('SELECT ticket fail: '.($ei[2] ?? 'unknown'));
+  }
   $ticket = $chk->fetch(PDO::FETCH_ASSOC);
   if (!$ticket) {
     $pdo->rollBack();
@@ -112,10 +128,10 @@ try {
   $ok = $ins->execute([$ticketId, ($message !== '' ? $message : ''), $filePath]);
   if (!$ok) {
     $ei = $ins->errorInfo();
-    throw new \PDOException($ei[2] ?? 'No se pudo insertar el mensaje');
+    throw new \PDOException('INSERT support_messages fail: '.($ei[2] ?? 'unknown'));
   }
 
-  // Actualizar ticket: marcar como no leído para el usuario y actualizar last_message_at
+  // Actualizar ticket
   if ($hasUnreadUser && $hasUnreadAdm) {
     $upd = $pdo->prepare("
       UPDATE support_tickets
@@ -135,12 +151,16 @@ try {
       WHERE id=?
     ");
   }
-  $upd->execute([$ticketId]);
+  if (!$upd->execute([$ticketId])) {
+    $ei = $upd->errorInfo();
+    throw new \PDOException('UPDATE ticket fail: '.($ei[2] ?? 'unknown'));
+  }
 
   $pdo->commit();
   respond(200, ['ok'=>true, 'ticket'=>$ticketId]);
+
 } catch (\Throwable $e) {
   if ($pdo->inTransaction()) $pdo->rollBack();
   error_log('admin_support POST fail: '.$e->getMessage());
-  fail(500, 'Error interno');
+  fail(500, 'Error interno', $e->getMessage());
 }
