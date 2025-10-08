@@ -1,60 +1,95 @@
 <?php
-// api/support_admin.php — panel admin soporte (JSON puro)
+// api/support_admin.php — Panel admin (JSON only)
 declare(strict_types=1);
 
-// Producción: no imprimir errores en HTML
-ini_set('display_errors','0');
+/* ===== Salida JSON y errores ===== */
+header('Content-Type: application/json; charset=utf-8');
+error_reporting(E_ALL);
+ini_set('display_errors','0');   // nunca HTML de errores
 ini_set('html_errors','0');
-
-// Captura cualquier salida temprana para luego limpiarla
-if (!headers_sent()) header('Content-Type: application/json; charset=utf-8');
+ini_set('log_errors','1');       // log al error_log del servidor
 ob_start();
 
-session_start();
+/* ===== Dependencias ===== */
+if (session_status() !== PHP_SESSION_ACTIVE) session_start();
 require_once __DIR__ . '/../db.php';
 
-// ========== Utilidades JSON ==========
+/* ===== Utils (mismas que en support_chat.php) ===== */
+function is_debug(): bool {
+  // APP_DEBUG=1 o ?debug=1
+  if (!empty($_GET['debug']) && $_GET['debug'] === '1') return true;
+  $v = $_ENV['APP_DEBUG'] ?? '0';
+  return (string)$v === '1';
+}
 
-function json_respond(int $code, array $payload): void {
+function respond(int $code, array $payload): void {
   http_response_code($code);
-  if (!headers_sent()) {
-    header('Content-Type: application/json; charset=utf-8');
-  }
-  // Limpia TODOS los buffers para evitar HTML/warnings previos
-  while (ob_get_level() > 0) { @ob_end_clean(); }
-  // Asegura JSON aunque haya bytes UTF-8 inválidos
-  $json = json_encode(
-    $payload,
-    JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE
-  );
-  if ($json === false) {
-    // Último recurso
-    $json = '{"ok":false,"error":"JSON encode failed"}';
-  }
-  echo $json;
+  if (ob_get_length() !== false) { @ob_clean(); }
+  echo json_encode($payload, JSON_UNESCAPED_UNICODE|JSON_PARTIAL_OUTPUT_ON_ERROR);
   exit;
 }
-
-function require_admin(PDO $pdo): array {
-  $uid = (int)($_SESSION['user_id'] ?? 0);
-  if ($uid <= 0) json_respond(401, ['ok'=>false,'error'=>'No autenticado']);
-  $st = $pdo->prepare("SELECT id, role, full_name, email FROM users WHERE id = ? LIMIT 1");
-  $st->execute([$uid]);
-  $u = $st->fetch(PDO::FETCH_ASSOC);
-  if (!$u) json_respond(401, ['ok'=>false,'error'=>'Sesión inválida']);
-  if (strtolower((string)$u['role']) !== 'admin') json_respond(403, ['ok'=>false,'error'=>'Acceso denegado']);
-  return $u;
+function fail(int $code, string $msg, ?string $detail=null): void {
+  $out = ['ok'=>false,'error'=>$msg];
+  if (is_debug() && $detail) $out['detail'] = $detail;
+  respond($code, $out);
 }
 
-// ========== Inicio ==========
+/** Comprueba si una columna existe en la tabla (en el esquema actual) */
+function hasColumn(PDO $pdo, string $table, string $col): bool {
+  $sql = "SELECT 1
+          FROM INFORMATION_SCHEMA.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE()
+            AND TABLE_NAME = ?
+            AND COLUMN_NAME = ?
+          LIMIT 1";
+  $st = $pdo->prepare($sql);
+  $st->execute([$table, $col]);
+  return (bool)$st->fetchColumn();
+}
 
+/** Devuelve true si la columna existe y es NOT NULL */
+function colIsNotNull(PDO $pdo, string $table, string $col): bool {
+  $sql = "SELECT IS_NULLABLE
+          FROM INFORMATION_SCHEMA.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE()
+            AND TABLE_NAME = ?
+            AND COLUMN_NAME = ?
+          LIMIT 1";
+  $st = $pdo->prepare($sql);
+  $st->execute([$table, $col]);
+  $val = $st->fetchColumn();
+  if ($val === false || $val === null) return false; // no existe
+  return (strtoupper((string)$val) === 'NO');
+}
+
+/* ===== Auth mínima (estilo support_chat, pero pidiendo rol admin si existe) ===== */
+$user_id = $_SESSION['user_id'] ?? null;
+if (!$user_id) fail(401, 'No autenticado', 'NO_AUTH');
+
+// Si la tabla users tiene columna role, exigir 'admin'
 try {
-  $admin = require_admin($pdo);
+  if (hasColumn($pdo, 'users', 'role')) {
+    $st = $pdo->prepare("SELECT role FROM users WHERE id=? LIMIT 1");
+    $st->execute([(int)$user_id]);
+    $role = strtolower((string)$st->fetchColumn());
+    if ($role !== 'admin') fail(403, 'Acceso denegado', 'NOT_ADMIN');
+  }
+} catch (\Throwable $e) {
+  error_log('support_admin role check: '.$e->getMessage());
+  fail(500, 'Error de autenticación', $e->getMessage());
+}
 
+/* ===== Router ===== */
+try {
   $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
   $action = $_GET['action'] ?? ($_POST['action'] ?? '');
 
-  // -------- LISTA DE TICKETS --------
+  /* --- GET: health --- */
+  if ($method === 'GET' && $action === 'health') {
+    respond(200, ['ok'=>true, 'ts'=>date('Y-m-d H:i:s')]);
+  }
+
+  /* --- GET: lista de tickets --- */
   if ($method === 'GET' && $action === 'list') {
     $status = $_GET['status'] ?? 'open';
     $status = in_array($status, ['open','resolved'], true) ? $status : 'open';
@@ -70,10 +105,10 @@ try {
         ORDER BY t.unread_admin DESC, t.last_message_at DESC, t.id DESC
         LIMIT 200
       ";
-      $stmt = $pdo->query($sql);
+      $st = $pdo->query($sql);
     } else {
       // Resueltos
-      $stmt = $pdo->prepare("
+      $st = $pdo->prepare("
         SELECT t.id, t.public_id, t.user_id, t.status, t.unread_admin, t.last_message_at, t.created_at,
                u.full_name
         FROM support_tickets t
@@ -82,17 +117,17 @@ try {
         ORDER BY t.last_message_at DESC, t.id DESC
         LIMIT 200
       ");
-      $stmt->execute();
+      $st->execute();
     }
 
-    $tickets = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    json_respond(200, ['ok'=>true, 'tickets'=>$tickets]);
+    $tickets = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    respond(200, ['ok'=>true, 'tickets'=>$tickets]);
   }
 
-  // -------- HILO DE UN TICKET --------
+  /* --- GET: hilo de un ticket --- */
   if ($method === 'GET' && $action === 'thread') {
     $ticketId = (int)($_GET['ticket_id'] ?? 0);
-    if ($ticketId <= 0) json_respond(400, ['ok'=>false,'error'=>'ticket_id inválido']);
+    if ($ticketId <= 0) fail(400, 'ticket_id inválido');
 
     $t = $pdo->prepare("
       SELECT t.id, t.public_id, t.user_id, t.status, t.unread_admin, t.last_message_at,
@@ -103,123 +138,146 @@ try {
     ");
     $t->execute([$ticketId]);
     $ticket = $t->fetch(PDO::FETCH_ASSOC);
-    if (!$ticket) json_respond(404, ['ok'=>false,'error'=>'Ticket no encontrado']);
+    if (!$ticket) fail(404, 'Ticket no encontrado');
 
-    // Hilo (incluye id para anti-duplicados en el front)
-    $m = $pdo->prepare("
+    // (opcional) soporto &since=YYYY-MM-DD HH:MM:SS para reducir payload
+    $since = $_GET['since'] ?? null;
+    $sql = "
       SELECT id, sender, message, file_path, created_at
       FROM support_messages
       WHERE ticket_id=?
-      ORDER BY id ASC
-      LIMIT 2000
-    ");
-    $m->execute([$ticketId]);
+    ";
+    $args = [$ticketId];
+    if ($since) {
+      // Sanitiza formato simple; si no matchea, ignora &since
+      if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $since)) {
+        $sql .= " AND created_at > ?";
+        $args[] = $since;
+      }
+    }
+    $sql .= " ORDER BY id ASC";
+    $m = $pdo->prepare($sql);
+    $m->execute($args);
     $messages = $m->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-    // Marcar como leído para admin
-    $pdo->prepare("UPDATE support_tickets SET unread_admin=0 WHERE id=?")->execute([$ticketId]);
-
-    json_respond(200, ['ok'=>true, 'ticket'=>$ticket, 'messages'=>$messages]);
-  }
-
-  // -------- RESPONDER EN UN TICKET --------
-  if ($method === 'POST' && $action === 'reply') {
-    $ticketId = (int)($_POST['ticket_id'] ?? 0);
-    $message  = trim((string)($_POST['message'] ?? ''));
-    if ($ticketId <= 0) json_respond(400, ['ok'=>false,'error'=>'ticket_id inválido']);
-    if ($message === '' && (empty($_FILES['file']) || $_FILES['file']['error']===UPLOAD_ERR_NO_FILE)) {
-      json_respond(400, ['ok'=>false,'error'=>'Mensaje vacío']);
+    // marcar leído para admin si existe la columna
+    if (hasColumn($pdo, 'support_tickets', 'unread_admin')) {
+      try {
+        $pdo->prepare("UPDATE support_tickets SET unread_admin=0 WHERE id=?")->execute([$ticketId]);
+      } catch (\Throwable $e) { /* ignore */ }
     }
 
-    // Comprobar ticket
+    respond(200, ['ok'=>true, 'ticket'=>$ticket, 'messages'=>$messages]);
+  }
+
+  /* --- POST: responder en un ticket --- */
+  if ($method === 'POST' && $action === 'reply') {
+    // Payload supera límites (post_max_size/upload_max_filesize)
+    if (empty($_POST) && empty($_FILES) && (int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {
+      fail(413, 'El contenido excede el límite del servidor');
+    }
+
+    $ticketId = (int)($_POST['ticket_id'] ?? 0);
+    $message  = trim((string)($_POST['message'] ?? ''));
+    if ($ticketId <= 0) fail(400, 'ticket_id inválido');
+
+    // comprobar que el ticket existe
     $q = $pdo->prepare("SELECT id FROM support_tickets WHERE id=? LIMIT 1");
     $q->execute([$ticketId]);
-    if (!$q->fetchColumn()) json_respond(404, ['ok'=>false,'error'=>'Ticket no encontrado']);
+    if (!$q->fetchColumn()) fail(404, 'Ticket no encontrado');
 
-    // Subida de archivo (opcional)
+    // Adjunto opcional
     $filePath = null;
     if (!empty($_FILES['file']) && $_FILES['file']['error'] !== UPLOAD_ERR_NO_FILE) {
       if ($_FILES['file']['error'] === UPLOAD_ERR_INI_SIZE || $_FILES['file']['error'] === UPLOAD_ERR_FORM_SIZE) {
-        json_respond(413, ['ok'=>false,'error'=>'Adjunto excede el límite']);
+        fail(413, 'Adjunto excede el límite');
       }
       if ($_FILES['file']['error'] !== UPLOAD_ERR_OK) {
-        json_respond(400, ['ok'=>false,'error'=>'Error al subir archivo']);
+        fail(400, 'Error al subir archivo', 'php upload err='.(string)$_FILES['file']['error']);
       }
+      // Límite blando 2MB
+      if (!empty($_FILES['file']['size']) && (int)$_FILES['file']['size'] > 2*1024*1024) {
+        fail(413, 'Adjunto excede 2 MB');
+      }
+
       $ext = strtolower(pathinfo($_FILES['file']['name'], PATHINFO_EXTENSION));
       if (!in_array($ext, ['png','jpg','jpeg','pdf'], true)) {
-        json_respond(400, ['ok'=>false,'error'=>'Extensión no permitida']);
+        fail(400, 'Extensión no permitida');
       }
       $dir = __DIR__ . '/../uploads/support/';
-      if (!is_dir($dir)) @mkdir($dir, 0777, true);
+      if (!is_dir($dir) && !@mkdir($dir, 0777, true)) {
+        fail(500, 'No se pudo preparar el directorio de adjuntos');
+      }
       $dest = $dir . uniqid('att_', true) . '.' . $ext;
       if (!@move_uploaded_file($_FILES['file']['tmp_name'], $dest)) {
-        json_respond(500, ['ok'=>false,'error'=>'No se pudo guardar el adjunto']);
+        fail(500, 'No se pudo guardar el adjunto');
       }
       $filePath = 'uploads/support/' . basename($dest);
     }
 
-    // Escribir mensaje
-    $pdo->beginTransaction();
+    // No permitir ambos vacíos
+    if ($message === '' && !$filePath) fail(400, 'Mensaje vacío');
+
+    // Para esquemas con message NOT NULL, usa '' si no hay texto
+    $messageForDB = ($message !== '' ? $message : '');
+
     try {
-      try {
-        $pdo->exec("SET SESSION time_zone = '+00:00'");
-      } catch (Throwable $tz) {
-        // Ignorar si el hosting lo bloquea
-      }
+      $pdo->beginTransaction();
+      try { $pdo->exec("SET time_zone = '+00:00'"); } catch (\Throwable $tz) { /* ignore */ }
 
-      // Nunca insertar NULL en message si la columna es NOT NULL
-      $msgToSave = ($message !== '') ? $message : '';
-
+      // Inserta SIEMPRE created_at=NOW() (compatibilidad STRICT MODE)
       $ins = $pdo->prepare("
         INSERT INTO support_messages (ticket_id, sender, message, file_path, created_at)
         VALUES (?, 'admin', ?, ?, NOW())
       ");
-      $ins->execute([$ticketId, $msgToSave, $filePath]);
+      $ok = $ins->execute([$ticketId, $messageForDB, $filePath]);
+      if (!$ok) {
+        $ei = $ins->errorInfo();
+        fail(500, 'Error interno', 'INSERT support_messages: '.($ei[2] ?? 'desconocido'));
+      }
 
-      // Actualizar ticket: unread_user (si existe) + last_message_at
-      try {
-        $pdo->prepare("
+      // Actualizar ticket: unread_user si existe, last_message_at/updated_at siempre
+      $hasUnreadUser = hasColumn($pdo, 'support_tickets', 'unread_user');
+      if ($hasUnreadUser) {
+        $upd = $pdo->prepare("
           UPDATE support_tickets
           SET unread_user=1, last_message_at=NOW(), updated_at=NOW()
           WHERE id=?
-        ")->execute([$ticketId]);
-      } catch (PDOException $e) {
-        // Si la columna unread_user no existe en este hosting, actualizar sin esa columna
-        if (stripos($e->getMessage(), 'Unknown column') !== false) {
-          $pdo->prepare("
-            UPDATE support_tickets
-            SET last_message_at=NOW(), updated_at=NOW()
-            WHERE id=?
-          ")->execute([$ticketId]);
-        } else {
-          throw $e;
-        }
+        ");
+      } else {
+        $upd = $pdo->prepare("
+          UPDATE support_tickets
+          SET last_message_at=NOW(), updated_at=NOW()
+          WHERE id=?
+        ");
       }
+      $upd->execute([$ticketId]);
 
       $pdo->commit();
-    } catch (Throwable $e) {
-      if ($pdo->inTransaction()) $pdo->rollBack();
-      error_log('support_admin reply: '.$e->getMessage());
-      json_respond(500, ['ok'=>false,'error'=>'Error interno al guardar el mensaje']);
-    }
+      respond(200, ['ok'=>true]);
 
-    json_respond(200, ['ok'=>true]);
+    } catch (\Throwable $e) {
+      if ($pdo->inTransaction()) $pdo->rollBack();
+      error_log('support_admin reply fail: '.$e->getMessage());
+      fail(500, 'Error interno', $e->getMessage());
+    }
   }
 
-  // -------- RESOLVER TICKET --------
+  /* --- POST: resolver ticket --- */
   if ($method === 'POST' && $action === 'resolve') {
     $ticketId = (int)($_POST['ticket_id'] ?? 0);
-    if ($ticketId <= 0) json_respond(400, ['ok'=>false,'error'=>'ticket_id inválido']);
+    if ($ticketId <= 0) fail(400, 'ticket_id inválido');
 
-    $pdo->prepare("UPDATE support_tickets SET status='resolved', updated_at=NOW() WHERE id=?")->execute([$ticketId]);
+    $st = $pdo->prepare("UPDATE support_tickets SET status='resolved', updated_at=NOW() WHERE id=?");
+    $st->execute([$ticketId]);
 
-    json_respond(200, ['ok'=>true]);
+    respond(200, ['ok'=>true]);
   }
 
-  // Acción no permitida
-  json_respond(405, ['ok'=>false,'error'=>'Method/Action not allowed']);
+  // Método/acción no soportada
+  fail(405, 'Method/Action not allowed');
 
-} catch (Throwable $e) {
+} catch (\Throwable $e) {
   error_log('support_admin fatal: '.$e->getMessage());
-  json_respond(500, ['ok'=>false,'error'=>'Error interno']);
+  fail(500, 'Error interno', $e->getMessage());
 }
