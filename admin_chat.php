@@ -11,13 +11,13 @@ ini_set('log_errors','1');
 if (session_status() !== PHP_SESSION_ACTIVE) session_start();
 require_once __DIR__ . '/db.php';   // Debe definir $pdo (PDO conectado)
 
-// ---------------- TU GUARD DE ADMIN ----------------
-$currentUser = $_SESSION['currentUser'] ?? []; // ajusta si lo guardas con otra clave
+// Verificar rol admin (ajusta si usas otro campo/valor)
 if (empty($currentUser['role']) || strtolower($currentUser['role']) !== 'admin') {
   http_response_code(403);
   echo 'Acceso denegado';
   exit;
 }
+
 
 // ---------------- Helpers ----------------
 function h(?string $s): string {
