@@ -1,5 +1,5 @@
 <?php
-// api/admin_support.php — Envío de mensajes como "agent" (JSON only, con debug)
+// api/admin_support.php — Envío de mensajes como "admin/agent" (JSON only, con debug y autodetección)
 declare(strict_types=1);
 
 header('Content-Type: application/json; charset=utf-8');
@@ -27,19 +27,31 @@ function respond(int $code, array $payload): void {
 function fail(int $code, string $msg, ?string $detail=null): void {
   if ($detail) error_log('[admin_support] '.$msg.' — '.$detail);
   $out = ['ok'=>false,'error'=>$msg];
-  if (is_debug() && $detail) $out['detail'] = $detail; // muestra detalle si ?debug=1
+  if (is_debug() && $detail) $out['detail'] = $detail;
   respond($code, $out);
 }
 function hasColumn(PDO $pdo, string $table, string $col): bool {
-  $sql = "SELECT 1
-          FROM INFORMATION_SCHEMA.COLUMNS
-          WHERE TABLE_SCHEMA = DATABASE()
-            AND TABLE_NAME = ?
-            AND COLUMN_NAME = ?
-          LIMIT 1";
+  $sql = "SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1";
   $st = $pdo->prepare($sql);
   $st->execute([$table, $col]);
   return (bool)$st->fetchColumn();
+}
+function senderAllowed(PDO $pdo): string {
+  // Detecta si sender es ENUM y contiene 'admin' o 'agent'; por defecto usa 'agent'
+  try {
+    $sql = "SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='support_messages' AND COLUMN_NAME='sender' LIMIT 1";
+    $st = $pdo->query($sql);
+    $type = (string)($st->fetchColumn() ?: '');
+    $lc = strtolower($type);
+    if ($lc && str_starts_with($lc,'enum(')) {
+      if (strpos($lc, "'admin'") !== false) return 'admin';
+      if (strpos($lc, "'agent'") !== false) return 'agent';
+    }
+  } catch (\Throwable $e) { /* ignore */ }
+  // Si no es ENUM o no encontramos nada, 'agent' es compatible con tu front (lo trata como no-'user')
+  return 'agent';
 }
 function is_admin(): bool {
   if (!empty($_SESSION['is_admin'])) return true;
@@ -66,7 +78,7 @@ $filePath = null;
 if ($ticketId <= 0) fail(400, 'ticket_id inválido');
 
 /* ===== Adjuntos (opcionales) ===== */
-if (!empty($_FILES['file']) && $_FILES['file']['error'] !== UPLOAD_ERR_NO_FILE) {
+if (!empty($_FILES['file']) && (int)$_FILES['file']['error'] !== UPLOAD_ERR_NO_FILE) {
   $err = (int)$_FILES['file']['error'];
   if ($err === UPLOAD_ERR_INI_SIZE || $err === UPLOAD_ERR_FORM_SIZE) {
     fail(413, 'Adjunto excede el límite', 'PHP upload error='.$err);
@@ -83,8 +95,8 @@ if (!empty($_FILES['file']) && $_FILES['file']['error'] !== UPLOAD_ERR_NO_FILE) 
   }
 
   $dir = __DIR__ . '/../uploads/support/';
-  if (!is_dir($dir)) {
-    if (!@mkdir($dir, 0777, true)) fail(500, 'No se pudo preparar el directorio de adjuntos', 'mkdir failed');
+  if (!is_dir($dir) && !@mkdir($dir, 0777, true)) {
+    fail(500, 'No se pudo preparar el directorio de adjuntos', 'mkdir failed');
   }
   if (!is_writable($dir)) {
     fail(500, 'Directorio de adjuntos no escribible', 'not writable: '.$dir);
@@ -120,18 +132,20 @@ try {
     fail(404, 'Ticket no encontrado');
   }
 
-  // Inserta mensaje como "agent"
+  $sender = senderAllowed($pdo); // 'admin' o 'agent' según tu esquema
+
+  // Inserta mensaje como admin/agent
   $ins = $pdo->prepare("
     INSERT INTO support_messages (ticket_id, sender, message, file_path, created_at)
-    VALUES (?, 'agent', ?, ?, NOW())
+    VALUES (?, ?, ?, ?, NOW())
   ");
-  $ok = $ins->execute([$ticketId, ($message !== '' ? $message : ''), $filePath]);
+  $ok = $ins->execute([$ticketId, $sender, ($message !== '' ? $message : ''), $filePath]);
   if (!$ok) {
     $ei = $ins->errorInfo();
     throw new \PDOException('INSERT support_messages fail: '.($ei[2] ?? 'unknown'));
   }
 
-  // Actualizar ticket
+  // Actualizar ticket (notificar al usuario y refrescar fechas)
   if ($hasUnreadUser && $hasUnreadAdm) {
     $upd = $pdo->prepare("
       UPDATE support_tickets
