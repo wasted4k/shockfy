@@ -1,6 +1,6 @@
 <?php
-// admin_chat.php — Vista SOLO LECTURA para administradores
-// Funciones: full_name, auto-refresh mensajes (derecha) + auto-refresh lista (izquierda) con dot no leído
+// admin_chat.php — Vista SOLO LECTURA + responder como admin
+// Funciones: full_name, auto-refresh mensajes (derecha) + auto-refresh lista (izquierda) con dot no leído + enviar como agent
 declare(strict_types=1);
 
 header('Content-Type: text/html; charset=utf-8');
@@ -165,7 +165,6 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'tickets') {
   $st->execute($args);
   $rows = $st->fetchAll(PDO::FETCH_ASSOC);
 
-  // Reducimos a lo que necesita el front
   $out = [];
   foreach ($rows as $t) {
     $out[] = [
@@ -265,7 +264,7 @@ if ($ticketId > 0) {
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <title>Soporte · Admin (solo lectura)</title>
+  <title>Soporte · Admin</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     :root{
@@ -278,7 +277,7 @@ if ($ticketId > 0) {
     .brand{ font-weight:700; }
     .wrap{ display:flex; gap:0; min-height:calc(100vh - 58px); }
     .col-left{ width:420px; max-width:100%; border-right:1px solid #1f2937; background:var(--panel); }
-    .col-right{ flex:1; min-width:0; }
+    .col-right{ flex:1; min-width:0; display:flex; flex-direction:column; }
     .tools{ padding:12px; border-bottom:1px solid #1f2937; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
     input[type="text"], select{ background:#0b1220; border:1px solid #1f2937; color:#e5e7eb; padding:8px 10px; border-radius:8px; }
     button{ border:0; padding:8px 12px; border-radius:8px; cursor:pointer; background:var(--accent); color:#0b1220; font-weight:600; }
@@ -303,18 +302,29 @@ if ($ticketId > 0) {
       100%{ box-shadow:0 0 0 0 rgba(244,63,94,0); transform:scale(1); }
     }
 
-    .messages{ padding:14px; max-height:calc(100vh - 58px - 56px); overflow:auto; }
+    .messages{ padding:14px; max-height:calc(100vh - 58px - 56px - 92px); overflow:auto; }
     .msg{ margin-bottom:12px; background:#0b1220; border:1px solid #1f2937; padding:10px; border-radius:12px; }
     .msg .head{ font-weight:700; margin-bottom:6px; }
     .msg .body{ white-space:pre-wrap; word-wrap:break-word; }
     .empty{ padding:24px; color:var(--muted); }
     .toolbar{ padding:12px; border-bottom:1px solid #1f2937; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
     .u-line{ color:var(--muted); }
+
+    /* Form de respuesta */
+    .replybar{
+      border-top:1px solid #1f2937; padding:10px; display:flex; gap:8px; align-items:center; background:#0b1220;
+    }
+    .replybar textarea{
+      flex:1; min-height:46px; max-height:160px; resize:vertical;
+      background:#0a0f1c; color:#e5e7eb; border:1px solid #1f2937; border-radius:8px; padding:8px 10px;
+    }
+    .replybar input[type=file]{ color:#e5e7eb; }
+    .replybar .btn-send{ background:var(--accent); color:#0b1220; border:0; padding:10px 14px; border-radius:10px; font-weight:700; cursor:pointer; }
   </style>
 </head>
 <body>
 <header>
-  <div class="brand">Soporte · Admin (solo lectura)</div>
+  <div class="brand">Soporte · Admin</div>
   <div class="muted">Estás logueado como ADMIN</div>
 </header>
 
@@ -416,6 +426,15 @@ if ($ticketId > 0) {
         <?php endif; ?>
       <?php endif; ?>
     </div>
+
+    <!-- Formulario de respuesta (solo si hay ticket seleccionado) -->
+    <?php if ($ticketSel): ?>
+    <div class="replybar">
+      <textarea id="replyText" placeholder="Escribe una respuesta al usuario..." maxlength="4000"></textarea>
+      <input type="file" id="replyFile" accept=".png,.jpg,.jpeg,.pdf" />
+      <button class="btn-send" id="replySend">Enviar</button>
+    </div>
+    <?php endif; ?>
   </main>
 </div>
 
@@ -470,6 +489,58 @@ if ($ticketId > 0) {
 
       fetchMessages().then(startMsgs);
       document.addEventListener('visibilitychange', ()=>{ if (document.hidden) stopMsgs(); else startMsgs(); });
+
+      // -------- Envío de respuesta del admin --------
+      const btn = document.getElementById('replySend');
+      const txt = document.getElementById('replyText');
+      const fil = document.getElementById('replyFile');
+
+      async function sendReply(){
+        if (!btn) return;
+        const msg = (txt && txt.value ? txt.value.trim() : '');
+        const f = (fil && fil.files && fil.files[0]) ? fil.files[0] : null;
+
+        if (!msg && !f){
+          alert('Escribe un mensaje o adjunta un archivo');
+          return;
+        }
+
+        const form = new FormData();
+        form.append('ticket_id', String(ticketId));
+        form.append('message', msg);
+        if (f) form.append('file', f);
+
+        try {
+          btn.disabled = true;
+          const res = await fetch('api/admin_support.php', { method:'POST', body: form });
+          const data = await res.json();
+          if (!data || !data.ok){
+            alert(data && data.error ? data.error : 'No se pudo enviar');
+          } else {
+            if (txt) txt.value = '';
+            if (fil) fil.value = '';
+            // tras enviar, refrescamos mensajes y (opcionalmente) lista
+            fetchMessages();
+            if (typeof fetchList === 'function') fetchList();
+          }
+        } catch (e) {
+          alert('Error de red al enviar');
+        } finally {
+          btn.disabled = false;
+        }
+      }
+
+      if (btn){
+        btn.addEventListener('click', (e)=>{ e.preventDefault(); sendReply(); });
+      }
+      if (txt){
+        txt.addEventListener('keydown', (e)=>{
+          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)){
+            e.preventDefault();
+            sendReply();
+          }
+        });
+      }
     }
   }
 
@@ -480,13 +551,14 @@ if ($ticketId > 0) {
   const listStatus = listBox.getAttribute('data-status') || 'open';
   const listQ = listBox.getAttribute('data-q') || '';
   const listLimit = parseInt(listBox.getAttribute('data-limit') || '100', 10);
-  const activeLink = document.querySelector('.ticket.active');
-  const activeId = activeLink ? parseInt(activeLink.getAttribute('data-id')||'0', 10) : 0;
 
   function esc(s){ return (s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
   function statusChipClass(st){ return st==='open' ? 'green' : (st==='pending' ? 'yellow' : 'red'); }
 
   function renderList(rows){
+    const activeLink = document.querySelector('.ticket.active');
+    const activeId = activeLink ? parseInt(activeLink.getAttribute('data-id')||'0', 10) : 0;
+
     if (!Array.isArray(rows) || !rows.length){
       listBox.innerHTML = '<div class="empty">No hay tickets con ese filtro.</div>';
       return;
@@ -506,8 +578,8 @@ if ($ticketId > 0) {
             <div><strong>${esc(title)}</strong>${dot}</div>
             <div class="chip ${chipClass}">${esc(t.status)}</div>
           </div>
-            <div class="muted">user_id: ${Number(t.user_id)}${name}</div>
-            <div class="muted">últ. msg: ${esc(t.last_message_at || '')}</div>
+          <div class="muted">user_id: ${Number(t.user_id)}${name}</div>
+          <div class="muted">últ. msg: ${esc(t.last_message_at || '')}</div>
         </a>`;
     }
     listBox.innerHTML = html;
@@ -532,6 +604,8 @@ if ($ticketId > 0) {
 
   function startList(){ stopList(); if (!document.hidden) pollListTimer = setInterval(fetchList, POLL_LIST_MS); }
   function stopList(){ if (pollListTimer){ clearInterval(pollListTimer); pollListTimer = null; } }
+
+  window.fetchList = fetchList; // para poder invocarla tras enviar
 
   fetchList().then(startList);
   document.addEventListener('visibilitychange', ()=>{ if (document.hidden) stopList(); else startList(); });
