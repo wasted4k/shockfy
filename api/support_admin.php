@@ -1,5 +1,5 @@
 <?php
-// api/support_admin.php — Panel admin (JSON only)
+// api/support_admin.php — Panel admin (JSON only, alineado con support_chat.php)
 declare(strict_types=1);
 
 /* ===== Salida JSON y errores ===== */
@@ -47,7 +47,7 @@ function hasColumn(PDO $pdo, string $table, string $col): bool {
   return (bool)$st->fetchColumn();
 }
 
-/** Devuelve true si la columna existe y es NOT NULL */
+/** Devuelve true si la columna existe y es NOT NULL (por si lo necesitas a futuro) */
 function colIsNotNull(PDO $pdo, string $table, string $col): bool {
   $sql = "SELECT IS_NULLABLE
           FROM INFORMATION_SCHEMA.COLUMNS
@@ -62,11 +62,10 @@ function colIsNotNull(PDO $pdo, string $table, string $col): bool {
   return (strtoupper((string)$val) === 'NO');
 }
 
-/* ===== Auth mínima (estilo support_chat, pero pidiendo rol admin si existe) ===== */
+/* ===== Auth mínima (estilo support_chat, pero exigiendo admin si existe column role) ===== */
 $user_id = $_SESSION['user_id'] ?? null;
 if (!$user_id) fail(401, 'No autenticado', 'NO_AUTH');
 
-// Si la tabla users tiene columna role, exigir 'admin'
 try {
   if (hasColumn($pdo, 'users', 'role')) {
     $st = $pdo->prepare("SELECT role FROM users WHERE id=? LIMIT 1");
@@ -94,30 +93,35 @@ try {
     $status = $_GET['status'] ?? 'open';
     $status = in_array($status, ['open','resolved'], true) ? $status : 'open';
 
+    $hasUnreadAdmin = hasColumn($pdo, 'support_tickets', 'unread_admin');
+    $selUnread      = $hasUnreadAdmin ? 't.unread_admin' : '0 AS unread_admin';
+    $orderBase      = 't.last_message_at DESC, t.id DESC';
+    $orderOpen      = $hasUnreadAdmin ? "t.unread_admin DESC, $orderBase" : $orderBase;
+
     if ($status === 'open') {
       // Abiertos = open + pending
       $sql = "
-        SELECT t.id, t.public_id, t.user_id, t.status, t.unread_admin, t.last_message_at, t.created_at,
+        SELECT t.id, t.public_id, t.user_id, t.status, $selUnread, t.last_message_at, t.created_at,
                u.full_name
         FROM support_tickets t
         JOIN users u ON u.id = t.user_id
         WHERE t.status IN ('open','pending')
-        ORDER BY t.unread_admin DESC, t.last_message_at DESC, t.id DESC
+        ORDER BY $orderOpen
         LIMIT 200
       ";
       $st = $pdo->query($sql);
     } else {
       // Resueltos
-      $st = $pdo->prepare("
-        SELECT t.id, t.public_id, t.user_id, t.status, t.unread_admin, t.last_message_at, t.created_at,
+      $sql = "
+        SELECT t.id, t.public_id, t.user_id, t.status, $selUnread, t.last_message_at, t.created_at,
                u.full_name
         FROM support_tickets t
         JOIN users u ON u.id = t.user_id
         WHERE t.status = 'resolved'
-        ORDER BY t.last_message_at DESC, t.id DESC
+        ORDER BY $orderBase
         LIMIT 200
-      ");
-      $st->execute();
+      ";
+      $st = $pdo->query($sql);
     }
 
     $tickets = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -130,7 +134,7 @@ try {
     if ($ticketId <= 0) fail(400, 'ticket_id inválido');
 
     $t = $pdo->prepare("
-      SELECT t.id, t.public_id, t.user_id, t.status, t.unread_admin, t.last_message_at,
+      SELECT t.id, t.public_id, t.user_id, t.status, t.last_message_at,
              t.created_at, t.updated_at, u.full_name
       FROM support_tickets t
       JOIN users u ON u.id = t.user_id
@@ -148,12 +152,9 @@ try {
       WHERE ticket_id=?
     ";
     $args = [$ticketId];
-    if ($since) {
-      // Sanitiza formato simple; si no matchea, ignora &since
-      if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $since)) {
-        $sql .= " AND created_at > ?";
-        $args[] = $since;
-      }
+    if ($since && preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $since)) {
+      $sql .= " AND created_at > ?";
+      $args[] = $since;
     }
     $sql .= " ORDER BY id ASC";
     $m = $pdo->prepare($sql);
@@ -162,9 +163,8 @@ try {
 
     // marcar leído para admin si existe la columna
     if (hasColumn($pdo, 'support_tickets', 'unread_admin')) {
-      try {
-        $pdo->prepare("UPDATE support_tickets SET unread_admin=0 WHERE id=?")->execute([$ticketId]);
-      } catch (\Throwable $e) { /* ignore */ }
+      try { $pdo->prepare("UPDATE support_tickets SET unread_admin=0 WHERE id=?")->execute([$ticketId]); }
+      catch (\Throwable $e) { /* ignore */ }
     }
 
     respond(200, ['ok'=>true, 'ticket'=>$ticket, 'messages'=>$messages]);
@@ -208,24 +208,36 @@ try {
       if (!is_dir($dir) && !@mkdir($dir, 0777, true)) {
         fail(500, 'No se pudo preparar el directorio de adjuntos');
       }
-      $dest = $dir . uniqid('att_', true) . '.' . $ext;
-      if (!@move_uploaded_file($_FILES['file']['tmp_name'], $dest)) {
-        fail(500, 'No se pudo guardar el adjunto');
-      }
-      $filePath = 'uploads/support/' . basename($dest);
+      $dest = $dir + uniqid('att_', true) . '.' . $ext; // <-- CORREGIDO abajo
     }
 
     // No permitir ambos vacíos
-    if ($message === '' && !$filePath) fail(400, 'Mensaje vacío');
+    // (si hay adjunto permitido, el message puede ir vacío → guardamos '' para NOT NULL)
+    $hasFile = (!empty($_FILES['file']) && $_FILES['file']['error'] !== UPLOAD_ERR_NO_FILE);
+    if ($message === '' && !$hasFile) fail(400, 'Mensaje vacío');
 
-    // Para esquemas con message NOT NULL, usa '' si no hay texto
-    $messageForDB = ($message !== '' ? $message : '');
-
+    // Guardar (compatibilidad STRICT MODE)
     try {
       $pdo->beginTransaction();
       try { $pdo->exec("SET time_zone = '+00:00'"); } catch (\Throwable $tz) { /* ignore */ }
 
-      // Inserta SIEMPRE created_at=NOW() (compatibilidad STRICT MODE)
+      // Si hubo adjunto, terminar de mover y componer path público
+      if ($hasFile) {
+        $ext = strtolower(pathinfo($_FILES['file']['name'], PATHINFO_EXTENSION));
+        $dir = __DIR__ . '/../uploads/support/';
+        if (!is_dir($dir) && !@mkdir($dir, 0777, true)) {
+          fail(500, 'No se pudo preparar el directorio de adjuntos');
+        }
+        $dest = $dir . uniqid('att_', true) . '.' . $ext; // ← CORRECCIÓN del bug anterior (+ → .)
+        if (!@move_uploaded_file($_FILES['file']['tmp_name'], $dest)) {
+          fail(500, 'No se pudo guardar el adjunto');
+        }
+        $filePath = 'uploads/support/' . basename($dest);
+      }
+
+      // Para esquemas con message NOT NULL, usa '' si no hay texto
+      $messageForDB = ($message !== '' ? $message : '');
+
       $ins = $pdo->prepare("
         INSERT INTO support_messages (ticket_id, sender, message, file_path, created_at)
         VALUES (?, 'admin', ?, ?, NOW())
