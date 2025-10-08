@@ -1,5 +1,5 @@
 <?php
-// admin_chat.php — Vista simple SOLO LECTURA para administradores (con full_name)
+// admin_chat.php — Vista simple SOLO LECTURA para administradores (con full_name + auto-refresh)
 declare(strict_types=1);
 
 header('Content-Type: text/html; charset=utf-8');
@@ -12,15 +12,11 @@ if (session_status() !== PHP_SESSION_ACTIVE) session_start();
 require_once __DIR__ . '/db.php';   // Debe definir $pdo (PDO conectado)
 
 function is_admin(): bool {
-  // ADAPTA ESTO a tu app real. Ejemplos:
-  // return !empty($_SESSION['is_admin']);               // 1 / true
-  // return ($_SESSION['role'] ?? null) === 'admin';
-  // Para demo: acepta si cualquiera de los dos está presente.
+  // Mantén esta lógica flexible como la venías usando
   if (!empty($_SESSION['is_admin'])) return true;
   if (($_SESSION['role'] ?? null) === 'admin') return true;
   return false;
 }
-
 
 // ---------------- Helpers ----------------
 function h(?string $s): string {
@@ -38,12 +34,90 @@ function hasColumn(PDO $pdo, string $table, string $col): bool {
   return (bool)$st->fetchColumn();
 }
 
+// ----------- Guard de seguridad -----------
+if (!isset($_SESSION['user_id'])) {
+  http_response_code(401);
+  echo '<h1>No autenticado</h1>';
+  exit;
+}
+if (!is_admin()) {
+  http_response_code(403);
+  echo '<h1>Acceso restringido</h1><p>Esta página es solo para administradores.</p>';
+  exit;
+}
+
 // Descubrir columnas
 $hasPublicId       = hasColumn($pdo, 'support_tickets', 'public_id');
 $hasUnreadAdm      = hasColumn($pdo, 'support_tickets', 'unread_admin');
 $hasUnreadUser     = hasColumn($pdo, 'support_tickets', 'unread_user');
 $usersHasFullName  = hasColumn($pdo, 'users', 'full_name');
-$msgHasFullName    = hasColumn($pdo, 'support_messages', 'full_name'); // por si existiera ahí también (opcional)
+$msgHasFullName    = hasColumn($pdo, 'support_messages', 'full_name'); // opcional
+
+// ===== AJAX: devolver mensajes del ticket en JSON (solo admin) =====
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'messages') {
+  header('Content-Type: application/json; charset=utf-8');
+  if (!is_admin()) {
+    http_response_code(403);
+    echo json_encode(['ok'=>false,'error'=>'forbidden']);
+    exit;
+  }
+  $ticketAjax = (int)($_GET['ticket'] ?? 0);
+  if ($ticketAjax <= 0) {
+    echo json_encode(['ok'=>false,'error'=>'ticket invalid']);
+    exit;
+  }
+
+  // Traer info básica del ticket + nombre del dueño (si existe)
+  $fieldsAjax = "t.id, t.user_id";
+  if ($usersHasFullName) $fieldsAjax .= ", u.full_name AS user_full_name";
+  $stA = $pdo->prepare("
+    SELECT $fieldsAjax
+    FROM support_tickets t
+    LEFT JOIN users u ON u.id = t.user_id
+    WHERE t.id = ?
+    LIMIT 1
+  ");
+  $stA->execute([$ticketAjax]);
+  $tk = $stA->fetch(PDO::FETCH_ASSOC);
+  if (!$tk) {
+    echo json_encode(['ok'=>false,'error'=>'ticket not found']);
+    exit;
+  }
+  $ticketUserNameAjax = $usersHasFullName ? (string)($tk['user_full_name'] ?? '') : '';
+
+  // Campos de mensajes
+  $msgFields = "m.sender, m.message, m.file_path, m.created_at";
+  if ($msgHasFullName) $msgFields .= ", m.full_name AS msg_full_name";
+
+  $mA = $pdo->prepare("
+    SELECT $msgFields
+    FROM support_messages m
+    WHERE m.ticket_id = ?
+    ORDER BY m.id ASC
+  ");
+  $mA->execute([$ticketAjax]);
+  $rows = $mA->fetchAll(PDO::FETCH_ASSOC);
+
+  // Normalizar a payload simple para el front
+  $out = [];
+  foreach ($rows as $r) {
+    $whoDefault = ($r['sender']==='user') ? ($ticketUserNameAjax ?: 'Usuario') : 'Agente';
+    $who = $whoDefault;
+    if ($msgHasFullName && isset($r['msg_full_name']) && trim((string)$r['msg_full_name'])!=='') {
+      $who = (string)$r['msg_full_name'];
+    }
+    $out[] = [
+      'who'       => $who,
+      'sender'    => (string)$r['sender'],
+      'message'   => (string)($r['message'] ?? ''),
+      'file_path' => (string)($r['file_path'] ?? ''),
+      'created_at'=> (string)($r['created_at'] ?? '')
+    ];
+  }
+
+  echo json_encode(['ok'=>true,'messages'=>$out], JSON_UNESCAPED_UNICODE);
+  exit;
+}
 
 // ---------------- Parámetros ----------------
 $allowedStatuses = ['all','open','pending','closed'];
@@ -82,7 +156,6 @@ if ($q !== '') {
       $cond[] = "t.public_id LIKE ?";
       $args[] = '%'.$q.'%';
     }
-    // incluir búsqueda por nombre si se escribe texto y tienes full_name
     if ($usersHasFullName && !ctype_digit($q)) {
       $cond[] = "u.full_name LIKE ?";
       $args[] = '%'.$q.'%';
@@ -127,7 +200,6 @@ if ($ticketId > 0) {
   }
 
   if ($ticketSel) {
-    // Si además tienes full_name en support_messages, lo traemos (opcional)
     $msgFields = "m.sender, m.message, m.file_path, m.created_at";
     if ($msgHasFullName) $msgFields .= ", m.full_name AS msg_full_name";
 
@@ -141,7 +213,6 @@ if ($ticketId > 0) {
     $messages = $m->fetchAll(PDO::FETCH_ASSOC);
   }
 }
-
 ?>
 <!doctype html>
 <html lang="es">
@@ -255,7 +326,8 @@ if ($ticketId > 0) {
       </div>
     </div>
 
-    <div class="messages">
+    <!-- IMPORTANTE: id="msgs" + data-ticket para el auto-refresh -->
+    <div class="messages" id="msgs" <?php if($ticketSel): ?> data-ticket="<?= (int)$ticketSel['id'] ?>"<?php endif; ?>>
       <?php if (!$ticketSel): ?>
         <div class="empty">No hay ticket seleccionado.</div>
       <?php else: ?>
@@ -263,9 +335,7 @@ if ($ticketId > 0) {
           <div class="empty">Este ticket no tiene mensajes.</div>
         <?php else: ?>
           <?php foreach ($messages as $m):
-            // Nombre a mostrar por mensaje
             $whoDefault = ($m['sender'] === 'user') ? ($ticketUserName ?: 'Usuario') : 'Agente';
-            // Si además tienes full_name por mensaje (columna en support_messages), úsalo con prioridad:
             if ($msgHasFullName && trim((string)($m['msg_full_name'] ?? '')) !== '') {
               $who = (string)$m['msg_full_name'];
             } else {
@@ -292,5 +362,76 @@ if ($ticketId > 0) {
     </div>
   </main>
 </div>
+
+<script>
+(function(){
+  const box = document.getElementById('msgs');
+  if (!box) return;
+
+  const ticketId = parseInt(box.getAttribute('data-ticket') || '0', 10);
+  if (!ticketId) return;
+
+  function esc(s){
+    return (s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  }
+
+  function render(messages){
+    if (!Array.isArray(messages) || !messages.length){
+      box.innerHTML = '<div class="empty">Este ticket no tiene mensajes.</div>';
+      return;
+    }
+    let html = '';
+    for (const m of messages){
+      const who = esc(m.who || ((m.sender==='user')?'Usuario':'Agente'));
+      const ts  = esc(m.created_at || '');
+      const body= (m.message && m.message !== '') ? '<div class="body">'+esc(m.message).replace(/\n/g,'<br>')+'</div>' : '<div class="body muted">(sin texto)</div>';
+      const att = (m.file_path && m.file_path!=='') ? `<div style="margin-top:8px"><a href="${esc(m.file_path)}" target="_blank" rel="noopener">Ver adjunto</a></div>` : '';
+      html += `
+        <div class="msg">
+          <div class="head">${who} <span class="muted">· ${ts}</span></div>
+          ${body}
+          ${att}
+        </div>`;
+    }
+    box.innerHTML = html;
+    box.scrollTop = box.scrollHeight + 120;
+  }
+
+  let pollTimer = null;
+  const POLL_MS = 7000; // 7 s
+
+  async function fetchMessages(){
+    try {
+      const u = new URL(window.location.href);
+      u.searchParams.set('ajax','messages');
+      u.searchParams.set('ticket', String(ticketId));
+      const res = await fetch(u.toString(), { headers: { 'Accept':'application/json' }});
+      const data = await res.json();
+      if (!data || !data.ok || !Array.isArray(data.messages)) return;
+      render(data.messages);
+    } catch (e) {
+      // Silencio para no romper UI si falla puntualmente
+    }
+  }
+
+  function start(){
+    stop();
+    if (document.hidden) return;
+    pollTimer = setInterval(fetchMessages, POLL_MS);
+  }
+  function stop(){
+    if (pollTimer){ clearInterval(pollTimer); pollTimer = null; }
+  }
+
+  // Primera sincronización + polling
+  fetchMessages().then(start);
+
+  // Pausar/reanudar según visibilidad
+  document.addEventListener('visibilitychange', ()=>{
+    if (document.hidden) stop(); else start();
+  });
+})();
+</script>
+
 </body>
 </html>
