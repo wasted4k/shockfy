@@ -11,11 +11,14 @@ ini_set('log_errors','1');
 if (session_status() !== PHP_SESSION_ACTIVE) session_start();
 require_once __DIR__ . '/db.php';   // Debe definir $pdo (PDO conectado)
 
-// Verificar rol admin (ajusta si usas otro campo/valor)
-if (empty($currentUser['role']) || strtolower($currentUser['role']) !== 'admin') {
-  http_response_code(403);
-  echo 'Acceso denegado';
-  exit;
+function is_admin(): bool {
+  // ADAPTA ESTO a tu app real. Ejemplos:
+  // return !empty($_SESSION['is_admin']);               // 1 / true
+  // return ($_SESSION['role'] ?? null) === 'admin';
+  // Para demo: acepta si cualquiera de los dos está presente.
+  if (!empty($_SESSION['is_admin'])) return true;
+  if (($_SESSION['role'] ?? null) === 'admin') return true;
+  return false;
 }
 
 
