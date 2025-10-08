@@ -7,7 +7,7 @@ header('Content-Type: application/json; charset=utf-8');
 error_reporting(E_ALL);
 ini_set('display_errors','0');   // nunca HTML de errores
 ini_set('html_errors','0');
-ini_set('log_errors','1');       // log al error_log del servidor
+ini_set('log_errors','1');
 ob_start();
 
 /* ===== Dependencias ===== */
@@ -137,7 +137,7 @@ function ensureUserTicket(PDO $pdo, int $userId): ?array {
       'user_id'         => $userId,
       'status'          => 'open',
       'unread_admin'    => 0,
-      'unread_user'     => $hasUnreadUser ? 0 : null,
+      'unread_user'     => hasColumn($pdo, 'support_tickets', 'unread_user') ? 0 : null,
       'last_message_at' => $now,
       'created_at'      => $now,
       'updated_at'      => $now,
@@ -156,6 +156,35 @@ function requireTicketOrFail(?array $ticket): array {
   return $ticket;
 }
 
+/**
+ * Devuelve el ticket más reciente del usuario.
+ * Prioriza open/pending; si no hay, devuelve el más reciente en cualquier estado.
+ * Si no existe ninguno, devuelve null.
+ */
+function getLatestUserTicket(PDO $pdo, int $userId): ?array {
+  // 1) Prioriza abiertos/pendientes por última actividad
+  $q1 = $pdo->prepare("
+    SELECT * FROM support_tickets
+    WHERE user_id=? AND status IN('open','pending')
+    ORDER BY last_message_at DESC, id DESC
+    LIMIT 1
+  ");
+  $q1->execute([$userId]);
+  $t = $q1->fetch(PDO::FETCH_ASSOC);
+  if ($t) return $t;
+
+  // 2) Si no hay abiertos/pendientes, devuelve el más reciente en cualquier estado
+  $q2 = $pdo->prepare("
+    SELECT * FROM support_tickets
+    WHERE user_id=?
+    ORDER BY last_message_at DESC, id DESC
+    LIMIT 1
+  ");
+  $q2->execute([$userId]);
+  $t = $q2->fetch(PDO::FETCH_ASSOC);
+  return $t ?: null;
+}
+
 /* ===== Router ===== */
 try {
   $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -163,7 +192,13 @@ try {
 
   /* --- GET: hilo --- */
   if ($method === 'GET' && $action === 'thread') {
-    $ticket = ensureUserTicket($pdo, (int)$user_id);
+    // Mostrar SIEMPRE el ticket más reciente del usuario (aunque esté resolved)
+    $ticket = getLatestUserTicket($pdo, (int)$user_id);
+
+    // Si el usuario aún no tiene ningún ticket, recién creamos uno open
+    if (!$ticket) {
+      $ticket = ensureUserTicket($pdo, (int)$user_id);
+    }
     $ticket = requireTicketOrFail($ticket);
 
     $m = $pdo->prepare("
@@ -185,7 +220,7 @@ try {
     respond(200, [
       'ok'        => true,
       'ticket'    => $ticket['id'],
-      'public_id' => $ticket['public_id'],
+      'public_id' => $ticket['public_id'] ?? null,
       'messages'  => $messages
     ]);
   }
@@ -231,7 +266,7 @@ try {
     // No permitir ambos vacíos
     if ($message === '' && !$filePath) fail(400, 'Mensaje vacío');
 
-    // Ticket válido
+    // Ticket válido (si el último era resolved/pending/open, seguimos usando el más reciente open/pending o creamos uno)
     $ticket = ensureUserTicket($pdo, (int)$user_id);
     $ticket = requireTicketOrFail($ticket);
 
