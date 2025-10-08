@@ -1,6 +1,6 @@
 <?php
-// admin_chat.php — Vista SOLO LECTURA + responder como admin
-// Funciones: full_name, auto-refresh mensajes (derecha) + auto-refresh lista (izquierda) con dot no leído + enviar como agent
+// admin_chat.php — Admin: ver, responder y CERRAR (resolver) tickets
+// Incluye: full_name, auto-refresh mensajes + lista, dot no leído, envío agent/admin, y botón "Marcar como resuelto"
 declare(strict_types=1);
 
 header('Content-Type: text/html; charset=utf-8');
@@ -35,11 +35,6 @@ function hasColumn(PDO $pdo, string $table, string $col): bool {
 }
 
 // ----------- Guard -----------
-if (!isset($_SESSION['user_id'])) {
-  http_response_code(401);
-  echo '<h1>No autenticado</h1>';
-  exit;
-}
 if (!is_admin()) {
   http_response_code(403);
   echo '<h1>Acceso restringido</h1><p>Solo administradores.</p>';
@@ -53,8 +48,8 @@ $hasUnreadUser     = hasColumn($pdo, 'support_tickets', 'unread_user');
 $usersHasFullName  = hasColumn($pdo, 'users', 'full_name');
 $msgHasFullName    = hasColumn($pdo, 'support_messages', 'full_name'); // opcional
 
-// ---------------- Parámetros comunes (usados en HTML y AJAX) ----------------
-$allowedStatuses = ['all','open','pending','closed'];
+// ---------------- Parámetros comunes ----------------
+$allowedStatuses = ['all','open','pending','closed','resolved'];
 $status = $_GET['status'] ?? 'open';
 if (!in_array($status, $allowedStatuses, true)) $status = 'open';
 
@@ -62,15 +57,16 @@ $q = trim((string)($_GET['q'] ?? ''));
 $ticketId = (int)($_GET['ticket'] ?? 0);
 $limit = max(1, min((int)($_GET['limit'] ?? 100), 500));
 
-// ---------------- ENDPOINT AJAX: MENSAJES DEL TICKET ----------------
+/* ===================================
+   AJAX: MENSAJES DEL TICKET
+=================================== */
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'messages') {
   header('Content-Type: application/json; charset=utf-8');
-  if (!is_admin()) { http_response_code(403); echo json_encode(['ok'=>false,'error'=>'forbidden']); exit; }
 
   $ticketAjax = (int)($_GET['ticket'] ?? 0);
   if ($ticketAjax <= 0) { echo json_encode(['ok'=>false,'error'=>'ticket invalid']); exit; }
 
-  $fieldsAjax = "t.id, t.user_id";
+  $fieldsAjax = "t.id, t.user_id, t.status";
   if ($usersHasFullName) $fieldsAjax .= ", u.full_name AS user_full_name";
   $stA = $pdo->prepare("
     SELECT $fieldsAjax
@@ -85,8 +81,9 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'messages') {
 
   // marcar leído si corresponde
   if ($hasUnreadAdm && (isset($_GET['markread']) && $_GET['markread'] === '1')) {
-    $upd = $pdo->prepare("UPDATE support_tickets SET unread_admin=0, updated_at=NOW() WHERE id=?");
-    try { $upd->execute([$ticketAjax]); } catch (\Throwable $e) { /* ignore */ }
+    try {
+      $pdo->prepare("UPDATE support_tickets SET unread_admin=0, updated_at=NOW() WHERE id=?")->execute([$ticketAjax]);
+    } catch (\Throwable $e) {}
   }
 
   $ticketUserNameAjax = $usersHasFullName ? (string)($tk['user_full_name'] ?? '') : '';
@@ -117,14 +114,15 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'messages') {
     ];
   }
 
-  echo json_encode(['ok'=>true,'messages'=>$out], JSON_UNESCAPED_UNICODE);
+  echo json_encode(['ok'=>true,'messages'=>$out,'status'=>(string)($tk['status'] ?? '')], JSON_UNESCAPED_UNICODE);
   exit;
 }
 
-// ---------------- ENDPOINT AJAX: LISTA DE TICKETS (para dots vivos) ----------------
+/* ===================================
+   AJAX: LISTA DE TICKETS
+=================================== */
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'tickets') {
   header('Content-Type: application/json; charset=utf-8');
-  if (!is_admin()) { http_response_code(403); echo json_encode(['ok'=>false,'error'=>'forbidden']); exit; }
 
   $statusAjax = $_GET['status'] ?? 'open';
   $qAjax = trim((string)($_GET['q'] ?? ''));
@@ -182,7 +180,40 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'tickets') {
   exit;
 }
 
-// ---------------- QUERY para render inicial (HTML) ----------------
+/* ===================================
+   AJAX: CERRAR (RESOLVER) TICKET
+=================================== */
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'close') {
+  header('Content-Type: application/json; charset=utf-8');
+
+  if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['ok'=>false,'error'=>'Method not allowed']);
+    exit;
+  }
+
+  $ticketClose = (int)($_POST['ticket_id'] ?? 0);
+  if ($ticketClose <= 0) { echo json_encode(['ok'=>false,'error'=>'ticket invalid']); exit; }
+
+  try {
+    $sql = "UPDATE support_tickets
+            SET status='resolved', updated_at=NOW()
+            WHERE id=?";
+    $st = $pdo->prepare($sql);
+    $st->execute([$ticketClose]);
+
+    echo json_encode(['ok'=>true]);
+  } catch (\Throwable $e) {
+    error_log('close ticket fail: '.$e->getMessage());
+    http_response_code(500);
+    echo json_encode(['ok'=>false,'error'=>'internal']);
+  }
+  exit;
+}
+
+/* ===================================
+   RENDER INICIAL (HTML)
+=================================== */
 $fields = "t.id, t.user_id, t.status, t.last_message_at, t.updated_at";
 if ($hasPublicId)  $fields .= ", t.public_id";
 if ($hasUnreadAdm) $fields .= ", t.unread_admin";
@@ -243,8 +274,10 @@ if ($ticketId > 0) {
 
   // Marcar leído al abrir
   if ($ticketSel && $hasUnreadAdm && !empty($ticketSel['unread_admin'])) {
-    $upd = $pdo->prepare("UPDATE support_tickets SET unread_admin=0, updated_at=NOW() WHERE id=?");
-    try { $upd->execute([$ticketId]); $ticketSel['unread_admin'] = 0; } catch (\Throwable $e) { /* ignore */ }
+    try {
+      $pdo->prepare("UPDATE support_tickets SET unread_admin=0, updated_at=NOW() WHERE id=?")->execute([$ticketId]);
+      $ticketSel['unread_admin'] = 0;
+    } catch (\Throwable $e) {}
   }
 
   $msgFields = "m.sender, m.message, m.file_path, m.created_at";
@@ -270,6 +303,7 @@ if ($ticketId > 0) {
     :root{
       --bg:#0f172a; --panel:#111827; --muted:#94a3b8; --text:#e5e7eb;
       --accent:#22c55e; --danger:#ef4444; --link:#38bdf8; --chip:#1f2937;
+      --bluebg:#0b1f2b; --bluetx:#93c5fd;
     }
     *{ box-sizing:border-box; }
     body{ margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif; background:var(--bg); color:var(--text); }
@@ -289,6 +323,7 @@ if ($ticketId > 0) {
     .row{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
     .chip{ display:inline-block; padding:2px 8px; border-radius:999px; background:var(--chip); font-size:12px; }
     .chip.red{ background:#3b0f15; color:#fca5a5; } .chip.green{ background:#0b2b1a; color:#86efac; } .chip.yellow{ background:#2b230b; color:#fde68a; }
+    .chip.blue{ background:var(--bluebg); color:var(--bluetx); }
 
     .dot{
       width:10px; height:10px; border-radius:999px; background:#f43f5e;
@@ -320,6 +355,11 @@ if ($ticketId > 0) {
     }
     .replybar input[type=file]{ color:#e5e7eb; }
     .replybar .btn-send{ background:var(--accent); color:#0b1220; border:0; padding:10px 14px; border-radius:10px; font-weight:700; cursor:pointer; }
+
+    .btn-close{
+      background:#ef4444; color:white; border:0; padding:8px 12px; border-radius:10px; font-weight:700; cursor:pointer;
+    }
+    .btn-close[disabled]{ opacity:.6; cursor:not-allowed; }
   </style>
 </head>
 <body>
@@ -336,6 +376,7 @@ if ($ticketId > 0) {
       <select name="status">
         <option value="open" <?= $status==='open'?'selected':'' ?>>abiertos</option>
         <option value="pending" <?= $status==='pending'?'selected':'' ?>>pendientes</option>
+        <option value="resolved" <?= $status==='resolved'?'selected':'' ?>>resueltos</option>
         <option value="closed" <?= $status==='closed'?'selected':'' ?>>cerrados</option>
         <option value="all" <?= $status==='all'?'selected':'' ?>>todos</option>
       </select>
@@ -351,7 +392,7 @@ if ($ticketId > 0) {
           $tid = (int)$t['id'];
           $isActive = ($tid === $ticketId);
           $statusChip = $t['status'];
-          $chipClass = ($statusChip==='open'?'green':($statusChip==='pending'?'yellow':'red'));
+          $chipClass = ($statusChip==='open'?'green':($statusChip==='pending'?'yellow':($statusChip==='resolved'?'blue':'red')));
           $title = $hasPublicId && !empty($t['public_id']) ? $t['public_id'] : ('#'.$tid);
           $unadm = $hasUnreadAdm ? (int)$t['unread_admin'] : 0;
           $name = $usersHasFullName ? trim((string)($t['user_full_name'] ?? '')) : '';
@@ -385,16 +426,21 @@ if ($ticketId > 0) {
           <?php else: ?>
             <span class="u-line">· user_id: <?= (int)$ticketSel['user_id'] ?></span>
           <?php endif; ?>
-          <span class="u-line">· status: <?= h((string)$ticketSel['status']) ?></span>
+          <span class="u-line">· status: 
+            <span class="chip <?= ($ticketSel['status']==='open'?'green':($ticketSel['status']==='pending'?'yellow':($ticketSel['status']==='resolved'?'blue':'red'))) ?>">
+              <?= h((string)$ticketSel['status']) ?>
+            </span>
+          </span>
+        </div>
+        <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+          <?php if (($ticketSel['status'] ?? '') !== 'resolved'): ?>
+            <button class="btn-close" id="btnCloseTicket">Marcar como resuelto</button>
+          <?php endif; ?>
+          <a href="?ticket=<?= (int)$ticketSel['id'] ?>&status=<?= h($status) ?>&q=<?= urlencode($q) ?>&limit=<?= (int)$limit ?>" class="muted">Actualizar</a>
         </div>
       <?php else: ?>
         <div class="muted">Selecciona un ticket para ver los mensajes</div>
       <?php endif; ?>
-      <div style="margin-left:auto">
-        <?php if ($ticketSel): ?>
-          <a href="?ticket=<?= (int)$ticketSel['id'] ?>&status=<?= h($status) ?>&q=<?= urlencode($q) ?>&limit=<?= (int)$limit ?>" class="muted">Actualizar</a>
-        <?php endif; ?>
-      </div>
     </div>
 
     <div class="messages" id="msgs" <?php if($ticketSel): ?> data-ticket="<?= (int)$ticketSel['id'] ?>"<?php endif; ?>>
@@ -427,8 +473,8 @@ if ($ticketId > 0) {
       <?php endif; ?>
     </div>
 
-    <!-- Formulario de respuesta (solo si hay ticket seleccionado) -->
-    <?php if ($ticketSel): ?>
+    <!-- Formulario de respuesta (solo si hay ticket seleccionado y NO está resuelto) -->
+    <?php if ($ticketSel && ($ticketSel['status'] ?? '') !== 'resolved'): ?>
     <div class="replybar">
       <textarea id="replyText" placeholder="Escribe una respuesta al usuario..." maxlength="4000"></textarea>
       <input type="file" id="replyFile" accept=".png,.jpg,.jpeg,.pdf" />
@@ -440,12 +486,15 @@ if ($ticketId > 0) {
 
 <script>
 (function(){
-  // ---------- Auto-refresh MENSAJES (panel derecho) ----------
+  // ---------- Helpers ----------
+  function esc(s){ return (s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+  function statusChipClass(st){ return st==='open' ? 'green' : (st==='pending' ? 'yellow' : (st==='resolved' ? 'blue' : 'red')); }
+
+  // ---------- Auto-refresh MENSAJES ----------
   const box = document.getElementById('msgs');
   if (box) {
     const ticketId = parseInt(box.getAttribute('data-ticket') || '0', 10);
     if (ticketId) {
-      function esc(s){ return (s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
       function renderMsgs(messages){
         if (!Array.isArray(messages) || !messages.length){
           box.innerHTML = '<div class="empty">Este ticket no tiene mensajes.</div>';
@@ -476,11 +525,25 @@ if ($ticketId > 0) {
           const u = new URL(window.location.href);
           u.searchParams.set('ajax','messages');
           u.searchParams.set('ticket', String(ticketId));
-          u.searchParams.set('markread','1'); // marcar leído al estar abierto
-          const res = await fetch(u.toString(), { headers: { 'Accept':'application/json' }});
+          u.searchParams.set('markread','1');
+          const res = await fetch(u.toString(), {
+            headers: { 'Accept':'application/json' },
+            credentials: 'same-origin'
+          });
           const data = await res.json();
           if (!data || !data.ok || !Array.isArray(data.messages)) return;
           renderMsgs(data.messages);
+
+          // Si el ticket cambió a resolved, ocultar barra de respuesta si existiera
+          if (data.status === 'resolved') {
+            const reply = document.querySelector('.replybar');
+            if (reply) reply.style.display = 'none';
+            const chipSpan = document.querySelector('.toolbar .chip');
+            if (chipSpan) {
+              chipSpan.className = 'chip ' + statusChipClass('resolved');
+              chipSpan.textContent = 'resolved';
+            }
+          }
         } catch (e) {}
       }
 
@@ -512,14 +575,13 @@ if ($ticketId > 0) {
 
         try {
           btn.disabled = true;
-          const res = await fetch('api/admin_support.php', { method:'POST', body: form });
+          const res = await fetch('api/admin_support.php?debug=1', { method:'POST', body: form, credentials:'same-origin' });
           const data = await res.json();
           if (!data || !data.ok){
             alert(data && data.error ? data.error : 'No se pudo enviar');
           } else {
             if (txt) txt.value = '';
             if (fil) fil.value = '';
-            // tras enviar, refrescamos mensajes y (opcionalmente) lista
             fetchMessages();
             if (typeof fetchList === 'function') fetchList();
           }
@@ -544,16 +606,13 @@ if ($ticketId > 0) {
     }
   }
 
-  // ---------- Auto-refresh LISTA (columna izquierda) ----------
+  // ---------- Auto-refresh LISTA ----------
   const listBox = document.getElementById('ticketList');
   if (!listBox) return;
 
   const listStatus = listBox.getAttribute('data-status') || 'open';
   const listQ = listBox.getAttribute('data-q') || '';
   const listLimit = parseInt(listBox.getAttribute('data-limit') || '100', 10);
-
-  function esc(s){ return (s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
-  function statusChipClass(st){ return st==='open' ? 'green' : (st==='pending' ? 'yellow' : 'red'); }
 
   function renderList(rows){
     const activeLink = document.querySelector('.ticket.active');
@@ -595,7 +654,7 @@ if ($ticketId > 0) {
       u.searchParams.set('status', listStatus);
       u.searchParams.set('q', listQ);
       u.searchParams.set('limit', String(listLimit));
-      const res = await fetch(u.toString(), { headers: { 'Accept':'application/json' }});
+      const res = await fetch(u.toString(), { headers: { 'Accept':'application/json' }, credentials:'same-origin' });
       const data = await res.json();
       if (!data || !data.ok || !Array.isArray(data.tickets)) return;
       renderList(data.tickets);
@@ -605,10 +664,46 @@ if ($ticketId > 0) {
   function startList(){ stopList(); if (!document.hidden) pollListTimer = setInterval(fetchList, POLL_LIST_MS); }
   function stopList(){ if (pollListTimer){ clearInterval(pollListTimer); pollListTimer = null; } }
 
-  window.fetchList = fetchList; // para poder invocarla tras enviar
+  window.fetchList = fetchList; // usable tras enviar/cerrar
 
   fetchList().then(startList);
   document.addEventListener('visibilitychange', ()=>{ if (document.hidden) stopList(); else startList(); });
+
+  // ---------- Cerrar ticket (resolver) ----------
+  const btnClose = document.getElementById('btnCloseTicket');
+  if (btnClose && box) {
+    const ticketId = parseInt(box.getAttribute('data-ticket') || '0', 10);
+    btnClose.addEventListener('click', async (e)=>{
+      e.preventDefault();
+      if (!ticketId) return;
+      if (!confirm('¿Marcar este ticket como RESUELTO?')) return;
+
+      btnClose.disabled = true;
+      try {
+        const u = new URL(window.location.href);
+        u.searchParams.set('ajax','close');
+        const form = new FormData();
+        form.append('ticket_id', String(ticketId));
+        const res = await fetch(u.toString(), { method:'POST', body: form, credentials:'same-origin' });
+        const data = await res.json();
+        if (!data || !data.ok) {
+          alert(data && data.error ? data.error : 'No se pudo cerrar el ticket');
+        } else {
+          // Ocultar barra de respuesta y actualizar chip
+          const reply = document.querySelector('.replybar');
+          if (reply) reply.style.display = 'none';
+          const chipSpan = document.querySelector('.toolbar .chip');
+          if (chipSpan) { chipSpan.className = 'chip blue'; chipSpan.textContent = 'resolved'; }
+          // Refrescar lista
+          if (typeof fetchList === 'function') fetchList();
+        }
+      } catch (e) {
+        alert('Error de red al cerrar ticket');
+      } finally {
+        btnClose.disabled = false;
+      }
+    });
+  }
 
 })();
 </script>
