@@ -21,7 +21,6 @@ function is_debug(): bool {
   $v = $_ENV['APP_DEBUG'] ?? '0';
   return (string)$v === '1';
 }
-
 function respond(int $code, array $payload): void {
   http_response_code($code);
   if (ob_get_length() !== false) { @ob_clean(); }
@@ -66,101 +65,9 @@ function colIsNotNull(PDO $pdo, string $table, string $col): bool {
 $user_id = $_SESSION['user_id'] ?? null;
 if (!$user_id) fail(401, 'No autenticado', 'NO_AUTH');
 
-/* ===== Tickets ===== */
-function ensureUserTicket(PDO $pdo, int $userId): ?array {
-  // 1) Ticket abierto o pendiente
-  $q = $pdo->prepare("SELECT * FROM support_tickets WHERE user_id=? AND status IN('open','pending') ORDER BY id DESC LIMIT 1");
-  $q->execute([$userId]);
-  $t = $q->fetch(PDO::FETCH_ASSOC);
-  if ($t) return $t;
+/* ===== Helpers de tickets ===== */
 
-  // 2) Crear ticket adaptando al esquema (public_id NOT NULL, unread_user ausente, etc.)
-  try {
-    $pdo->beginTransaction();
-
-    try { $pdo->exec("SET time_zone = '+00:00'"); } catch (\Throwable $tz) { /* ignore */ }
-
-    $hasUnreadUser   = hasColumn($pdo, 'support_tickets', 'unread_user');
-    $hasPublicId     = hasColumn($pdo, 'support_tickets', 'public_id');
-    $publicNotNull   = $hasPublicId ? colIsNotNull($pdo, 'support_tickets', 'public_id') : false;
-
-    // Armamos columnas/valores dinámicamente
-    $cols = ['user_id','status','unread_admin','last_message_at','created_at','updated_at'];
-    $vals = ['?','?','?','NOW()','NOW()','NOW()'];
-    $args = [$userId, 'open', 0];
-
-    if ($hasUnreadUser) {
-      $cols[] = 'unread_user';
-      $vals[] = '?';
-      $args[] = 0;
-    }
-
-    $tmpPublic = null;
-    if ($hasPublicId && $publicNotNull) {
-      // Si public_id es NOT NULL, ponemos un valor temporal único para no violar la restricción
-      $tmpPublic = 'TMP-'.bin2hex(random_bytes(5));
-      $cols[] = 'public_id';
-      $vals[] = '?';
-      $args[] = $tmpPublic;
-    }
-
-    $sql = "INSERT INTO support_tickets (".implode(',', $cols).") VALUES (".implode(',', $vals).")";
-    $ins = $pdo->prepare($sql);
-    if (!$ins->execute($args)) {
-      $ei = $ins->errorInfo();
-      throw new \PDOException($ei[2] ?? 'No se pudo insertar ticket');
-    }
-
-    $id = (int)$pdo->lastInsertId();
-    if ($id <= 0) throw new \PDOException('ID de ticket inválido');
-
-    // Actualizar public_id definitivo si la columna existe
-    if ($hasPublicId) {
-      $public = sprintf('ST-%06d', $id);
-      $up = $pdo->prepare("UPDATE support_tickets SET public_id=? WHERE id=?");
-      if (!$up->execute([$public, $id])) {
-        $ei = $up->errorInfo();
-        throw new \PDOException($ei[2] ?? 'No se pudo actualizar public_id');
-      }
-      $finalPublic = $public;
-    } else {
-      $finalPublic = null;
-    }
-
-    $pdo->commit();
-
-    $now = date('Y-m-d H:i:s');
-    // Construye el array sin SELECT adicional
-    return [
-      'id'              => $id,
-      'public_id'       => $finalPublic,
-      'user_id'         => $userId,
-      'status'          => 'open',
-      'unread_admin'    => 0,
-      'unread_user'     => hasColumn($pdo, 'support_tickets', 'unread_user') ? 0 : null,
-      'last_message_at' => $now,
-      'created_at'      => $now,
-      'updated_at'      => $now,
-    ];
-  } catch (\Throwable $e) {
-    if ($pdo->inTransaction()) $pdo->rollBack();
-    error_log('ensureUserTicket fail: '.$e->getMessage());
-    return null;
-  }
-}
-
-function requireTicketOrFail(?array $ticket): array {
-  if (!$ticket || empty($ticket['id'])) {
-    fail(500, 'No se pudo obtener/crear ticket', 'ticket null/invalid');
-  }
-  return $ticket;
-}
-
-/**
- * Devuelve el ticket más reciente del usuario.
- * Prioriza open/pending; si no hay, devuelve el más reciente en cualquier estado.
- * Si no existe ninguno, devuelve null.
- */
+/** Devuelve el ticket más reciente del usuario; prioriza open/pending */
 function getLatestUserTicket(PDO $pdo, int $userId): ?array {
   // 1) Prioriza abiertos/pendientes por última actividad
   $q1 = $pdo->prepare("
@@ -185,6 +92,75 @@ function getLatestUserTicket(PDO $pdo, int $userId): ?array {
   return $t ?: null;
 }
 
+/** Crea un nuevo ticket (solo para usar en POST cuando el usuario envía su primer mensaje) */
+function createNewTicket(PDO $pdo, int $userId): ?array {
+  try {
+    $pdo->beginTransaction();
+    try { $pdo->exec("SET time_zone = '+00:00'"); } catch (\Throwable $tz) { /* ignore */ }
+
+    $hasUnreadUser   = hasColumn($pdo, 'support_tickets', 'unread_user');
+    $hasPublicId     = hasColumn($pdo, 'support_tickets', 'public_id');
+    $publicNotNull   = $hasPublicId ? colIsNotNull($pdo, 'support_tickets', 'public_id') : false;
+
+    $cols = ['user_id','status','unread_admin','last_message_at','created_at','updated_at'];
+    $vals = ['?','?','?','NOW()','NOW()','NOW()'];
+    $args = [$userId, 'open', 0];
+
+    if ($hasUnreadUser) {
+      $cols[] = 'unread_user';
+      $vals[] = '?';
+      $args[] = 0;
+    }
+
+    if ($hasPublicId && $publicNotNull) {
+      $tmpPublic = 'TMP-'.bin2hex(random_bytes(5));
+      $cols[] = 'public_id';
+      $vals[] = '?';
+      $args[] = $tmpPublic;
+    }
+
+    $sql = "INSERT INTO support_tickets (".implode(',', $cols).") VALUES (".implode(',', $vals).")";
+    $ins = $pdo->prepare($sql);
+    if (!$ins->execute($args)) {
+      $ei = $ins->errorInfo();
+      throw new \PDOException($ei[2] ?? 'No se pudo insertar ticket');
+    }
+
+    $id = (int)$pdo->lastInsertId();
+    if ($id <= 0) throw new \PDOException('ID de ticket inválido');
+
+    $finalPublic = null;
+    if ($hasPublicId) {
+      $public = sprintf('ST-%06d', $id);
+      $up = $pdo->prepare("UPDATE support_tickets SET public_id=? WHERE id=?");
+      if (!$up->execute([$public, $id])) {
+        $ei = $up->errorInfo();
+        throw new \PDOException($ei[2] ?? 'No se pudo actualizar public_id');
+      }
+      $finalPublic = $public;
+    }
+
+    $pdo->commit();
+
+    $now = date('Y-m-d H:i:s');
+    return [
+      'id'              => $id,
+      'public_id'       => $finalPublic,
+      'user_id'         => $userId,
+      'status'          => 'open',
+      'unread_admin'    => 0,
+      'unread_user'     => hasColumn($pdo, 'support_tickets', 'unread_user') ? 0 : null,
+      'last_message_at' => $now,
+      'created_at'      => $now,
+      'updated_at'      => $now,
+    ];
+  } catch (\Throwable $e) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
+    error_log('createNewTicket fail: '.$e->getMessage());
+    return null;
+  }
+}
+
 /* ===== Router ===== */
 try {
   $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -192,34 +168,33 @@ try {
 
   /* --- GET: hilo --- */
   if ($method === 'GET' && $action === 'thread') {
-    // Mostrar SIEMPRE el ticket más reciente del usuario (aunque esté resolved)
+    // 🔹 NO crear ticket al abrir el chat: solo devolver el más reciente si existe
     $ticket = getLatestUserTicket($pdo, (int)$user_id);
 
-    // Si el usuario aún no tiene ningún ticket, recién creamos uno open
-    if (!$ticket) {
-      $ticket = ensureUserTicket($pdo, (int)$user_id);
-    }
-    $ticket = requireTicketOrFail($ticket);
+    $ticket_id = $ticket['id'] ?? null;
+    $messages = [];
 
-    $m = $pdo->prepare("
-      SELECT sender, message, file_path, created_at
-      FROM support_messages
-      WHERE ticket_id=?
-      ORDER BY id ASC
-    ");
-    $m->execute([(int)$ticket['id']]);
-    $messages = $m->fetchAll(PDO::FETCH_ASSOC);
+    if ($ticket_id) {
+      $m = $pdo->prepare("
+        SELECT sender, message, file_path, created_at
+        FROM support_messages
+        WHERE ticket_id=?
+        ORDER BY id ASC
+      ");
+      $m->execute([$ticket_id]);
+      $messages = $m->fetchAll(PDO::FETCH_ASSOC);
 
-    // marcar leído para usuario (si existe la columna)
-    if (hasColumn($pdo, 'support_tickets', 'unread_user')) {
-      try {
-        $pdo->prepare("UPDATE support_tickets SET unread_user=0 WHERE id=?")->execute([(int)$ticket['id']]);
-      } catch (\Throwable $e) { /* ignore */ }
+      // marcar leído para usuario (si existe la columna)
+      if (hasColumn($pdo, 'support_tickets', 'unread_user')) {
+        try {
+          $pdo->prepare("UPDATE support_tickets SET unread_user=0 WHERE id=?")->execute([$ticket_id]);
+        } catch (\Throwable $e) { /* ignore */ }
+      }
     }
 
     respond(200, [
       'ok'        => true,
-      'ticket'    => $ticket['id'],
+      'ticket'    => $ticket_id,                 // puede ser null si nunca escribió
       'public_id' => $ticket['public_id'] ?? null,
       'messages'  => $messages
     ]);
@@ -243,7 +218,7 @@ try {
       if ($_FILES['file']['error'] !== UPLOAD_ERR_OK) {
         fail(400, 'Error al subir archivo', 'php upload err='.(string)$_FILES['file']['error']);
       }
-      // Límite blando 2MB
+      // Límite 2MB
       if (!empty($_FILES['file']['size']) && (int)$_FILES['file']['size'] > 2*1024*1024) {
         fail(413, 'Adjunto excede 2 MB');
       }
@@ -266,9 +241,12 @@ try {
     // No permitir ambos vacíos
     if ($message === '' && !$filePath) fail(400, 'Mensaje vacío');
 
-    // Ticket válido (si el último era resolved/pending/open, seguimos usando el más reciente open/pending o creamos uno)
-    $ticket = ensureUserTicket($pdo, (int)$user_id);
-    $ticket = requireTicketOrFail($ticket);
+    // 🔹 Crear ticket SOLO ahora si no existe uno activo (open/pending)
+    $ticket = getLatestUserTicket($pdo, (int)$user_id);
+    if (!$ticket || !in_array(($ticket['status'] ?? ''), ['open','pending'], true)) {
+      $ticket = createNewTicket($pdo, (int)$user_id);
+      if (!$ticket) fail(500, 'No se pudo crear ticket', 'createNewTicket null');
+    }
 
     // Para esquemas con message NOT NULL, usa '' si no hay texto
     $messageForDB = ($message !== '' ? $message : '');
@@ -277,7 +255,7 @@ try {
       $pdo->beginTransaction();
       try { $pdo->exec("SET time_zone = '+00:00'"); } catch (\Throwable $tz) { /* ignore */ }
 
-      // Inserta SIEMPRE created_at=NOW() (compatibilidad STRICT MODE)
+      // Inserta mensaje
       $ins = $pdo->prepare("
         INSERT INTO support_messages (ticket_id, sender, message, file_path, created_at)
         VALUES (?, 'user', ?, ?, NOW())
@@ -288,17 +266,17 @@ try {
         fail(500, 'Error interno', 'INSERT support_messages: '.($ei[2] ?? 'desconocido'));
       }
 
-      // Actualizar ticket (si hay unread_admin)
+      // Actualizar ticket (status/open + last_message + unread_admin si existe)
       if (hasColumn($pdo, 'support_tickets', 'unread_admin')) {
         $upd = $pdo->prepare("
           UPDATE support_tickets
-          SET unread_admin=1, last_message_at=NOW(), updated_at=NOW()
+          SET status='open', unread_admin=1, last_message_at=NOW(), updated_at=NOW()
           WHERE id=?
         ");
       } else {
         $upd = $pdo->prepare("
           UPDATE support_tickets
-          SET last_message_at=NOW(), updated_at=NOW()
+          SET status='open', last_message_at=NOW(), updated_at=NOW()
           WHERE id=?
         ");
       }

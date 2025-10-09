@@ -426,7 +426,6 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
 })();
 </script>
 
-
 <!-- Chat -->
 <script>
 document.addEventListener('DOMContentLoaded', function(){
@@ -478,12 +477,13 @@ document.addEventListener('DOMContentLoaded', function(){
     bodyMsgs.scrollTop = bodyMsgs.scrollHeight + 120;
   }
 
-  function clearMsgs(){
+  function clearMsgs(hasHistory=false){
     if (!bodyMsgs) return;
-    bodyMsgs.innerHTML = `
+    // Si no hay historial (ticket=null o sin mensajes), mostramos placeholder neutro
+    bodyMsgs.innerHTML = hasHistory ? '' : `
       <div class="support-msg">
         <div><strong>Agente</strong></div>
-        <div>¡Hola! ¿En qué podemos ayudar?</div>
+        <div>Aún no hay conversación. Escribe tu primer mensaje para iniciar el ticket.</div>
       </div>`;
   }
 
@@ -506,7 +506,8 @@ document.addEventListener('DOMContentLoaded', function(){
 
   function startPolling(){
     stopPolling();
-    if (!state.isOpen) return;
+    // 🔹 Solo hacemos polling si el chat está abierto y YA existe un ticket
+    if (!state.isOpen || !state.ticketId) return;
     if (document.hidden) return;
     state.pollTimer = setInterval(async ()=>{ try { await fetchAndAppendNew(); } catch (e) {} }, state.POLL_MS);
   }
@@ -557,34 +558,32 @@ document.addEventListener('DOMContentLoaded', function(){
     const data = await parseJsonResponse(res);
 
     if (reset){
-      clearMsgs();
       state.lastTs = null;
+      // Si no hay mensajes, mostramos placeholder; si hay, limpiamos para listar todos
+      const hasHistory = !!(data && Array.isArray(data.messages) && data.messages.length);
+      clearMsgs(hasHistory);
     }
 
     if (data && typeof data.ticket !== 'undefined') {
-      state.ticketId = data.ticket;
+      state.ticketId = data.ticket || null; // puede ser null
     }
 
-    if (data && Array.isArray(data.messages)){
-      if (reset){
-        for (const m of data.messages){
-          addMsg({
-            who: m.sender === 'user' ? 'me' : 'agent',
-            text: m.message || '',
-            att: m.file_path || '',
-            ts: m.created_at || ''
-          });
-        }
-      }
+    if (data && Array.isArray(data.messages) && data.messages.length){
       for (const m of data.messages){
-        if (!m.created_at) continue;
-        if (!state.lastTs || toDate(m.created_at) > toDate(state.lastTs)){
+        addMsg({
+          who: m.sender === 'user' ? 'me' : 'agent',
+          text: m.message || '',
+          att: m.file_path || '',
+          ts: m.created_at || ''
+        });
+        if (m.created_at && (!state.lastTs || toDate(m.created_at) > toDate(state.lastTs))){
           state.lastTs = m.created_at;
         }
       }
     }
 
-    if (reset) startPolling();
+    // 🔹 Arrancamos polling solo si ya existe ticket
+    startPolling();
   }
 
   async function fetchAndAppendNew(){
@@ -592,7 +591,7 @@ document.addEventListener('DOMContentLoaded', function(){
     const data = await parseJsonResponse(res);
     if (!data || !Array.isArray(data.messages)) return;
 
-    if (typeof data.ticket !== 'undefined') state.ticketId = data.ticket;
+    if (typeof data.ticket !== 'undefined') state.ticketId = data.ticket || null;
 
     const news = [];
     for (const m of data.messages){
@@ -610,10 +609,13 @@ document.addEventListener('DOMContentLoaded', function(){
         att: m.file_path || '',
         ts: m.created_at || ''
       });
-      if (!state.lastTs || toDate(m.created_at) > toDate(state.lastTs)){
+      if (!state.lastTs || (m.created_at && toDate(m.created_at) > toDate(state.lastTs))){
         state.lastTs = m.created_at;
       }
     }
+
+    // Si antes no había ticket y ahora sí (tras el primer envío), iniciar polling
+    if (!state.pollTimer && state.ticketId) startPolling();
   }
 
   async function sendMessage(){
@@ -624,6 +626,10 @@ document.addEventListener('DOMContentLoaded', function(){
       return;
     }
 
+    // Optimista: mostrar mi mensaje de inmediato en la UI
+    if (text){
+      addMsg({ who:'me', text, att:'', ts:new Date().toISOString().slice(0,19).replace('T',' ') });
+    }
     if (input) input.value = '';
 
     const form = new FormData();
@@ -635,21 +641,35 @@ document.addEventListener('DOMContentLoaded', function(){
       const timeoutId = setTimeout(()=>controller.abort(), 15000);
       const res  = await fetch(API_SUPPORT_URL, { method:'POST', body: form, signal: controller.signal });
       clearTimeout(timeoutId);
-      await parseJsonResponse(res);
+      const data = await parseJsonResponse(res);
 
-      await fetchAndAppendNew();
+      // Guardar ticket creado por el backend (primera vez)
+      if (data && data.ticket) {
+        state.ticketId = data.ticket;
+      }
+
+      await fetchAndAppendNew(); // sincronizar tiempos/adjuntos/orden real
       window.showToast && showToast('Mensaje enviado', 'ok');
       if (file) file.value = '';
-    }catch(err){
+
+      // Si se acaba de crear el ticket, inicia polling
+      if (!state.pollTimer && state.ticketId) startPolling();
+
+    } catch(err){
       console.error('Network/JSON error →', err);
       window.showToast ? showToast(err.message || 'Error de red al enviar', 'err') : alert(err.message || 'Error de red al enviar');
     }
   }
 
   sendBtn?.addEventListener('click', (e)=>{ e.preventDefault(); sendMessage(); });
-  input?.addEventListener('keydown', (e)=>{ if ((e.key === 'Enter' && (e.metaKey || e.ctrlKey))){ e.preventDefault(); sendMessage(); } });
+  input?.addEventListener('keydown', (e)=>{
+    if ((e.key === 'Enter' && (e.metaKey || e.ctrlKey))){
+      e.preventDefault(); sendMessage();
+    }
+  });
 });
 </script>
+
 
 
 
