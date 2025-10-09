@@ -481,7 +481,7 @@ if ($ticketId > 0) {
         // 2) Enviar SIEMPRE la notificación simple al usuario
         const notify = new FormData();
         notify.append('ticket_id', String(ticketId));
-        notify.append('message', 'Tu ticket fue marcado como RESUELTO. ¡Gracias por contactarnos!');
+        notify.append('message', 'Tu ticket fue marcado como RESUELTO. NO es necesario que respondas este mensaje, si lo haces abrirás un nuevo ticket. ¡Gracias por contactarnos!');
         try {
           const postReq = await fetch('api/admin_support.php?debug=1', { method:'POST', body: notify, credentials:'same-origin' });
           const postData = await postReq.json();
