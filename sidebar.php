@@ -439,6 +439,59 @@ if (!defined('APP_SLUG')) {
   }
 }
 
+/* ===== Sidebar móvil: scroll suave dentro del panel ===== */
+@media (max-width:1024px){
+  .sidebar{
+    /* cuando está abierto, que el contenido del panel deslice con el dedo */
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    background: var(--bg-sidebar);
+  }
+}
+
+/* ===== Toggle móvil: mismo color del sidebar + efecto slide con scroll ===== */
+.sidebar-mobile-toggle{
+  /* look: azul oscuro como el sidebar */
+  background: var(--bg-sidebar) !important;
+  color: #fff !important;
+  border: 1px solid var(--border-med) !important;
+  box-shadow: 0 10px 24px rgba(0,0,0,.35) !important;
+  border-radius: 14px !important;
+}
+
+@media (max-width:1024px){
+  .sidebar-mobile-toggle{
+    /* que “viaje” con el scroll del documento */
+    position: sticky !important;
+    top: 12px;                 /* pegada arriba */
+    left: 12px;
+    right: auto;
+    transform: translateY(0);
+    transition: transform .25s ease, opacity .25s ease, box-shadow .2s ease;
+    z-index: 130;
+  }
+  /* clase para ocultar en scroll hacia abajo (slide up) */
+  .sidebar-mobile-toggle.is-hidden{
+    transform: translateY(-140%);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* cuando el sidebar esté abierto, escondemos el toggle para no solaparlo */
+  .sidebar.open + .sidebar-overlay + .sidebar-mobile-toggle,
+  .sidebar.open ~ .sidebar-mobile-toggle{
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* overlay a tono (no gris claro) */
+  .sidebar-overlay{
+    background: rgba(17,16,29,.55);
+    backdrop-filter: blur(3px);
+  }
+}
+
+
 
 </style>
 
