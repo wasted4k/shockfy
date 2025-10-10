@@ -55,18 +55,10 @@ if (!defined('APP_SLUG')) {
   --text-subtle:#9aa3b2;
   --border-weak:rgba(255,255,255,.10);
   --border-med:rgba(255,255,255,.16);
-  --brand:#17a2bf;             /* acento */
+  --brand:#17a2bf;             /* acento (se puede ajustar a tu marca) */
   --brand-2:#12849c;
   --accent:#1fb58f;            /* acento secundario */
   --accent-2:#169a7b;
-
-  /* FAB tokens */
-  --fab-blue-1:#15132a;
-  --fab-blue-2:#0F0D21;
-  --fab-border:rgba(255,255,255,.18);
-  --fab-hover:#1b1936;
-  --fab-ring:rgba(33,150,243,.28);
-  --fab-text:#ffffff;
 }
 
 /* ===== Base (sidebar existente) ===== */
@@ -136,79 +128,31 @@ if (!defined('APP_SLUG')) {
 /* ===== Layout responsive ===== */
 .sidebar ~ .page{ margin-left:78px; transition:margin-left .4s ease; }
 .sidebar.open ~ .page{ margin-left:250px; }
-
-/* Sidebar móvil: scroll suave dentro del panel y color consistente */
 @media (max-width:1024px){
-  .sidebar{
-    width:250px;
-    transform: translateX(-100%);
-    padding:10px 14px;
-    overflow: auto;                      /* scroll interno */
-    -webkit-overflow-scrolling: touch;   /* scroll suave en iOS */
-    background: var(--bg-sidebar);
-  }
+  .sidebar{ width:250px; transform: translateX(-100%); padding:10px 14px; }
   .sidebar.open{ transform: translateX(0); }
   .sidebar ~ .page, .sidebar.open ~ .page{ margin-left:0; }
   .sidebar li .tooltip{ display:none !important; }
 }
-
-/* Overlay táctil a tono */
+/* Overlay táctil */
 .sidebar-overlay{
-  position: fixed; inset: 0; background: rgba(17,16,29,.55);
-  backdrop-filter: blur(3px); z-index: 98; opacity:0; pointer-events:none; transition: opacity .2s ease;
+  position: fixed; inset: 0; background: rgba(15,23,42,.35);
+  backdrop-filter: blur(2px); z-index: 98; opacity:0; pointer-events:none; transition: opacity .2s ease;
 }
 @media (max-width:1024px){ .sidebar.open + .sidebar-overlay{ opacity:1; pointer-events:auto; } }
-
-/* Botón hamburguesa flotante para abrir/cerrar en móvil */
-.sidebar-mobile-toggle{
-  position: fixed; top: 12px; left: 12px;
-  display: none; align-items: center; justify-content: center;
-  gap: 6px; padding: 10px; border-radius: 14px;
-  background: var(--bg-sidebar); color: #fff;
-  border: 1px solid var(--border-med);
-  box-shadow: 0 10px 24px rgba(0,0,0,.35);
-  z-index: 101; cursor: pointer;
-  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
-  transition: transform .25s ease, opacity .25s ease, box-shadow .2s ease;
-}
-/* clase opcional para ocultar al hacer scroll (si luego agregas JS) */
-.sidebar-mobile-toggle.is-hidden{ transform: translateY(-140%); opacity: 0; pointer-events: none; }
-
-.sidebar-mobile-toggle i{ font-size: 22px; line-height: 1; }
-@media (max-width:1024px){
-  .sidebar-mobile-toggle{ display: inline-flex; position: sticky; top: 12px; }
-}
 
 /* ===== FAB Soporte ===== */
 .support-fab{
   position: fixed; right: 16px; bottom: 16px; z-index: 120;
-  display: flex !important; align-items: center !important; justify-content: center !important;
-  width: 56px !important; height: 56px !important; border-radius: 20px !important;
-  background: linear-gradient(180deg, var(--fab-blue-1) 0%, var(--fab-blue-2) 100%) !important;
-  border: 1px solid var(--fab-border) !important; color:#fff;
-  box-shadow: 0 10px 28px rgba(0,0,0,.35) !important; cursor: pointer;
-  padding: 0 !important; gap: 0 !important;
-  transition: transform .12s ease, filter .18s ease, box-shadow .18s ease, background .18s ease;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 56px; height: 56px; border-radius: 16px;
+  background: linear-gradient(180deg,var(--brand) 0%, var(--brand-2) 100%);
+  border: 1px solid rgba(255,255,255,.20); color:#fff;
+  box-shadow: 0 10px 24px rgba(2,6,23,.35); cursor: pointer;
 }
-.support-fab i{ font-size: 22px !important; line-height: 1; display: block; transform: translateY(0); }
-.support-fab .label{ display:none; margin-left:8px; font-weight:600; letter-spacing:.2px; }
-.support-fab:hover{
-  background: linear-gradient(180deg, var(--fab-hover) 0%, var(--fab-blue-2) 100%) !important;
-  filter: brightness(1.02); transform: translateY(-1px);
-  box-shadow: 0 14px 32px rgba(0,0,0,.45) !important;
-}
-.support-fab:active{ transform: translateY(0); }
-.support-fab:focus-visible{
-  outline: none;
-  box-shadow: 0 0 0 3px var(--fab-ring), 0 12px 28px rgba(0,0,0,.35) !important;
-}
-@media (min-width:768px){
-  .support-fab{ height: 54px !important; border-radius: 999px !important; padding: 0 16px !important; gap: 8px !important; width: auto !important; }
-  .support-fab .label{ display:inline !important; }
-}
-@media (max-width:1024px){
-  .support-fab{ right: 12px; bottom: 12px; }
-}
+.support-fab i{ font-size: 24px; line-height: 1; }
+.support-fab .label{ display:none; margin-left:8px; font-weight:600; }
+@media (min-width:768px){ .support-fab{ width:auto; padding:0 14px; gap:8px; } .support-fab .label{ display:inline; } }
 
 /* ===== Overlay del chat ===== */
 .support-overlay{
@@ -238,7 +182,7 @@ if (!defined('APP_SLUG')) {
 .support-chat .chat-header{
   position: relative;
   display:flex; align-items:center; justify-content:space-between; gap:10px;
-  min-height: 52px; padding:10px 14px; box-sizing:border-box;
+  padding:12px 14px;
   background: var(--bg-surface-2);
   color: var(--text-strong);
   border-bottom: 1px solid var(--border-weak);
@@ -248,15 +192,13 @@ if (!defined('APP_SLUG')) {
   background: linear-gradient(90deg, var(--brand), var(--accent));
 }
 .support-chat .chat-title{ font-weight: 700; font-size: 15px; letter-spacing:.2px; }
-.support-chat .chat-actions{ display:flex; align-items:center; gap:8px; margin:0; padding:0; }
+.support-chat .chat-actions{ display:flex; gap:6px; }
 .support-chat .icon-btn{
-  width:36px; height:36px; display:flex; align-items:center; justify-content:center;
+  width:34px; height:34px; display:grid; place-items:center;
   border-radius:10px; border:1px solid var(--border-med);
   background: rgba(255,255,255,.04); color:#fff; cursor:pointer; transition: all .15s ease;
-  line-height:1; margin:0; padding:0;
 }
 .support-chat .icon-btn:hover{ background: rgba(255,255,255,.08); transform: translateY(-1px); }
-.support-chat .icon-btn i, .support-chat .icon-btn svg{ display:block; line-height:1; vertical-align:middle; font-size:18px; }
 
 /* Body — fondo uniforme */
 .support-chat .chat-body{
@@ -339,6 +281,165 @@ if (!defined('APP_SLUG')) {
   .support-chat{ bottom: 92px; right: 10px; }
   .support-fab{ right: 12px; bottom: 12px; }
 }
+
+
+/* === Centrado perfecto de los botones del header === */
+
+/* Asegura altura consistente del header y centra verticalmente */
+.support-chat .chat-header{
+  display: flex;
+  align-items: center;          /* centra vertical */
+  min-height: 52px;             /* altura estable */
+  padding: 10px 14px;           /* balancea el acento superior de 2px */
+  box-sizing: border-box;
+}
+
+/* Alinea el contenedor de acciones con el centro exacto */
+.support-chat .chat-actions{
+  display: flex;
+  align-items: center;          /* centra vertical */
+  gap: 8px;                     /* separación óptica */
+  margin: 0; padding: 0;
+}
+
+/* Botón icónico cuadrado, sin “em-baseline” que lo baje */
+.support-chat .icon-btn{
+  width: 36px;
+  height: 36px;
+  display: flex;                /* en lugar de grid, evita baseline raro */
+  align-items: center;
+  justify-content: center;
+  line-height: 1;               /* quita empuje por línea de texto */
+  margin: 0; padding: 0;
+}
+
+/* Si usas íconos de fuente, evita que el glifo “se siente” más abajo */
+.support-chat .icon-btn i,
+.support-chat .icon-btn svg{
+  display: block;
+  line-height: 1;
+  vertical-align: middle;
+  transform: translateY(0);     /* normaliza nudge si algún set trae offset */
+  font-size: 18px;              /* ajusta al cuadrado de 36px */
+}
+
+/* Opcional: si aún percibes 1px de bajada por el acento superior,
+   puedes compensar con este micro-ajuste visual: */
+/*
+.support-chat .chat-actions{ transform: translateY(-1px); }
+*/
+
+
+/* ==== FAB rediseñado: dark blue + pill ==== */
+:root{
+  --fab-blue-1:#15132a;       /* base (match sidebar, un pelo más claro) */
+  --fab-blue-2:#0F0D21;       /* sombra/gradiente */
+  --fab-border:rgba(255,255,255,.18);
+  --fab-hover:#1b1936;        /* hover */
+  --fab-ring:rgba(33,150,243,.28); /* foco accesible */
+  --fab-text:#ffffff;
+}
+
+/* Base: compacto en móvil (redondo), pill en desktop */
+.support-fab{
+  background: linear-gradient(180deg, var(--fab-blue-1) 0%, var(--fab-blue-2) 100%) !important;
+  color: var(--fab-text) !important;
+  border: 1px solid var(--fab-border) !important;
+  box-shadow: 0 10px 28px rgba(0,0,0,.35) !important;
+
+  /* rediseño de forma */
+  width: 56px;
+  height: 56px;
+  border-radius: 20px !important;   /* más redondeado */
+  padding: 0 14px;
+  gap: 8px;
+
+  /* micro-animación */
+  transition: transform .12s ease, filter .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+/* Icono */
+.support-fab i{
+  font-size: 22px !important;
+  line-height: 1;
+  display: inline-block;
+  transform: translateY(0); /* normaliza baselines */
+}
+
+/* Etiqueta (ya la cambias por HTML) */
+.support-fab .label{
+  font-weight: 600;
+  letter-spacing:.2px;
+}
+
+/* Hover/active */
+.support-fab:hover{
+  background: linear-gradient(180deg, var(--fab-hover) 0%, var(--fab-blue-2) 100%) !important;
+  filter: brightness(1.02);
+  transform: translateY(-1px);
+  box-shadow: 0 14px 32px rgba(0,0,0,.45) !important;
+}
+.support-fab:active{
+  transform: translateY(0);
+}
+
+/* Focus ring accesible (teclado) */
+.support-fab:focus-visible{
+  outline: none;
+  box-shadow: 0 0 0 3px var(--fab-ring), 0 12px 28px rgba(0,0,0,.35) !important;
+}
+
+/* En desktop: forma pill más estilizada y cómoda de clicar */
+@media (min-width:768px){
+  .support-fab{
+    height: 54px;
+    border-radius: 999px !important;     /* pill */
+    padding: 0 16px;
+  }
+}
+
+/* Separación respecto al borde inferior/derecho en móviles */
+@media (max-width:1024px){
+  .support-fab{ right: 12px; bottom: 12px; }
+}
+
+/* Centrado perfecto del icono en el FAB */
+.support-fab{
+  display: flex !important;            /* asegúrate de usar flex, no inline-flex */
+  align-items: center !important;       /* centro vertical */
+  justify-content: center !important;   /* centro horizontal */
+  padding: 0 !important;                /* sin padding cuando solo hay icono */
+  gap: 0 !important;                    /* sin gap si no hay label */
+  width: 56px !important;
+  height: 56px !important;
+}
+
+/* Normaliza el glifo del icono (font o svg) */
+.support-fab i,
+.support-fab svg{
+  display: block !important;
+  line-height: 1 !important;            /* quita el baseline que empuja */
+  vertical-align: middle !important;
+  transform: translateY(0) !important;  /* sin “nudge” */
+  font-size: 22px !important;           /* ajusta si lo quieres más grande */
+  height: 1em;                          /* caja consistente */
+  width: 1em;
+}
+
+/* En desktop, si SÍ muestras texto (label), volvemos a forma “pill” */
+@media (min-width:768px){
+  .support-fab .label{ display:inline !important; }
+  .support-fab{
+    padding: 0 16px !important;
+    gap: 8px !important;
+    width: auto !important;
+    height: 54px !important;
+    border-radius: 999px !important;
+    justify-content: center !important;
+  }
+}
+
+
 </style>
 
 
@@ -466,7 +567,7 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
 <!-- ===== FAB Soporte + Chat ===== -->
 <button class="support-fab" id="supportFab" aria-label="Abrir chat de soporte" title="Soporte">
   <i class="bx bx-message-dots" aria-hidden="true"></i>
-  <span class="label">Ay</span>
+  <span class="label">Ayuda</span>
 </button>
 
 <div class="support-overlay" id="supportOverlay" aria-hidden="true"></div>
