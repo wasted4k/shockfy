@@ -330,42 +330,79 @@ if (!defined('APP_SLUG')) {
 */
 
 
-
-/* === FAB "Ayuda" — colores y texto === */
-/* Ajusta estos colores a tu branding si quieres */
+/* ==== FAB rediseñado: dark blue + pill ==== */
 :root{
-  --fab-a:#17a2bf;   /* arriba */
-  --fab-b:#12849c;   /* abajo */
-  --fab-hover:#1ab0cd;
-  --fab-border:rgba(255,255,255,.22);
-  --fab-shadow:0 12px 26px rgba(2, 6, 23, .38);
+  --fab-blue-1:#15132a;       /* base (match sidebar, un pelo más claro) */
+  --fab-blue-2:#0F0D21;       /* sombra/gradiente */
+  --fab-border:rgba(255,255,255,.18);
+  --fab-hover:#1b1936;        /* hover */
+  --fab-ring:rgba(33,150,243,.28); /* foco accesible */
+  --fab-text:#ffffff;
 }
 
+/* Base: compacto en móvil (redondo), pill en desktop */
 .support-fab{
-  background: linear-gradient(180deg, var(--fab-a) 0%, var(--fab-b) 100%) !important;
+  background: linear-gradient(180deg, var(--fab-blue-1) 0%, var(--fab-blue-2) 100%) !important;
+  color: var(--fab-text) !important;
   border: 1px solid var(--fab-border) !important;
-  box-shadow: var(--fab-shadow) !important;
+  box-shadow: 0 10px 28px rgba(0,0,0,.35) !important;
+
+  /* rediseño de forma */
+  width: 56px;
+  height: 56px;
+  border-radius: 20px !important;   /* más redondeado */
+  padding: 0 14px;
+  gap: 8px;
+
+  /* micro-animación */
+  transition: transform .12s ease, filter .18s ease, box-shadow .18s ease, background .18s ease;
 }
 
-/* Cambia el texto visible a "Ayuda" sin tocar el HTML */
-.support-fab .label{
-  position: relative;
-  color: transparent;               /* ocultar el texto original */
+/* Icono */
+.support-fab i{
+  font-size: 22px !important;
+  line-height: 1;
+  display: inline-block;
+  transform: translateY(0); /* normaliza baselines */
 }
-.support-fab .label::before{
-  content: "Ayuda";
-  position: absolute; inset: 0 auto 0 0;
-  color: #fff; font-weight: 600;
+
+/* Etiqueta (ya la cambias por HTML) */
+.support-fab .label{
+  font-weight: 600;
+  letter-spacing:.2px;
 }
 
 /* Hover/active */
 .support-fab:hover{
-  filter: brightness(1.05);
+  background: linear-gradient(180deg, var(--fab-hover) 0%, var(--fab-blue-2) 100%) !important;
+  filter: brightness(1.02);
   transform: translateY(-1px);
+  box-shadow: 0 14px 32px rgba(0,0,0,.45) !important;
 }
 .support-fab:active{
   transform: translateY(0);
 }
+
+/* Focus ring accesible (teclado) */
+.support-fab:focus-visible{
+  outline: none;
+  box-shadow: 0 0 0 3px var(--fab-ring), 0 12px 28px rgba(0,0,0,.35) !important;
+}
+
+/* En desktop: forma pill más estilizada y cómoda de clicar */
+@media (min-width:768px){
+  .support-fab{
+    height: 54px;
+    border-radius: 999px !important;     /* pill */
+    padding: 0 16px;
+  }
+}
+
+/* Separación respecto al borde inferior/derecho en móviles */
+@media (max-width:1024px){
+  .support-fab{ right: 12px; bottom: 12px; }
+}
+
 
 
 </style>
