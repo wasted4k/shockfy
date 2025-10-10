@@ -567,7 +567,7 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
 <!-- ===== FAB Soporte + Chat ===== -->
 <button class="support-fab" id="supportFab" aria-label="Abrir chat de soporte" title="Soporte">
   <i class="bx bx-message-dots" aria-hidden="true"></i>
-  <span class="label"></span>
+  <span class="label">Ayuda</span>
 </button>
 
 <div class="support-overlay" id="supportOverlay" aria-hidden="true"></div>
