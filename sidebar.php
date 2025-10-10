@@ -330,6 +330,44 @@ if (!defined('APP_SLUG')) {
 */
 
 
+
+/* === FAB "Ayuda" — colores y texto === */
+/* Ajusta estos colores a tu branding si quieres */
+:root{
+  --fab-a:#17a2bf;   /* arriba */
+  --fab-b:#12849c;   /* abajo */
+  --fab-hover:#1ab0cd;
+  --fab-border:rgba(255,255,255,.22);
+  --fab-shadow:0 12px 26px rgba(2, 6, 23, .38);
+}
+
+.support-fab{
+  background: linear-gradient(180deg, var(--fab-a) 0%, var(--fab-b) 100%) !important;
+  border: 1px solid var(--fab-border) !important;
+  box-shadow: var(--fab-shadow) !important;
+}
+
+/* Cambia el texto visible a "Ayuda" sin tocar el HTML */
+.support-fab .label{
+  position: relative;
+  color: transparent;               /* ocultar el texto original */
+}
+.support-fab .label::before{
+  content: "Ayuda";
+  position: absolute; inset: 0 auto 0 0;
+  color: #fff; font-weight: 600;
+}
+
+/* Hover/active */
+.support-fab:hover{
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+.support-fab:active{
+  transform: translateY(0);
+}
+
+
 </style>
 
 
