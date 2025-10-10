@@ -281,6 +281,55 @@ if (!defined('APP_SLUG')) {
   .support-chat{ bottom: 92px; right: 10px; }
   .support-fab{ right: 12px; bottom: 12px; }
 }
+
+
+/* === Centrado perfecto de los botones del header === */
+
+/* Asegura altura consistente del header y centra verticalmente */
+.support-chat .chat-header{
+  display: flex;
+  align-items: center;          /* centra vertical */
+  min-height: 52px;             /* altura estable */
+  padding: 10px 14px;           /* balancea el acento superior de 2px */
+  box-sizing: border-box;
+}
+
+/* Alinea el contenedor de acciones con el centro exacto */
+.support-chat .chat-actions{
+  display: flex;
+  align-items: center;          /* centra vertical */
+  gap: 8px;                     /* separación óptica */
+  margin: 0; padding: 0;
+}
+
+/* Botón icónico cuadrado, sin “em-baseline” que lo baje */
+.support-chat .icon-btn{
+  width: 36px;
+  height: 36px;
+  display: flex;                /* en lugar de grid, evita baseline raro */
+  align-items: center;
+  justify-content: center;
+  line-height: 1;               /* quita empuje por línea de texto */
+  margin: 0; padding: 0;
+}
+
+/* Si usas íconos de fuente, evita que el glifo “se siente” más abajo */
+.support-chat .icon-btn i,
+.support-chat .icon-btn svg{
+  display: block;
+  line-height: 1;
+  vertical-align: middle;
+  transform: translateY(0);     /* normaliza nudge si algún set trae offset */
+  font-size: 18px;              /* ajusta al cuadrado de 36px */
+}
+
+/* Opcional: si aún percibes 1px de bajada por el acento superior,
+   puedes compensar con este micro-ajuste visual: */
+/*
+.support-chat .chat-actions{ transform: translateY(-1px); }
+*/
+
+
 </style>
 
 
