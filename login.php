@@ -1,4 +1,5 @@
 <?php
+
 session_start();
 
 // Si el usuario ya está logueado, redirigirlo
