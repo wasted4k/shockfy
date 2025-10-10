@@ -403,6 +403,41 @@ if (!defined('APP_SLUG')) {
   .support-fab{ right: 12px; bottom: 12px; }
 }
 
+/* Centrado perfecto del icono en el FAB */
+.support-fab{
+  display: flex !important;            /* asegúrate de usar flex, no inline-flex */
+  align-items: center !important;       /* centro vertical */
+  justify-content: center !important;   /* centro horizontal */
+  padding: 0 !important;                /* sin padding cuando solo hay icono */
+  gap: 0 !important;                    /* sin gap si no hay label */
+  width: 56px !important;
+  height: 56px !important;
+}
+
+/* Normaliza el glifo del icono (font o svg) */
+.support-fab i,
+.support-fab svg{
+  display: block !important;
+  line-height: 1 !important;            /* quita el baseline que empuja */
+  vertical-align: middle !important;
+  transform: translateY(0) !important;  /* sin “nudge” */
+  font-size: 22px !important;           /* ajusta si lo quieres más grande */
+  height: 1em;                          /* caja consistente */
+  width: 1em;
+}
+
+/* En desktop, si SÍ muestras texto (label), volvemos a forma “pill” */
+@media (min-width:768px){
+  .support-fab .label{ display:inline !important; }
+  .support-fab{
+    padding: 0 16px !important;
+    gap: 8px !important;
+    width: auto !important;
+    height: 54px !important;
+    border-radius: 999px !important;
+    justify-content: center !important;
+  }
+}
 
 
 </style>
