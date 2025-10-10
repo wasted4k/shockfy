@@ -329,11 +329,9 @@ if (!defined('APP_SLUG')) {
 
 /* ====== BOTÓN MENÚ (MÓVIL): mismo color y deslizante con scroll ====== */
 .sidebar-mobile-toggle{
-  /* Estado base (desktop): no visible */
-  position: fixed;
+  position: fixed;              /* desktop por defecto (no visible en desktop igual) */
   top: 12px; left: 12px;
-  display: none;
-  align-items: center; justify-content: center;
+  display: none; align-items:center; justify-content:center;
   gap: 6px; padding: 10px 12px; border-radius: 14px;
   background: var(--bg-sidebar); color: #fff;
   border: 1px solid var(--border-med);
@@ -342,27 +340,6 @@ if (!defined('APP_SLUG')) {
   -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
 }
 .sidebar-mobile-toggle i{ font-size: 22px; line-height: 1; }
-
-/* SOLO en mobile: que tenga el MISMO color del sidebar y que SE DESLICE con el scroll */
-@media (max-width:1024px){
-  .sidebar-mobile-toggle{
-    position: sticky !important;                 /* ← se mueve con el scroll */
-    top: calc(12px + env(safe-area-inset-top));  /* respeta notch */
-    left: auto;                                   /* que no “fije” a la izquierda por el fixed base */
-    right: auto;
-    margin: 12px;                                 /* entra al flujo del documento */
-    display: inline-flex;                         /* visible solo en mobile */
-    background: var(--bg-sidebar);                /* mismo azul del menú */
-    color: #fff;
-    border: 1px solid var(--border-med);
-  }
-
-  /* Cuando el sidebar está abierto, opcional: mantenlo visible igual */
-  .sidebar.open ~ .sidebar-mobile-toggle{
-    position: sticky !important;
-  }
-}
-
 
 /* En MOBILE: que tenga el MISMO COLOR y que SE DESLICE con el scroll (sticky) */
 @media (max-width:1024px){
@@ -382,6 +359,28 @@ if (!defined('APP_SLUG')) {
 @media (max-width:1024px){
   .sidebar.open + .sidebar-overlay{ opacity:1; pointer-events:auto; }
 }
+
+
+/* === Botón menú móvil: mismo azul y base fija (el “deslizamiento” lo hace JS) === */
+@media (max-width:1024px){
+  .sidebar-mobile-toggle{
+    position: fixed !important;     /* fijo, pero lo moveremos con JS */
+    top: 12px !important;
+    left: 12px !important;
+    right: auto !important;
+    background: var(--bg-sidebar) !important;  /* azul oscuro del sidebar */
+    color: #fff !important;
+    border: 1px solid var(--border-med) !important;
+    box-shadow: 0 10px 24px rgba(0,0,0,.35) !important;
+    border-radius: 14px !important;
+    transform: translateY(0) !important;       /* punto de partida */
+    will-change: transform;
+    z-index: 130;                               /* por encima del contenido */
+  }
+}
+
+
+
 </style>
 
 <link href="https://unpkg.com/boxicons@2.0.7/css/boxicons.min.css" rel="stylesheet">
