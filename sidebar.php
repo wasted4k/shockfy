@@ -329,9 +329,11 @@ if (!defined('APP_SLUG')) {
 
 /* ====== BOTÓN MENÚ (MÓVIL): mismo color y deslizante con scroll ====== */
 .sidebar-mobile-toggle{
-  position: fixed;              /* desktop por defecto (no visible en desktop igual) */
+  /* Estado base (desktop): no visible */
+  position: fixed;
   top: 12px; left: 12px;
-  display: none; align-items:center; justify-content:center;
+  display: none;
+  align-items: center; justify-content: center;
   gap: 6px; padding: 10px 12px; border-radius: 14px;
   background: var(--bg-sidebar); color: #fff;
   border: 1px solid var(--border-med);
@@ -340,6 +342,27 @@ if (!defined('APP_SLUG')) {
   -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
 }
 .sidebar-mobile-toggle i{ font-size: 22px; line-height: 1; }
+
+/* SOLO en mobile: que tenga el MISMO color del sidebar y que SE DESLICE con el scroll */
+@media (max-width:1024px){
+  .sidebar-mobile-toggle{
+    position: sticky !important;                 /* ← se mueve con el scroll */
+    top: calc(12px + env(safe-area-inset-top));  /* respeta notch */
+    left: auto;                                   /* que no “fije” a la izquierda por el fixed base */
+    right: auto;
+    margin: 12px;                                 /* entra al flujo del documento */
+    display: inline-flex;                         /* visible solo en mobile */
+    background: var(--bg-sidebar);                /* mismo azul del menú */
+    color: #fff;
+    border: 1px solid var(--border-med);
+  }
+
+  /* Cuando el sidebar está abierto, opcional: mantenlo visible igual */
+  .sidebar.open ~ .sidebar-mobile-toggle{
+    position: sticky !important;
+  }
+}
+
 
 /* En MOBILE: que tenga el MISMO COLOR y que SE DESLICE con el scroll (sticky) */
 @media (max-width:1024px){
