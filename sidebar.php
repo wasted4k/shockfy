@@ -479,7 +479,6 @@ document.addEventListener('DOMContentLoaded', function(){
 
   function clearMsgs(hasHistory=false){
     if (!bodyMsgs) return;
-    // Si no hay historial (ticket=null o sin mensajes), mostramos placeholder neutro
     bodyMsgs.innerHTML = hasHistory ? '' : `
       <div class="support-msg">
         <div><strong>Agente</strong></div>
@@ -506,7 +505,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
   function startPolling(){
     stopPolling();
-    // 🔹 Solo hacemos polling si el chat está abierto y YA existe un ticket
+    // Solo hacemos polling si el chat está abierto y YA existe un ticket
     if (!state.isOpen || !state.ticketId) return;
     if (document.hidden) return;
     state.pollTimer = setInterval(async ()=>{ try { await fetchAndAppendNew(); } catch (e) {} }, state.POLL_MS);
@@ -559,7 +558,6 @@ document.addEventListener('DOMContentLoaded', function(){
 
     if (reset){
       state.lastTs = null;
-      // Si no hay mensajes, mostramos placeholder; si hay, limpiamos para listar todos
       const hasHistory = !!(data && Array.isArray(data.messages) && data.messages.length);
       clearMsgs(hasHistory);
     }
@@ -582,8 +580,7 @@ document.addEventListener('DOMContentLoaded', function(){
       }
     }
 
-    // 🔹 Arrancamos polling solo si ya existe ticket
-    startPolling();
+    startPolling(); // solo arranca si hay ticketId
   }
 
   async function fetchAndAppendNew(){
@@ -614,10 +611,10 @@ document.addEventListener('DOMContentLoaded', function(){
       }
     }
 
-    // Si antes no había ticket y ahora sí (tras el primer envío), iniciar polling
     if (!state.pollTimer && state.ticketId) startPolling();
   }
 
+  // ✅ sendMessage SIN pintado optimista (evita duplicados)
   async function sendMessage(){
     const text = (input?.value || '').trim();
     const f = file?.files && file.files[0];
@@ -626,11 +623,9 @@ document.addEventListener('DOMContentLoaded', function(){
       return;
     }
 
-    // Optimista: mostrar mi mensaje de inmediato en la UI
-    if (text){
-      addMsg({ who:'me', text, att:'', ts:new Date().toISOString().slice(0,19).replace('T',' ') });
-    }
-    if (input) input.value = '';
+    // Deshabilitar botón mientras envía para evitar dobles clics
+    const prevSendDisabled = sendBtn?.disabled;
+    if (sendBtn) sendBtn.disabled = true;
 
     const form = new FormData();
     form.append('message', text);
@@ -643,21 +638,26 @@ document.addEventListener('DOMContentLoaded', function(){
       clearTimeout(timeoutId);
       const data = await parseJsonResponse(res);
 
+      // Limpiar inputs
+      if (input) input.value = '';
+      if (file) file.value = '';
+
       // Guardar ticket creado por el backend (primera vez)
       if (data && data.ticket) {
         state.ticketId = data.ticket;
       }
 
-      await fetchAndAppendNew(); // sincronizar tiempos/adjuntos/orden real
+      // Recargar hilo completo (fuente de verdad = backend)
+      await loadThread(true);
       window.showToast && showToast('Mensaje enviado', 'ok');
-      if (file) file.value = '';
 
-      // Si se acaba de crear el ticket, inicia polling
       if (!state.pollTimer && state.ticketId) startPolling();
 
     } catch(err){
       console.error('Network/JSON error →', err);
       window.showToast ? showToast(err.message || 'Error de red al enviar', 'err') : alert(err.message || 'Error de red al enviar');
+    } finally {
+      if (sendBtn) sendBtn.disabled = prevSendDisabled ?? false;
     }
   }
 
