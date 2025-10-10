@@ -32,11 +32,9 @@ $__currency = $_SESSION['currency_pref'] ?? 'S/.';
 $__tz = $_SESSION['timezone'] ?? 'America/New_York';
 
 // ---- CONFIGURACIÓN BASE DEL PROYECTO ----
-// Si tu app vive en /shockfy, deja así. Si algún día la mueves a raíz, cambia a ''.
 if (!defined('APP_SLUG')) {
   define('APP_SLUG', '/');
 }
-
 ?>
 <link rel="icon" type="image/png" href="assets/img/favicon.png">
 
@@ -47,17 +45,17 @@ if (!defined('APP_SLUG')) {
 /* ========== Tokens minimal premium ========== */
 :root{
   --bg-sidebar:#11101D;
-  --bg-surface:#0f0e19;        /* fondo principal uniforme (sin destellos) */
-  --bg-surface-2:#131127;      /* leve elevación */
+  --bg-surface:#0f0e19;
+  --bg-surface-2:#131127;
   --glass:rgba(255,255,255,.05);
   --text-strong:#f7f8fb;
   --text-muted:#c9ceda;
   --text-subtle:#9aa3b2;
   --border-weak:rgba(255,255,255,.10);
   --border-med:rgba(255,255,255,.16);
-  --brand:#17a2bf;             /* acento (se puede ajustar a tu marca) */
+  --brand:#17a2bf;
   --brand-2:#12849c;
-  --accent:#1fb58f;            /* acento secundario */
+  --accent:#1fb58f;
   --accent-2:#169a7b;
 }
 
@@ -134,6 +132,7 @@ if (!defined('APP_SLUG')) {
   .sidebar ~ .page, .sidebar.open ~ .page{ margin-left:0; }
   .sidebar li .tooltip{ display:none !important; }
 }
+
 /* Overlay táctil */
 .sidebar-overlay{
   position: fixed; inset: 0; background: rgba(15,23,42,.35);
@@ -282,167 +281,85 @@ if (!defined('APP_SLUG')) {
   .support-fab{ right: 12px; bottom: 12px; }
 }
 
-
 /* === Centrado perfecto de los botones del header === */
-
-/* Asegura altura consistente del header y centra verticalmente */
-.support-chat .chat-header{
-  display: flex;
-  align-items: center;          /* centra vertical */
-  min-height: 52px;             /* altura estable */
-  padding: 10px 14px;           /* balancea el acento superior de 2px */
-  box-sizing: border-box;
-}
-
-/* Alinea el contenedor de acciones con el centro exacto */
-.support-chat .chat-actions{
-  display: flex;
-  align-items: center;          /* centra vertical */
-  gap: 8px;                     /* separación óptica */
-  margin: 0; padding: 0;
-}
-
-/* Botón icónico cuadrado, sin “em-baseline” que lo baje */
-.support-chat .icon-btn{
-  width: 36px;
-  height: 36px;
-  display: flex;                /* en lugar de grid, evita baseline raro */
-  align-items: center;
-  justify-content: center;
-  line-height: 1;               /* quita empuje por línea de texto */
-  margin: 0; padding: 0;
-}
-
-/* Si usas íconos de fuente, evita que el glifo “se siente” más abajo */
-.support-chat .icon-btn i,
-.support-chat .icon-btn svg{
-  display: block;
-  line-height: 1;
-  vertical-align: middle;
-  transform: translateY(0);     /* normaliza nudge si algún set trae offset */
-  font-size: 18px;              /* ajusta al cuadrado de 36px */
-}
-
-/* Opcional: si aún percibes 1px de bajada por el acento superior,
-   puedes compensar con este micro-ajuste visual: */
-/*
-.support-chat .chat-actions{ transform: translateY(-1px); }
-*/
-
+.support-chat .chat-header{ display:flex; align-items:center; min-height:52px; padding:10px 14px; box-sizing:border-box; }
+.support-chat .chat-actions{ display:flex; align-items:center; gap:8px; margin:0; padding:0; }
+.support-chat .icon-btn{ width:36px; height:36px; display:flex; align-items:center; justify-content:center; line-height:1; margin:0; padding:0; }
+.support-chat .icon-btn i, .support-chat .icon-btn svg{ display:block; line-height:1; vertical-align:middle; font-size:18px; }
 
 /* ==== FAB rediseñado: dark blue + pill ==== */
 :root{
-  --fab-blue-1:#15132a;       /* base (match sidebar, un pelo más claro) */
-  --fab-blue-2:#0F0D21;       /* sombra/gradiente */
+  --fab-blue-1:#15132a;
+  --fab-blue-2:#0F0D21;
   --fab-border:rgba(255,255,255,.18);
-  --fab-hover:#1b1936;        /* hover */
-  --fab-ring:rgba(33,150,243,.28); /* foco accesible */
+  --fab-hover:#1b1936;
+  --fab-ring:rgba(33,150,243,.28);
   --fab-text:#ffffff;
 }
-
-/* Base: compacto en móvil (redondo), pill en desktop */
 .support-fab{
   background: linear-gradient(180deg, var(--fab-blue-1) 0%, var(--fab-blue-2) 100%) !important;
   color: var(--fab-text) !important;
   border: 1px solid var(--fab-border) !important;
   box-shadow: 0 10px 28px rgba(0,0,0,.35) !important;
 
-  /* rediseño de forma */
-  width: 56px;
-  height: 56px;
-  border-radius: 20px !important;   /* más redondeado */
-  padding: 0 14px;
-  gap: 8px;
-
-  /* micro-animación */
+  width: 56px; height: 56px; border-radius: 20px !important;
+  padding: 0 !important; gap: 0 !important;
+  display:flex !important; align-items:center !important; justify-content:center !important;
   transition: transform .12s ease, filter .18s ease, box-shadow .18s ease, background .18s ease;
 }
-
-/* Icono */
-.support-fab i{
-  font-size: 22px !important;
-  line-height: 1;
-  display: inline-block;
-  transform: translateY(0); /* normaliza baselines */
-}
-
-/* Etiqueta (ya la cambias por HTML) */
-.support-fab .label{
-  font-weight: 600;
-  letter-spacing:.2px;
-}
-
-/* Hover/active */
+.support-fab i{ font-size: 22px !important; line-height: 1; display:block; transform: translateY(0); }
+.support-fab .label{ display:none; margin-left:8px; font-weight:600; letter-spacing:.2px; }
 .support-fab:hover{
   background: linear-gradient(180deg, var(--fab-hover) 0%, var(--fab-blue-2) 100%) !important;
-  filter: brightness(1.02);
-  transform: translateY(-1px);
+  filter: brightness(1.02); transform: translateY(-1px);
   box-shadow: 0 14px 32px rgba(0,0,0,.45) !important;
 }
-.support-fab:active{
-  transform: translateY(0);
-}
-
-/* Focus ring accesible (teclado) */
+.support-fab:active{ transform: translateY(0); }
 .support-fab:focus-visible{
   outline: none;
   box-shadow: 0 0 0 3px var(--fab-ring), 0 12px 28px rgba(0,0,0,.35) !important;
 }
-
-/* En desktop: forma pill más estilizada y cómoda de clicar */
 @media (min-width:768px){
-  .support-fab{
-    height: 54px;
-    border-radius: 999px !important;     /* pill */
-    padding: 0 16px;
-  }
+  .support-fab{ height: 54px !important; border-radius: 999px !important; padding: 0 16px !important; gap: 8px !important; width: auto !important; }
+  .support-fab .label{ display:inline !important; }
 }
-
-/* Separación respecto al borde inferior/derecho en móviles */
 @media (max-width:1024px){
   .support-fab{ right: 12px; bottom: 12px; }
 }
 
-/* Centrado perfecto del icono en el FAB */
-.support-fab{
-  display: flex !important;            /* asegúrate de usar flex, no inline-flex */
-  align-items: center !important;       /* centro vertical */
-  justify-content: center !important;   /* centro horizontal */
-  padding: 0 !important;                /* sin padding cuando solo hay icono */
-  gap: 0 !important;                    /* sin gap si no hay label */
-  width: 56px !important;
-  height: 56px !important;
+/* ====== BOTÓN MENÚ (MÓVIL): mismo color y deslizante con scroll ====== */
+.sidebar-mobile-toggle{
+  position: fixed;              /* desktop por defecto (no visible en desktop igual) */
+  top: 12px; left: 12px;
+  display: none; align-items:center; justify-content:center;
+  gap: 6px; padding: 10px 12px; border-radius: 14px;
+  background: var(--bg-sidebar); color: #fff;
+  border: 1px solid var(--border-med);
+  box-shadow: 0 10px 24px rgba(0,0,0,.35);
+  z-index: 101; cursor: pointer;
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
 }
+.sidebar-mobile-toggle i{ font-size: 22px; line-height: 1; }
 
-/* Normaliza el glifo del icono (font o svg) */
-.support-fab i,
-.support-fab svg{
-  display: block !important;
-  line-height: 1 !important;            /* quita el baseline que empuja */
-  vertical-align: middle !important;
-  transform: translateY(0) !important;  /* sin “nudge” */
-  font-size: 22px !important;           /* ajusta si lo quieres más grande */
-  height: 1em;                          /* caja consistente */
-  width: 1em;
-}
-
-/* En desktop, si SÍ muestras texto (label), volvemos a forma “pill” */
-@media (min-width:768px){
-  .support-fab .label{ display:inline !important; }
-  .support-fab{
-    padding: 0 16px !important;
-    gap: 8px !important;
-    width: auto !important;
-    height: 54px !important;
-    border-radius: 999px !important;
-    justify-content: center !important;
+/* En MOBILE: que tenga el MISMO COLOR y que SE DESLICE con el scroll (sticky) */
+@media (max-width:1024px){
+  .sidebar-mobile-toggle{
+    position: sticky;                  /* ← se mueve/desliza con el scroll */
+    top: calc(12px + env(safe-area-inset-top));
+    left: calc(12px + env(safe-area-inset-left));
+    right: auto;
+    display: inline-flex;
+    background: var(--bg-sidebar);     /* mismo azul oscuro del menú */
+    color: #fff;
+    border: 1px solid var(--border-med);
   }
 }
 
-
+/* Cuando el sidebar móvil está abierto, el overlay activa interacción */
+@media (max-width:1024px){
+  .sidebar.open + .sidebar-overlay{ opacity:1; pointer-events:auto; }
+}
 </style>
-
-
 
 <link href="https://unpkg.com/boxicons@2.0.7/css/boxicons.min.css" rel="stylesheet">
 
@@ -539,7 +456,9 @@ if (!defined('APP_SLUG')) {
 <div class="sidebar-overlay" aria-hidden="true"></div>
 
 <!-- Botón hamburguesa flotante (móvil) -->
-<button class="sidebar-mobile-toggle" id="sidebarMobileToggle" aria-label="Abrir menú"><i class="bx bx-menu"></i></button>
+<button class="sidebar-mobile-toggle" id="sidebarMobileToggle" aria-label="Abrir menú">
+  <i class="bx bx-menu"></i>
+</button>
 
 <?php
 $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
@@ -607,10 +526,9 @@ $trialOverlay = (defined('TRIAL_EXPIRED_OVERLAY') && TRIAL_EXPIRED_OVERLAY);
 <script>
 // Configurar URL absoluta del endpoint del chat (sin fallbacks)
 (function(){
-  var slug = <?php echo json_encode(APP_SLUG); ?>;      // "/shockfy" o ""
-  var base = slug ? slug.replace(/\/$/, '') : '';       // "/shockfy" -> "/shockfy"
+  var slug = <?php echo json_encode(APP_SLUG); ?>;
+  var base = slug ? slug.replace(/\/$/, '') : '';
   window.API_SUPPORT_URL = window.location.origin + '/api/support_chat.php';
-  // Ej.: "http://localhost/shockfy/api/support_chat.php"
 })();
 </script>
 
@@ -632,26 +550,15 @@ document.addEventListener('DOMContentLoaded', function(){
   const KEY = 'supportChatOpen';
   const API_SUPPORT_URL = window.API_SUPPORT_URL;
 
-  const state = {
-    lastTs: null,
-    pollTimer: null,
-    POLL_MS: 5000,
-    isOpen: false,
-    ticketId: null
-  };
+  const state = { lastTs:null, pollTimer:null, POLL_MS:5000, isOpen:false, ticketId:null };
 
   function replaceNodeWithClone(el){
-    if (!el) return el;
-    const clone = el.cloneNode(true);
-    el.replaceWith(clone);
-    return clone;
+    if (!el) return el; const clone = el.cloneNode(true); el.replaceWith(clone); return clone;
   }
   const sendBtn = replaceNodeWithClone(document.getElementById('supportSend'));
   const input   = replaceNodeWithClone(inputOrig);
 
-  function esc(str){
-    return (str||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-  }
+  function esc(str){ return (str||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 
   function addMsg({who, text, att, ts}){
     const wrap = document.createElement('div');
@@ -680,43 +587,30 @@ document.addEventListener('DOMContentLoaded', function(){
     const raw = await res.text();
     let data = null;
     try { data = raw ? JSON.parse(raw) : null; }
-    catch (e) {
-      console.error('Respuesta no JSON:', (raw||'').slice(0,400));
-      throw new Error('Respuesta no válida del servidor');
-    }
-    if (!res.ok) {
-      const msg = data?.error || `HTTP ${res.status}`;
-      throw new Error(msg);
-    }
+    catch (e) { console.error('Respuesta no JSON:', (raw||'').slice(0,400)); throw new Error('Respuesta no válida del servidor'); }
+    if (!res.ok) { const msg = data?.error || `HTTP ${res.status}`; throw new Error(msg); }
     return data;
   }
 
   function startPolling(){
     stopPolling();
-    // Solo hacemos polling si el chat está abierto y YA existe un ticket
     if (!state.isOpen || !state.ticketId) return;
     if (document.hidden) return;
     state.pollTimer = setInterval(async ()=>{ try { await fetchAndAppendNew(); } catch (e) {} }, state.POLL_MS);
   }
-  function stopPolling(){
-    if (state.pollTimer){ clearInterval(state.pollTimer); state.pollTimer = null; }
-  }
+  function stopPolling(){ if (state.pollTimer){ clearInterval(state.pollTimer); state.pollTimer = null; } }
 
   function openChat(){
     if (!chat || !overlay) return;
-    chat.classList.add('open');
-    overlay.classList.add('show');
-    body.style.overflow = 'hidden';
-    state.isOpen = true;
+    chat.classList.add('open'); overlay.classList.add('show');
+    body.style.overflow = 'hidden'; state.isOpen = true;
     try{ localStorage.setItem(KEY,'1'); }catch(e){}
     loadThread(true).then(()=> input?.focus());
   }
   function closeChat(){
     if (!chat || !overlay) return;
-    chat.classList.remove('open');
-    overlay.classList.remove('show');
-    body.style.overflow = '';
-    state.isOpen = false;
+    chat.classList.remove('open'); overlay.classList.remove('show');
+    body.style.overflow = ''; state.isOpen = false;
     try{ localStorage.setItem(KEY,'0'); }catch(e){}
     stopPolling();
   }
@@ -728,15 +622,7 @@ document.addEventListener('DOMContentLoaded', function(){
   btnClose?.addEventListener('click', closeChat);
   overlay?.addEventListener('click', closeChat);
   document.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ closeChat(); }});
-  btnMin?.addEventListener('click', ()=>{
-    if (!chat || !overlay) return;
-    chat.classList.remove('open');
-    overlay.classList.remove('show');
-    body.style.overflow = '';
-    state.isOpen = false;
-    stopPolling();
-    try{ localStorage.setItem(KEY,'0'); }catch(e){}
-  });
+  btnMin?.addEventListener('click', ()=>{ chat?.classList.remove('open'); overlay?.classList.remove('show'); body.style.overflow=''; state.isOpen=false; stopPolling(); try{ localStorage.setItem(KEY,'0'); }catch(e){}; });
 
   document.addEventListener('visibilitychange', ()=>{ if (document.hidden) stopPolling(); else if (state.isOpen) startPolling(); });
 
@@ -750,25 +636,15 @@ document.addEventListener('DOMContentLoaded', function(){
       clearMsgs(hasHistory);
     }
 
-    if (data && typeof data.ticket !== 'undefined') {
-      state.ticketId = data.ticket || null; // puede ser null
-    }
+    if (data && typeof data.ticket !== 'undefined') state.ticketId = data.ticket || null;
 
     if (data && Array.isArray(data.messages) && data.messages.length){
       for (const m of data.messages){
-        addMsg({
-          who: m.sender === 'user' ? 'me' : 'agent',
-          text: m.message || '',
-          att: m.file_path || '',
-          ts: m.created_at || ''
-        });
-        if (m.created_at && (!state.lastTs || toDate(m.created_at) > toDate(state.lastTs))){
-          state.lastTs = m.created_at;
-        }
+        addMsg({ who: m.sender === 'user' ? 'me' : 'agent', text: m.message || '', att: m.file_path || '', ts: m.created_at || '' });
+        if (m.created_at && (!state.lastTs || toDate(m.created_at) > toDate(state.lastTs))) state.lastTs = m.created_at;
       }
     }
-
-    startPolling(); // solo arranca si hay ticketId
+    startPolling();
   }
 
   async function fetchAndAppendNew(){
@@ -788,30 +664,18 @@ document.addEventListener('DOMContentLoaded', function(){
 
     news.sort((a,b)=> (toDate(a.created_at) - toDate(b.created_at)));
     for (const m of news){
-      addMsg({
-        who: m.sender === 'user' ? 'me' : 'agent',
-        text: m.message || '',
-        att: m.file_path || '',
-        ts: m.created_at || ''
-      });
-      if (!state.lastTs || (m.created_at && toDate(m.created_at) > toDate(state.lastTs))){
-        state.lastTs = m.created_at;
-      }
+      addMsg({ who: m.sender === 'user' ? 'me' : 'agent', text: m.message || '', att: m.file_path || '', ts: m.created_at || '' });
+      if (!state.lastTs || (m.created_at && toDate(m.created_at) > toDate(state.lastTs))) state.lastTs = m.created_at;
     }
 
     if (!state.pollTimer && state.ticketId) startPolling();
   }
 
-  // ✅ sendMessage SIN pintado optimista (evita duplicados)
   async function sendMessage(){
     const text = (input?.value || '').trim();
     const f = file?.files && file.files[0];
-    if (!text && !f){
-      window.showToast ? showToast('Escribe un mensaje o adjunta un archivo', 'warn') : alert('Escribe un mensaje o adjunta un archivo');
-      return;
-    }
+    if (!text && !f){ window.showToast ? showToast('Escribe un mensaje o adjunta un archivo', 'warn') : alert('Escribe un mensaje o adjunta un archivo'); return; }
 
-    // Deshabilitar botón mientras envía para evitar dobles clics
     const prevSendDisabled = sendBtn?.disabled;
     if (sendBtn) sendBtn.disabled = true;
 
@@ -826,19 +690,13 @@ document.addEventListener('DOMContentLoaded', function(){
       clearTimeout(timeoutId);
       const data = await parseJsonResponse(res);
 
-      // Limpiar inputs
       if (input) input.value = '';
       if (file) file.value = '';
 
-      // Guardar ticket creado por el backend (primera vez)
-      if (data && data.ticket) {
-        state.ticketId = data.ticket;
-      }
+      if (data && data.ticket) state.ticketId = data.ticket;
 
-      // Recargar hilo completo (fuente de verdad = backend)
       await loadThread(true);
       window.showToast && showToast('Mensaje enviado', 'ok');
-
       if (!state.pollTimer && state.ticketId) startPolling();
 
     } catch(err){
@@ -850,17 +708,9 @@ document.addEventListener('DOMContentLoaded', function(){
   }
 
   sendBtn?.addEventListener('click', (e)=>{ e.preventDefault(); sendMessage(); });
-  input?.addEventListener('keydown', (e)=>{
-    if ((e.key === 'Enter' && (e.metaKey || e.ctrlKey))){
-      e.preventDefault(); sendMessage();
-    }
-  });
+  input?.addEventListener('keydown', (e)=>{ if ((e.key === 'Enter' && (e.metaKey || e.ctrlKey))){ e.preventDefault(); sendMessage(); } });
 });
 </script>
-
-
-
-
 
 <script>
 /* Toggle de la barra lateral (desktop y móvil) */
@@ -873,7 +723,6 @@ document.addEventListener('DOMContentLoaded', function(){
   const KEY       = 'sidebarOpen';
 
   if (!sidebar) return;
-
   const isMobile = () => mq.matches;
 
   function persist(open){ try{ localStorage.setItem(KEY, open ? 'true' : 'false'); }catch(e){} }
@@ -885,11 +734,7 @@ document.addEventListener('DOMContentLoaded', function(){
   function applyInitial() {
     let saved = null;
     try { saved = localStorage.getItem(KEY); } catch(e){}
-    if (isMobile()) {
-      close(); // forzar cerrada en móvil
-    } else {
-      (saved === 'true') ? open() : close();
-    }
+    if (isMobile()) { close(); } else { (saved === 'true') ? open() : close(); }
   }
   applyInitial();
 
@@ -900,10 +745,9 @@ document.addEventListener('DOMContentLoaded', function(){
   overlay?.addEventListener('click', (e)=>{ e.preventDefault(); close(); });
   document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') close(); });
 
-  // Si cambias entre móvil/desktop, re-aplica la regla
+  // Reaplica regla al cambiar de breakpoint
   const onBP = ()=>applyInitial();
   if (mq.addEventListener) mq.addEventListener('change', onBP);
-  else mq.addListener(onBP); // fallback Safari viejo
+  else mq.addListener(onBP);
 })();
 </script>
-
