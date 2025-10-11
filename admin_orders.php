@@ -1,5 +1,5 @@
 <?php
-// admin_orders.php — Panel admin para revisar solicitudes de pago manual + Soporte.
+// admin_orders.php — Panel admin SOLO para aprobar/rechazar pagos manuales.
 
 // 1) Sesión primero (para que auth_check.php vea $_SESSION)
 if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
@@ -18,14 +18,9 @@ if (empty($currentUser['role']) || strtolower($currentUser['role']) !== 'admin')
   exit;
 }
 
-// ----- Config base del proyecto (usado por el panel de soporte) -----
-if (!defined('APP_SLUG')) {
-  // Si tu app vive en /shockfy deja así. Si la movieras a raíz, pon ''.
-  define('APP_SLUG', '/shockfy');
-}
-
+// ===== Configuración mínima =====
 const PAGE_SIZE = 15;
-const PREMIUM_PLAN_CODE = 'starter';
+const PREMIUM_PLAN_CODE = 'starter'; // plan activado al aprobar
 
 // CSRF
 if (empty($_SESSION['csrf_token'])) {
@@ -42,7 +37,7 @@ $offset = ($page - 1) * PAGE_SIZE;
 $validStatuses = ['pending','approved','rejected','all'];
 if (!in_array($status, $validStatuses, true)) { $status = 'pending'; }
 
-// POST acciones (aprobación/rechazo pagos)
+// ===== Acciones POST (aprobar/rechazar) =====
 $flash = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $action = $_POST['action'] ?? '';
@@ -54,10 +49,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   } elseif ($pr_id <= 0) {
     $flash = ['type'=>'error','msg'=>'ID inválido.'];
   } else {
-    // Leer PR + Usuario
+    // Leer solicitud + usuario
     $stmt = $pdo->prepare("
       SELECT pr.id, pr.user_id, pr.status, pr.method, pr.amount_usd, pr.currency, pr.receipt_path,
-             u.plan, u.account_state, u.email, u.full_name
+             u.plan, u.account_state
       FROM payment_requests pr
       JOIN users u ON u.id = pr.user_id
       WHERE pr.id = :id
@@ -74,8 +69,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($action === 'approve') {
           // Aprobar solicitud
-          $pdo->prepare("UPDATE payment_requests SET status='approved', updated_at=UTC_TIMESTAMP() WHERE id=:id")
-              ->execute(['id' => $pr_id]);
+          $pdo->prepare("
+            UPDATE payment_requests
+            SET status='approved', updated_at=UTC_TIMESTAMP()
+            WHERE id=:id
+          ")->execute(['id' => $pr_id]);
 
           // Activar cuenta, asignar plan y fijar 30 días de vigencia
           $pdo->prepare("
@@ -87,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             WHERE id = :uid
           ")->execute([
             'uid'  => $pr['user_id'],
-            'plan' => PREMIUM_PLAN_CODE, // 'starter' por defecto
+            'plan' => PREMIUM_PLAN_CODE,
           ]);
 
           $pdo->commit();
@@ -95,14 +93,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         } elseif ($action === 'reject') {
           // Rechazar solicitud
-          $pdo->prepare("UPDATE payment_requests SET status='rejected', updated_at=UTC_TIMESTAMP() WHERE id=:id")
-              ->execute(['id' => $pr_id]);
+          $pdo->prepare("
+            UPDATE payment_requests
+            SET status='rejected', updated_at=UTC_TIMESTAMP()
+            WHERE id=:id
+          ")->execute(['id' => $pr_id]);
+
           // Salir de pending -> active (plan no se toca)
           $pdo->prepare("UPDATE users SET account_state='active' WHERE id=:uid")
               ->execute(['uid' => $pr['user_id']]);
 
           $pdo->commit();
           $flash = ['type'=>'success','msg'=>"Solicitud #{$pr_id} rechazada. El usuario salió de 'pendiente'."];
+
         } else {
           $pdo->rollBack();
           $flash = ['type'=>'error','msg'=>'Acción no reconocida.'];
@@ -131,7 +134,7 @@ if (!empty($_GET['flash'])) {
   if (is_array($tmp)) { $flash = $tmp; }
 }
 
-// WHERE
+// ===== Consultas (listado y paginación) =====
 $where  = [];
 $params = [];
 if ($status !== 'all') {
@@ -191,61 +194,7 @@ function chip($status){
   <link rel="icon" href="assets/img/favicon.png" type="image/png">
   <link rel="stylesheet" href="style.css">
 
-<style>
-/* ========== Estilos mínimos del panel de soporte (admin) ========== */
-.sap{ margin-top:22px; background:#0f172a; border:1px solid #1f2937; border-radius:14px; color:#e5e7eb; }
-.sap-header{ display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-bottom:1px solid #1f2937; }
-.sap-header h2{ margin:0; font-size:18px; }
-.sap-controls{ display:flex; gap:10px; align-items:center; }
-.sap-btn{ padding:8px 12px; border-radius:10px; border:1px solid #374151; background:#1f2937; color:#e5e7eb; cursor:pointer; }
-.sap-btn:hover{ filter:brightness(1.08); }
-.sap-btn.brand{ background:#16a34a; border-color:#22c55e; color:#fff; }
-.sap-btn.danger{ background:#b91c1c; border-color:#dc2626; color:#fff; }
-.sap-autorefresh{ font-size:13px; color:#9ca3af; display:flex; align-items:center; gap:6px; }
-
-.sap-grid{ display:grid; grid-template-columns: 320px 1fr; gap:0; min-height:420px; }
-@media (max-width: 980px){ .sap-grid{ grid-template-columns: 1fr; } }
-
-.sap-list{ border-right:1px solid #1f2937; max-height:60vh; overflow:auto; }
-@media (max-width: 980px){ .sap-list{ max-height:unset; } }
-
-#sapTickets{ list-style:none; margin:0; padding:0; }
-#sapTickets li{ border-bottom:1px solid #1f2937; padding:10px 12px; display:flex; gap:10px; align-items:center; cursor:pointer; }
-#sapTickets li:hover{ background:#111827; }
-#sapTickets li.active{ background:#0b1220; box-shadow: inset 0 0 0 1px #22c55e33; }
-.ticket-main{ display:flex; flex-direction:column; gap:3px; min-width:0; }
-.ticket-title{ font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.ticket-meta{ font-size:12px; color:#9ca3af; display:flex; gap:8px; flex-wrap:wrap; }
-.ticket-badges{ margin-left:auto; display:flex; gap:8px; align-items:center; }
-.badge{ font-size:11px; padding:2px 6px; border-radius:999px; border:1px solid #374151; color:#e5e7eb; }
-.badge.unread{ background:#14532d; border-color:#16a34a; }
-
-.sap-empty{ padding:12px; text-align:center; color:#9ca3af; }
-
-.sap-thread{ display:flex; flex-direction:column; min-height:420px; }
-.sap-thread-header{ display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border-bottom:1px solid #1f2937; }
-.sap-thread-title{ font-weight:700; }
-.sap-thread-meta{ font-size:12px; color:#9ca3af; }
-
-.sap-messages{ padding:12px; display:flex; flex-direction:column; gap:10px; height:48vh; overflow:auto; }
-@media (max-width: 980px){ .sap-messages{ height:40vh; } }
-.sap-placeholder{ color:#9ca3af; }
-
-.msg{ max-width:78%; padding:8px 10px; border-radius:12px; border:1px solid #374151; background:#111827; }
-.msg.admin{ margin-left:auto; background:#0b3b2f; border-color:#16a34a66; }
-.msg .who{ font-weight:600; font-size:13px; margin-bottom:2px; }
-.msg .text{ white-space:pre-wrap; word-break:break-word; }
-.msg .att{ margin-top:6px; font-size:13px; }
-.msg .att a{ color:#93c5fd; }
-
-.sap-reply{ display:grid; gap:8px; border-top:1px solid #1f2937; padding:10px; }
-.sap-reply textarea{ min-height:70px; padding:.6rem .7rem; border-radius:12px; border:1px solid #374151; background:#0b1220; color:#fff; outline:none; resize:vertical; }
-.sap-reply-tools{ display:flex; align-items:center; gap:10px; }
-.sap-attach{ padding:6px 10px; border:1px solid #374151; border-radius:10px; background:#111827; color:#e5e7eb; cursor:pointer; }
-.sap-attach input{ display:none; }
-.sap-hint{ font-size:12px; color:#9ca3af; }
-</style>
-
+  <!-- Estilos de la página (diseño original preservado) -->
   <style>
     :root{
       --sidebar-w:260px; --bg:#f5f7fb; --card:#ffffff; --text:#0f172a; --muted:#6b7280; --primary:#2563eb; --border:#e5e7eb; --shadow:0 16px 32px rgba(2,6,23,.08); --radius:16px;
@@ -421,463 +370,6 @@ function chip($status){
               </tbody>
             </table>
           </div>
-
-<!-- ========== Panel de Soporte (Admin) ========== -->
-<section id="supportAdminPanel" class="sap">
-  <header class="sap-header">
-    <h2>Soporte (Chats de usuarios)</h2>
-    <div class="sap-controls">
-      <select id="sapStatus">
-        <option value="open" selected>Abiertos</option>
-        <option value="resolved">Resueltos</option>
-      </select>
-      <button class="sap-btn" id="sapRefresh" title="Recargar">⟲</button>
-      <label class="sap-autorefresh">
-        <input type="checkbox" id="sapAuto"> Autorefresco (15s)
-      </label>
-    </div>
-  </header>
-
-  <div class="sap-grid">
-    <!-- Columna izquierda: lista de tickets -->
-    <aside class="sap-list">
-      <ul id="sapTickets"></ul>
-      <div class="sap-empty" id="sapEmptyList" style="display:none;">No hay tickets.</div>
-    </aside>
-
-    <!-- Columna derecha: hilo y acciones -->
-    <main class="sap-thread">
-      <div id="sapThreadHeader" class="sap-thread-header">
-        <div>
-          <div class="sap-thread-title">Selecciona un ticket</div>
-          <div class="sap-thread-meta" id="sapThreadMeta"></div>
-        </div>
-        <div class="sap-thread-actions">
-          <button class="sap-btn danger" id="sapResolve" disabled>Finalizar caso</button>
-        </div>
-      </div>
-
-      <div id="sapMessages" class="sap-messages">
-        <div class="sap-placeholder">Selecciona un ticket a la izquierda para ver el chat.</div>
-      </div>
-
-      <form id="sapReplyForm" class="sap-reply" enctype="multipart/form-data">
-        <textarea id="sapReplyText" placeholder="Escribe una respuesta para el usuario..." disabled></textarea>
-        <div class="sap-reply-tools">
-          <label class="sap-attach">
-            📎 Adjuntar
-            <input type="file" id="sapReplyFile" accept=".png,.jpg,.jpeg,.pdf">
-          </label>
-          <span class="sap-hint">Máx. 2&nbsp;MB</span>
-          <button class="sap-btn brand" id="sapSend" disabled>Enviar</button>
-        </div>
-      </form>
-    </main>
-  </div>
-</section>
-<!-- ========== /Panel de Soporte (Admin) ========== -->
-
-<script>
-// Exponer APP_SLUG a JS para construir URLs absolutas al API admin
-window.APP_SLUG = <?php echo json_encode(APP_SLUG); ?>;
-window.API_ADMIN_SUPPORT = window.location.origin + (window.APP_SLUG ? window.APP_SLUG.replace(/\/$/,'') : '') + '/api/support_admin.php';
-
-// Helper robusto para parsear JSON: detecta HTML, BOM, warnings y extrae JSON si viene "contaminado".
-async function parseJsonResponse(res, reqUrl=''){
-  const ct = (res.headers.get('content-type') || '').toLowerCase();
-  let raw = await res.text();
-
-  const debug = {
-    url: reqUrl,
-    status: res.status,
-    contentType: ct,
-    preview: raw ? raw.slice(0, 400) : ''
-  };
-
-  const tryParse = (txt) => {
-    if (!txt) return null;
-    txt = txt.replace(/^\uFEFF/, '').trim();        // quita BOM/espacios
-    return JSON.parse(txt);
-  };
-
-  try {
-    // Camino feliz: JSON declarado
-    if (ct.includes('application/json')) {
-      const data = tryParse(raw);
-      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-      return data;
-    }
-
-    // Si no viene como JSON, intentamos extraer un bloque {...} por si hay warnings/HTML alrededor
-    const i = raw.indexOf('{');
-    const j = raw.lastIndexOf('}');
-    if (i !== -1 && j !== -1 && j > i) {
-      const sub = raw.slice(i, j + 1);
-      const data = tryParse(sub);
-      if (data && typeof data === 'object') {
-        if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-        console.warn('Se extrajo JSON desde una respuesta no-JSON. Revisa el backend.', debug);
-        return data;
-      }
-    }
-
-    // Detección clara de HTML/login/redirect
-    if (/<!doctype|<html|<body|<form[^>]*login|window\.location|http-equiv=['"]refresh/i.test(raw)) {
-      throw new Error('El API devolvió HTML (posible redirect o sesión expirada).');
-    }
-
-    throw new Error('Respuesta no JSON del servidor.');
-  } catch (e) {
-    console.error('Respuesta no JSON:', debug);
-    throw new Error(e.message || 'Respuesta no válida del servidor');
-  }
-}
-</script>
-
-<script>
-(function(){
-  const $  = s => document.querySelector(s);
-  const $$ = s => Array.from(document.querySelectorAll(s));
-
-  const listEl   = $('#sapTickets');
-  const emptyEl  = $('#sapEmptyList');
-  const statusEl = $('#sapStatus');
-  const refreshEl= $('#sapRefresh');
-  const autoEl   = $('#sapAuto'); // opcional
-
-  const threadTitle = $('#sapThreadHeader .sap-thread-title');
-  const threadMeta  = $('#sapThreadMeta');
-  const msgsEl      = $('#sapMessages');
-  const replyForm   = $('#sapReplyForm');
-  const replyText   = $('#sapReplyText');
-  const replyFile   = $('#sapReplyFile');
-  const sendBtn     = $('#sapSend');
-  const resolveBtn  = $('#sapResolve');
-
-  function escapeHTML(s){
-    return (s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-  }
-
-  const commonGetOpts = {
-    credentials: 'include',
-    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'Cache-Control': 'no-cache' },
-    cache: 'no-store',
-    redirect: 'follow'
-  };
-  const commonPostOpts = {
-    credentials: 'include',
-    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'Cache-Control': 'no-cache' },
-    cache: 'no-store',
-    redirect: 'follow'
-  };
-
-  const API = {
-    list: (status='open') => {
-      const url = `${window.API_ADMIN_SUPPORT}?action=list&status=${encodeURIComponent(status)}`;
-      return fetch(url, commonGetOpts).then(r => parseJsonResponse(r, url));
-    },
-    thread: (ticketId) => {
-      const url = `${window.API_ADMIN_SUPPORT}?action=thread&ticket_id=${ticketId}`;
-      return fetch(url, commonGetOpts).then(r => parseJsonResponse(r, url));
-    },
-    reply: (ticketId, text, file) => {
-      const fd = new FormData();
-      fd.append('action','reply');
-      fd.append('ticket_id', String(ticketId));
-      fd.append('message', text);
-      if (file) fd.append('file', file);
-      const opts = { method:'POST', body: fd, ...commonPostOpts };
-      return fetch(window.API_ADMIN_SUPPORT, opts).then(r => parseJsonResponse(r, window.API_ADMIN_SUPPORT + ' [reply]'));
-    },
-    resolve: (ticketId) => {
-      const fd = new FormData();
-      fd.append('action','resolve');
-      fd.append('ticket_id', String(ticketId));
-      const opts = { method:'POST', body: fd, ...commonPostOpts };
-      return fetch(window.API_ADMIN_SUPPORT, opts).then(r => parseJsonResponse(r, window.API_ADMIN_SUPPORT + ' [resolve]'));
-    }
-  };
-
-  // ===== Estado y polling =====
-  const state = {
-    status: 'open',
-    tickets: [],
-    selected: null,
-    lastTs: null,                // último created_at mostrado del hilo seleccionado
-    paintedIds: new Set(),       // anti-duplicados por id
-    timers: { list: null, thread: null },
-    POLL_MS: 4000
-  };
-
-  function startListPolling(){
-    stopListPolling();
-    state.timers.list = setInterval(async ()=>{
-      if (document.hidden) return;
-      await loadTickets(true); // mantener selección si existe
-    }, state.POLL_MS);
-  }
-  function stopListPolling(){
-    if (state.timers.list){ clearInterval(state.timers.list); state.timers.list = null; }
-  }
-  function startThreadPolling(){
-    stopThreadPolling();
-    if (!state.selected) return;
-    state.timers.thread = setInterval(async ()=>{
-      if (document.hidden) return;
-      await fetchAndAppendNew();
-    }, state.POLL_MS);
-  }
-  function stopThreadPolling(){
-    if (state.timers.thread){ clearInterval(state.timers.thread); state.timers.thread = null; }
-  }
-  document.addEventListener('visibilitychange', ()=>{
-    if (document.hidden){ stopListPolling(); stopThreadPolling(); }
-    else { startListPolling(); startThreadPolling(); }
-  });
-
-  function fmtDate(iso){
-    if (!iso) return '';
-    // Trátalo como “hora local” sin añadir Z (UTC).
-    const d = new Date(iso.replace(' ','T'));
-    return isNaN(d) ? iso : d.toLocaleString();
-  }
-
-  function renderTickets(){
-    listEl.innerHTML = '';
-    if (!state.tickets.length){
-      emptyEl.style.display = 'block';
-      return;
-    }
-    emptyEl.style.display = 'none';
-    state.tickets.forEach(t=>{
-      const li = document.createElement('li');
-      li.dataset.id = t.id;
-      li.className = (state.selected === t.id ? 'active' : '');
-      li.innerHTML = `
-        <div class="ticket-main">
-          <div class="ticket-title">${escapeHTML(t.public_id || ('#'+t.id))} · ${escapeHTML(t.full_name ?? ('Usuario #'+t.user_id))}</div>
-          <div class="ticket-meta">
-            <span>${escapeHTML(t.status)}</span>
-            <span>Último: ${fmtDate(t.last_message_at)}</span>
-          </div>
-        </div>
-        <div class="ticket-badges">
-          ${Number(t.unread_admin) ? '<span class="badge unread">Nuevo</span>' : ''}
-        </div>
-      `;
-      li.addEventListener('click', ()=> selectTicket(t.id));
-      listEl.appendChild(li);
-    });
-  }
-
-  async function loadTickets(keepSelection=false){
-    try{
-      const data = await API.list(state.status);
-      if (!data || data.ok !== true) { throw new Error(data?.error || 'Error list'); }
-
-      const prevSel = keepSelection ? state.selected : null;
-      state.tickets = Array.isArray(data.tickets) ? data.tickets : [];
-      renderTickets();
-      if (prevSel){
-        const exists = state.tickets.some(t => t.id === prevSel);
-        if (exists){
-          $$('#sapTickets li').forEach(li => li.classList.toggle('active', Number(li.dataset.id) === prevSel));
-        } else {
-          if (state.selected === prevSel) clearThread();
-        }
-      }
-    }catch(e){
-      console.error('Error en loadTickets:', e?.message || e);
-      listEl.innerHTML = '<li>⚠️ Error al cargar tickets (abre la consola para detalles)</li>';
-      emptyEl.style.display = 'none';
-    }
-  }
-
-  function clearThread(){
-    threadTitle.textContent = 'Selecciona un ticket';
-    threadMeta.textContent = '';
-    msgsEl.innerHTML = '<div class="sap-placeholder">Selecciona un ticket a la izquierda para ver el chat.</div>';
-    replyText.disabled = true; replyFile.disabled = true; sendBtn.disabled = true; resolveBtn.disabled = true;
-    state.selected = null;
-    state.lastTs = null;
-    state.paintedIds.clear();
-    stopThreadPolling();
-  }
-
-  function renderThread(ticket, msgs){
-    threadTitle.textContent = `${(ticket.public_id || ('#'+ticket.id))} — ${ticket.full_name ?? ('Usuario #'+ticket.user_id)}`;
-    threadMeta.textContent  = `Estado: ${ticket.status} · Último mensaje: ${fmtDate(ticket.last_message_at)} · Creado: ${fmtDate(ticket.created_at)}`;
-
-    msgsEl.innerHTML = '';
-    state.paintedIds.clear();
-    (msgs || []).forEach(m=> appendOne(m));
-
-    const resolved = (ticket.status === 'resolved');
-    replyText.disabled = resolved; replyFile.disabled = resolved; sendBtn.disabled = resolved;
-    resolveBtn.disabled = resolved;
-
-    // set lastTs al máximo created_at mostrado (lexicográfico)
-    for (const m of (msgs || [])){
-      if (!m.created_at) continue;
-      if (!state.lastTs || m.created_at > state.lastTs) {
-        state.lastTs = m.created_at;
-      }
-    }
-  }
-
-  function appendOne(m){
-    // anti-duplicados por id
-    if (m.id && state.paintedIds.has(m.id)) return;
-
-    const div = document.createElement('div');
-    div.className = 'msg ' + (m.sender === 'admin' ? 'admin' : '');
-    const who = (m.sender === 'admin') ? 'Admin' : 'Usuario';
-    const safe = escapeHTML(m.message || '');
-    const att = m.file_path ? `<div class="att">Adjunto: <a href="${m.file_path}" target="_blank" rel="noopener noreferrer">Ver archivo</a></div>` : '';
-    div.innerHTML = `
-      <div class="who">${who} · <small>${fmtDate(m.created_at)}</small></div>
-      <div class="text">${safe}</div>
-      ${att}
-    `;
-    if (m.id) div.dataset.mid = m.id;
-    msgsEl.appendChild(div);
-    msgsEl.scrollTop = msgsEl.scrollHeight + 120;
-
-    // actualizar lastTs (lexicográfico)
-    if (m.created_at && (!state.lastTs || m.created_at > state.lastTs)) {
-      state.lastTs = m.created_at;
-    }
-    if (m.id) state.paintedIds.add(m.id);
-  }
-
-  async function selectTicket(id){
-    state.selected = id;
-    state.lastTs = null;            // fuerza recálculo
-    state.paintedIds.clear();
-    $$('#sapTickets li').forEach(li => li.classList.toggle('active', Number(li.dataset.id) === id));
-    try{
-      const data = await API.thread(id);
-      if (!data || data.ok !== true){ throw new Error(data?.error || 'Error thread'); }
-      renderThread(data.ticket, data.messages || []);
-
-      // marcar como leído en UI
-      const t = state.tickets.find(x => x.id === id);
-      if (t){ t.unread_admin = 0; }
-      renderTickets();
-
-      // arrancar polling del hilo
-      startThreadPolling();
-    }catch(e){
-      console.error('Error en selectTicket:', e?.message || e);
-      msgsEl.innerHTML = '<div class="sap-placeholder">No se pudo cargar el hilo (ver consola).</div>';
-    }
-  }
-
-  async function fetchAndAppendNew(){
-    if (!state.selected) return;
-    const data = await API.thread(state.selected);
-    if (!data || data.ok !== true) return;
-
-    const msgs = Array.isArray(data.messages) ? data.messages : [];
-    const last = state.lastTs || null;
-
-    // SOLO versión lexicográfica
-    const news = msgs
-      .filter(m => m.created_at && (!last || m.created_at > last))
-      .sort((a,b)=> a.created_at.localeCompare(b.created_at));
-
-    if (news.length){
-      news.forEach(appendOne);
-    }
-
-    // refrescar cabecera por si cambió last_message_at
-    if (data.ticket){
-      threadMeta.textContent  = `Estado: ${data.ticket.status} · Último mensaje: ${fmtDate(data.ticket.last_message_at)} · Creado: ${fmtDate(data.ticket.created_at)}`;
-    }
-
-    // reordenar lista/badges sin perder selección
-    await loadTickets(true);
-  }
-
-  async function sendReply(e){
-    e.preventDefault();
-    const id = state.selected;
-    if (!id) return;
-
-    const text = (replyText.value || '').trim();
-    const file = replyFile.files && replyFile.files[0];
-
-    if (!text && !file){
-      alert('Escribe un mensaje o adjunta un archivo.');
-      return;
-    }
-    if (file && file.size > 2 * 1024 * 1024){
-      alert('Adjunto supera 2 MB.');
-      return;
-    }
-
-    sendBtn.disabled = true;
-    try{
-      const res = await API.reply(id, text, file || null);
-      if (!res || res.ok !== true){ throw new Error(res?.error || 'Error reply'); }
-      replyText.value = '';
-      if (replyFile) replyFile.value = '';
-
-      // tras enviar, trae SOLO lo nuevo (incluida tu respuesta con timestamp del servidor)
-      await fetchAndAppendNew();
-    }catch(e){
-      console.error('Error al enviar respuesta:', e?.message || e);
-      alert('No se pudo enviar la respuesta (ver consola).');
-    }finally{
-      sendBtn.disabled = false;
-    }
-  }
-
-  async function resolveTicket(){
-    const id = state.selected;
-    if (!id) return;
-    if (!confirm('¿Finalizar este caso?')) return;
-
-    resolveBtn.disabled = true;
-    try{
-      const res = await API.resolve(id);
-      if (!res || res.ok !== true){ throw new Error(res?.error || 'Error resolve'); }
-
-      // refresca hilo (quedará read-only) y lista
-      await fetchAndAppendNew();
-      await loadTickets(true);
-
-      // si estás en “Abiertos”, lo sacamos del panel
-      if (state.status === 'open'){
-        clearThread();
-      }
-    }catch(e){
-      console.error('Error al finalizar caso:', e?.message || e);
-      alert('No se pudo finalizar el caso (ver consola).');
-    }finally{
-      resolveBtn.disabled = false;
-    }
-  }
-
-  // Eventos UI
-  statusEl.addEventListener('change', async ()=>{
-    state.status = statusEl.value;
-    clearThread();
-    await loadTickets();
-  });
-  refreshEl.addEventListener('click', ()=>loadTickets(true)); // manual si quieres
-  replyForm.addEventListener('submit', sendReply);
-  resolveBtn.addEventListener('click', resolveTicket);
-
-  // Inicial
-  clearThread();
-  loadTickets().then(()=>{ startListPolling(); });
-
-  // El checkbox de auto-refresh queda opcional; nuestro polling ya corre siempre
-  autoEl?.addEventListener('change', ()=>{ /* noop */ });
-
-})();
-</script>
 
           <?php
             $totalPages = (int)ceil($total / PAGE_SIZE);
