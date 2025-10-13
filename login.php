@@ -399,7 +399,7 @@ img, video{ max-width:100%; height:auto; }
       <p>Registra ventas en segundos, controla inventario y mira métricas clave del mes. Seguridad, sencillez y rendimiento en un mismo lugar.</p>
       <div class="intro-cta">
         <a class="btn-ghost" href="signup.php">Crear cuenta</a>
-        <a class="cta" href="signup.php">Pruébalo gratis 15 días</a>
+        <a class="cta" href="signup.php">Pruébalo gratis 30 días</a>
       </div>
       <div class="points">
         <div class="point">
