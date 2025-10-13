@@ -353,7 +353,7 @@ $displayName = $_SESSION['full_name'] ?? $_SESSION['username'] ?? $_SESSION['ema
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M5 13l4 4L19 7l-4-4z"/><path d="M15 7l-1.5 1.5"/><path d="M7 15l-1.5 1.5"/><path d="M5 19l2-2"/>
             </svg>
-            Empieza gratis 15 días
+            Empieza gratis 30 días
           </a>
           <a class="btn ghost" href="login.php">Ver demo</a>
         </div>
@@ -578,7 +578,7 @@ $displayName = $_SESSION['full_name'] ?? $_SESSION['username'] ?? $_SESSION['ema
   <section class="section" id="precios">
     <div class="features">
       <h2 class="sec-title">Un solo plan. Todo incluido.</h2>
-      <p class="sec-sub">Empieza gratis por 15 días. Luego puedes continuar activar nuestro plan premium económico.</p>
+      <p class="sec-sub">Empieza gratis por 30 días. Luego puedes continuar activar nuestro plan premium económico.</p>
       <div class="pricing">
         <div class="plan">
           <div style="font-weight:800;letter-spacing:.2px">Plan Estándar</div>
@@ -621,7 +621,7 @@ $displayName = $_SESSION['full_name'] ?? $_SESSION['username'] ?? $_SESSION['ema
           <h4 onclick="toggleQA(this)">¿Necesito tarjeta para la prueba?
             <svg class="caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0b1220" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
           </h4>
-          <p>No. Empiezas sin tarjeta. Al terminar los 15 días puedes suscribirte si te convence.</p>
+          <p>No. Empiezas sin tarjeta. Al terminar los 30 días puedes suscribirte si te convence.</p>
         </div>
         <div class="qa">
           <h4 onclick="toggleQA(this)">¿Puedo exportar mis datos?
@@ -648,7 +648,7 @@ $displayName = $_SESSION['full_name'] ?? $_SESSION['username'] ?? $_SESSION['ema
   <!-- CTA FINAL -->
   <section class="section" style="padding-top:8px">
     <div class="cta-final">
-      <div style="font-size:20px;font-weight:800;line-height:1.2">Prueba ShockFy gratis por 15 días</div>
+      <div style="font-size:20px;font-weight:800;line-height:1.2">Prueba ShockFy gratis por 30 días</div>
       <div>
         <a href="signup.php">Crear mi cuenta</a>
       </div>
