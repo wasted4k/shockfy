@@ -218,7 +218,7 @@ unset($_SESSION['flash']);
       <?php endif; ?>
 
       <h1 class="title" id="signupTitle">Crea tu cuenta</h1>
-      <p class="subtitle">Prueba gratis 15 días — <span style="white-space:nowrap">no se requiere tarjeta</span>.</p>
+      <p class="subtitle">Prueba gratis 30 días — <span style="white-space:nowrap">no se requiere tarjeta</span>.</p>
 
       <form action="signup_process.php" method="post" novalidate id="signupForm">
         <div class="split">

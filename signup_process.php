@@ -61,7 +61,8 @@ $username = mb_substr($email, 0, 50);
 // Fechas de prueba (UTC)
 $nowUtc = new DateTime('now', new DateTimeZone('UTC'));
 $trial_start = $nowUtc->format('Y-m-d H:i:s');
-$trial_end   = $nowUtc->modify('+15 days')->format('Y-m-d H:i:s');
+$trial_end   = (clone $nowUtc)->modify('+30 days')->format('Y-m-d H:i:s');
+
 
 // Moneda por país (tu columna currency_pref es VARCHAR(10) con default "S/.")
 $currency_map = array(
