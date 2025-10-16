@@ -366,6 +366,12 @@ img, video{ max-width:100%; height:auto; }
   -webkit-text-fill-color: #0f172a !important;
 }
 
+h3 a { 
+  color: inherit; 
+  text-decoration: none;
+}
+
+
 </style>
 </head>
 <body>
@@ -375,7 +381,7 @@ img, video{ max-width:100%; height:auto; }
     <div class="nav-container">
       <div class="logo">
         <img src="assets/img/icono_menu.png" alt="ShockFy">
-        <h3>ShockFy</h3>
+       <h3><a href="home.php">ShockFy</a></h3>
       </div>
       <input type="checkbox" id="nav-toggle" class="nav-toggle" aria-label="Abrir menú" />
       <label for="nav-toggle" class="nav-burger" aria-label="Abrir menú" aria-controls="nav-menu">
