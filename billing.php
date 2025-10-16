@@ -57,7 +57,10 @@ $PLANS = [
   // NOTA: el código de plan sigue siendo 'starter' para no romper contratos;
   'starter' => [
     'name' => 'Premium',
-    'price_label' => '$2.99/mes',
+    'price_label' => [
+  'old' => '$4.99',
+  'new' => '$2.99/mes'
+],
     'badge' => 'Recomendado',
     'features' => [
       'Inventario Ilimitado',
@@ -289,6 +292,21 @@ unset($_SESSION['billing_ok'], $_SESSION['billing_err']);
 }
 
 
+.old-price {
+  text-decoration: line-through;
+  color: #999;
+  margin-right: 8px;
+  font-size: 20px;
+  opacity: 0.8;
+}
+
+.new-price {
+  color: #16a34a;
+  font-weight: 900;
+  font-size: 26px;
+}
+
+
   </style>
 </head>
 <body>
@@ -338,7 +356,11 @@ unset($_SESSION['billing_ok'], $_SESSION['billing_err']);
                   <h3><?= htmlspecialchars($PLANS['starter']['name']) ?></h3>
                   <span class="badge"><?= htmlspecialchars($PLANS['starter']['badge']) ?></span>
                 </div>
-                <div class="price"><?= htmlspecialchars($PLANS['starter']['price_label']) ?></div>
+                <div class="price">
+  <span class="old-price"><?= htmlspecialchars($PLANS['starter']['price_label']['old']) ?></span>
+  <span class="new-price"><?= htmlspecialchars($PLANS['starter']['price_label']['new']) ?></span>
+</div>
+
                 <ul class="ul">
                   <?php foreach ($PLANS['starter']['features'] as $f): ?>
                     <li><?= htmlspecialchars($f) ?></li>
