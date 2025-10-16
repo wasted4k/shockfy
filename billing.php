@@ -51,15 +51,13 @@ function display_plan_name(?string $code): string {
   return $map[strtolower($code)] ?? strtoupper($code);
 }
 
-/**
- * Planes disponibles (mostrar "Premium" para starter y precio fijo $4.99/mes)
- */
+
+
 $PLANS = [
   // NOTA: el código de plan sigue siendo 'starter' para no romper contratos;
-  // solo el nombre visible cambia a "Premium" y el precio se fija a $4.99/mes.
   'starter' => [
     'name' => 'Premium',
-    'price_label' => '$4.99/mes',
+    'price_label' => '$2.99/mes',
     'badge' => 'Recomendado',
     'features' => [
       'Inventario Ilimitado',
