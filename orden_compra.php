@@ -931,6 +931,12 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
 })();
 </script>
 
+# Script para desactivar boton de instrucciones de "bolivares"
+
+<script>
+  document.getElementById("ve-instrucciones").disabled = true;
+</script>
+
 
 
 
