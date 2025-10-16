@@ -46,7 +46,7 @@ function display_plan_name(?string $code): string {
 
 // ===== Parámetros de UI =====
 $plan = $_GET['plan'] ?? $_POST['plan'] ?? 'starter';
-$amountUSD = 4.99;
+$amountUSD = 2.99;
 $description = 'ShockFy Premium';
 $next = $_GET['next'] ?? $_POST['next'] ?? '';
 
