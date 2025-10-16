@@ -54,10 +54,9 @@ function display_plan_name(?string $code): string {
 
 
 $PLANS = [
-  // NOTA: el código de plan sigue siendo 'starter' para no romper contratos;
   'starter' => [
     'name' => 'Premium',
-    'price_label' => '$2.99/mes',
+    'price_label' => '<span style="text-decoration: line-through; color: #888;">$4.99</span> <span style="color: #28a745; font-weight: bold;">$2.99/mes</span>',
     'badge' => 'Recomendado',
     'features' => [
       'Inventario Ilimitado',
@@ -66,9 +65,7 @@ $PLANS = [
       'Alertas de stock bajo',
       'Importación/Exportación (CSV/PDF)',
       'Historial de movimientos',
-      
-      
-    'Backups automáticos diarios',
+      'Backups automáticos diarios',
     ],
   ],
   'free' => [
