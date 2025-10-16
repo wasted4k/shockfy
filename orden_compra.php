@@ -588,7 +588,7 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
         <li><strong>Numero de cuenta:</strong> 570-954-8915-8047</li>
         <li><strong>Yape:</strong> 925 578 960</li>
         <li><strong>Titular:</strong> Freibel Villalobos Villalobos</li>
-        <li><strong>Monto:</strong> S/. 18.00 </li>
+        <li><strong>Monto:</strong> S/. 11.00 </li>
       </ul>
       <p>Guarda tu comprobante; el equipo lo validará y activará tu plan.</p>
     </div>
@@ -715,7 +715,7 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
 
 
                       if (method === 'bolivares') {
-  title.textContent = 'Pago en Bolívares (Venezuela) - 1,500 VES';
+  title.textContent = 'Pago en Bolívares (Venezuela) - 1,000 VES';
   subtitle.textContent = 'Plan Premium - ' + price; 
 
   body.innerHTML = `
@@ -725,7 +725,7 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
         <li><strong>Banco:</strong> Banesco</li>
         <li><strong>Número de cuenta:</strong> 01340002440021044691</li>
         <li><strong>Titular:</strong> Freibel Villalobos Villalobos</li>
-        <li><strong>Monto:</strong> 1,500 VES </li>
+        <li><strong>Monto:</strong> 1,000 VES </li>
          <div class="hr" role="separator" aria-hidden="true"></div>
          <li><strong>Datos Pago Movil:</strong></li>
          <li><strong>Numero:</strong> 0426-9636029</li>
