@@ -315,6 +315,25 @@ $displayName = $_SESSION['full_name'] ?? $_SESSION['username'] ?? $_SESSION['ema
   .mcard h5{ font-size: 11px; }
 }
 
+.price {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.old-price {
+  text-decoration: line-through;
+  color: #999;
+  margin-right: 8px;
+  font-size: 20px;
+  opacity: 0.8;
+}
+
+.new-price {
+  color: #16a34a; /* verde */
+  font-weight: 900;
+  font-size: 26px;
+}
+
 
   </style>
 </head>
@@ -593,7 +612,12 @@ $displayName = $_SESSION['full_name'] ?? $_SESSION['username'] ?? $_SESSION['ema
       <div class="pricing">
         <div class="plan">
           <div style="font-weight:800;letter-spacing:.2px">Plan Estándar</div>
-          <div class="price">$2.99 <small>/ mes</small></div>
+          <div class="price">
+  <span class="old-price">$4.99</span>
+  <span class="new-price">$2.99</span>
+  <small>/ mes</small>
+</div>
+
           <div class="plist">
             <div class="row">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
