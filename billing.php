@@ -294,7 +294,7 @@ unset($_SESSION['billing_ok'], $_SESSION['billing_err']);
 
 .old-price {
   text-decoration: line-through;
-  color: #999;
+  color: #f54949ff;
   margin-right: 8px;
   font-size: 20px;
   opacity: 0.8;
