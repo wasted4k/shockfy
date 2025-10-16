@@ -777,7 +777,7 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
   // Instrucciones (mismo video/modal que usas en otros)
   btnInstr.addEventListener('click', () => {
     openVideoModal(
-      'https://www.youtube.com/embed/qNx22A7pJ3c?list=PLFo_FFi1lfVi1n6UfGHBTH4-XKwNvSFYv',
+      'https://www.youtube.com/embed/qNx22A7pJ3c?list=PLFo_FFi1lfVi1',
       'Instrucciones de pago en Bolívares'
     );
   });
@@ -930,14 +930,6 @@ $PAYPAL_SUBSCRIBE_URL = 'https://www.paypal.com/webapps/billing/plans/subscribe?
   }, true); // capturando, para correr antes del handler original
 })();
 </script>
-
-# Script para desactivar boton de instrucciones de "bolivares"
-
-<script>
-  document.getElementById("ve-instrucciones").disabled = true;
-</script>
-
-
 
 
               </div>
