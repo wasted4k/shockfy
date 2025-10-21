@@ -447,6 +447,7 @@ function trial_meta($row): array {
                   <?php else: ?>
                     <button class="btn warn tooltip" title="Activar trial (<?= 7 ?> días)" onclick="activateTrial(<?= (int)$u['id'] ?>, this)">✨ Activar trial</button>
                   <?php endif; ?>
+                  <button class="btn warn tooltip" title="Ajustar días de prueba" onclick="promptTrialDays(<?= (int)$u['id'] ?>, this)">🗓️ Ajustar días</button>
 
                   <?php
                     $isStarter = ($u['plan'] ?? '') === 'starter';
@@ -814,6 +815,92 @@ function trial_meta($row): array {
     // Run normalize on load
     window.addEventListener('load', normalizeRowButtons);
 
+// Función que pide el número de días y llama a la lógica de actualización.
+function promptTrialDays(userId, btnElement) {
+    const days = prompt("Ingresa la cantidad de días de prueba a AGREGAR o RENOVAR para el usuario #" + userId + " (ej: 30):");
+
+    // 1. Cancelado o vacío
+    if (days === null || days.trim() === '') {
+        return;
+    }
+
+    const numDays = parseInt(days, 10);
+
+    // 2. No es un número válido o es cero/negativo
+    if (isNaN(numDays) || numDays <= 0) {
+        showToast("Cantidad de días inválida. Debe ser un número positivo.", 'error');
+        return;
+    }
+
+    // 3. Deshabilitar botón para UX
+    btnElement.disabled = true;
+    const originalText = btnElement.innerHTML;
+    btnElement.innerHTML = 'Cargando...';
+
+    // 4. Enviar solicitud AJAX
+    postAction({ 
+        ajax_set_trial_days: 1, 
+        user_id: userId, 
+        days: numDays 
+    }).then(res => {
+        if (res.status === 'success') {
+            showToast(res.msg, 'ok');
+            // Actualizar la fila en el HTML sin recargar
+            updateTrialRow(userId, res.trial_ends_at, res.trial_active, res.plan);
+        } else {
+            showToast(res.msg || 'Error al ajustar el trial.', 'error');
+        }
+    }).catch(() => {
+        showToast('Error de conexión con el servidor.', 'error');
+    }).finally(() => {
+        btnElement.disabled = false;
+        btnElement.innerHTML = originalText;
+    });
+}
+
+// Esta función actualiza el HTML de la fila de la tabla
+function updateTrialRow(userId, trialEndsAt, isActive, plan) {
+    const tr = document.querySelector(`tr[data-id="${userId}"]`);
+    if (!tr) return;
+
+    // A) Actualizar el atributo data (usado para modals/lógica)
+    tr.dataset.trial_ends_at = trialEndsAt;
+    tr.dataset.plan = plan; // si finalizas, fuerza plan a 'free'
+
+    // B) Actualizar la columna Plan
+    const planChip = tr.querySelector('.plan-chip');
+    if (planChip) planChip.textContent = plan;
+    
+    // C) Actualizar la columna Trial
+    const trialCol = tr.querySelector('.trial-col');
+    if (trialCol) {
+        let chipClass, trialText;
+        if (!trialEndsAt) {
+            chipClass = 'gray';
+            trialText = '—';
+        } else {
+            const end = new Date(trialEndsAt + 'Z'); // Asume UTC de la BD
+            const now = new Date();
+            const active = now <= end;
+            
+            trialText = active 
+                ? "Activo · fin: " + end.toISOString().slice(0, 16).replace('T', ' ') + ' UTC'
+                : "Expirado · fin: " + end.toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
+
+            chipClass = active ? 'ok' : 'bad';
+        }
+        
+        trialCol.innerHTML = `<span class="chip ${chipClass} trial-chip">${trialText}</span>`;
+    }
+    
+    // D) Reemplazar el botón de acción "Activar/Finalizar trial"
+    const trialBtnContainer = tr.querySelector('.row-actions');
+    if (trialBtnContainer) {
+        // En un entorno real, es mejor recargar la fila completa o actualizar
+        // el botón de Activar/Finalizar Trial (ya que su lógica depende de si el trial está activo)
+        // Por simplicidad, aquí solo actualizamos el chip.
+    }
+}
   </script>
 </body>
 </html>
