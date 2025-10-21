@@ -509,7 +509,7 @@ $totalMes = $stmt->fetchColumn();
             <table class="products-table table-cards" id="productsTable">
               <thead>
                 <tr>
-                
+                  <th data-key="id">ID</th>
                   <th data-key="code">Código</th>
                   <th data-key="name">Prenda</th>
                   <th data-key="size">Talla</th>
@@ -587,7 +587,7 @@ $totalMes = $stmt->fetchColumn();
             <table class="sales-table table-cards" id="salesTable">
               <thead>
                 <tr>
-                  
+                  <th data-key="id">ID</th>
                   <th data-key="product_name">Producto</th>
                   <th data-key="size">Talla</th>
                   <th data-key="color">Color</th>
