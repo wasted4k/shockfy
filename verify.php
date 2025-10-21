@@ -47,14 +47,14 @@ try {
                         WHERE id = :id");
   $upd->execute([':id' => $uid]);
 
-  // Iniciar trial de 15 días si aún no existe
+  // Iniciar trial de 30 días si aún no existe
   $trialCheck = $pdo->prepare("SELECT trial_started_at, trial_ends_at FROM users WHERE id = ? LIMIT 1");
   $trialCheck->execute([$uid]);
   $t = $trialCheck->fetch(PDO::FETCH_ASSOC);
 
   if (empty($t['trial_started_at']) && empty($t['trial_ends_at'])) {
     $nowUtc   = new DateTime('now', new DateTimeZone('UTC'));
-    $endsUtc  = (clone $nowUtc)->modify('+15 days');
+    $endsUtc  = (clone $nowUtc)->modify('+30 days');
 
     $trialUpd = $pdo->prepare("UPDATE users 
                                SET trial_started_at = :ts,
