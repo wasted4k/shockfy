@@ -295,28 +295,72 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             color:var(--text);
             font-size: 14px; /* Asegurar tamaño consistente */
         }
-        .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
-        .btn.cancel{background:#fff;color:var(--muted);border:1px solid var(--border)}
-        .modal-close{
-            position:absolute;
-            top:12px;
-            right:12px;
-            width:34px;
-            height:34px;
-            border-radius:10px;
-            border:1px solid var(--border);
-            display:grid;
-            place-items:center;
-            background:#f8fafc;
-            cursor:pointer
-        }
-        /* Modo oscuro del Modal */
-        body.dark .modal-content{ background:#0b1220; border-color:#1f2a4a; }
-        body.dark .modal-content h3{ color:#e5e7eb; }
-        body.dark .modal-content input#cat_name_modal{ background:#0e1630; border-color:#2a365a; color:#e5e7eb; }
-        body.dark .modal-close{ background:#0e1630; border-color:#2a365a; }
-        body.dark .modal-close svg{ stroke:#e5e7eb; }
-        body.dark .btn.cancel{ background:#0e1630; border-color:#2a365a; color:#aeb9cf; }
+       .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
+
+/* 1. Botón Cancelar (Modo CLARO) */
+.btn.cancel{
+    background:#fff;
+    color:var(--muted);
+    border:1px solid var(--border);
+    transition: all .2s ease; /* Añadimos transición para un efecto suave */
+}
+
+/* ✅ Hover del botón Cancelar (Modo CLARO) */
+.btn.cancel:hover{
+    background: var(--bg); /* Usa el fondo de la página, un blanco suave */
+    color: var(--text); /* Texto oscuro para mejor legibilidad */
+    border-color: var(--muted); /* Borde un poco más notable */
+    transform: translateY(-1px); /* Mantiene el efecto de "elevación" del botón */
+}
+
+
+.modal-close{
+    position:absolute;
+    top:12px;
+    right:12px;
+    width:34px;
+    height:34px;
+    border-radius:10px;
+    border:1px solid var(--border);
+
+}
+
+/* ✅ Hover del botón de cerrar (¡Añadido para mejor UX!) */
+.modal-close:hover {
+    background: #e2e8f0; 
+    border-color: #cbd5e1;
+}
+
+/* Opcional: Centrado visual más fino en el SVG, por si acaso */
+.modal-close svg {
+    /* Desplazamos visualmente 0.5px hacia arriba */
+    transform: translateY(-0.5px); 
+}
+
+/* Modo oscuro del Modal */
+body.dark .modal-content{ background:#0b1220; border-color:#1f2a4a; }
+body.dark .modal-content h3{ color:#e5e7eb; }
+body.dark .modal-content input#cat_name_modal{ background:#0e1630; border-color:#2a365a; color:#e5e7eb; }
+body.dark .modal-close{ background:#0e1630; border-color:#2a365a; }
+body.dark .modal-close svg{ stroke:#e5e7eb; }
+
+/* 2. Botón Cancelar (Modo OSCURO) */
+body.dark .btn.cancel{ 
+    background:#0e1630; 
+    border-color:#2a365a; 
+    color:#aeb9cf; 
+    transition: all .2s ease; /* Aseguramos la transición también aquí */
+}
+
+/* ✅ Hover del botón Cancelar (Modo OSCURO) */
+body.dark .btn.cancel:hover{
+    background: #132146; /* Un color ligeramente más oscuro para resaltar */
+    border-color: #43548a; /* Un borde que contraste */
+    color: #fff; /* Texto blanco puro */
+    transform: translateY(-1px);
+}
+
+
 
     </style>
 </head>
@@ -392,7 +436,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <label for="cost_price">Precio de costo *</label>
                             <div class="field">
                                 <span class="prefix"><?= htmlspecialchars($currency) ?></span>
-                                <input id="cost_price" name="cost_price" type="number" inputmode="decimal" step="0.01" value="0.00" required>
+                                <input id="cost_price" name="cost_price" type="number" inputmode="decimal" step="0.01" value="0" required>
                             </div>
                         </div>
 
@@ -400,7 +444,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <label for="sale_price">Precio de venta *</label>
                             <div class="field">
                                 <span class="prefix"><?= htmlspecialchars($currency) ?></span>
-                                <input id="sale_price" name="sale_price" type="number" inputmode="decimal" step="0.01" value="0.00" required>
+                                <input id="sale_price" name="sale_price" type="number" inputmode="decimal" step="0.01" value="0" required>
                             </div>
                         </div>
 
@@ -463,12 +507,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <div id="categoryModal">
         <div class="modal-content">
-            <button class="modal-close" onclick="closeModal()" aria-label="Cerrar">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M18 6 6 18"/>
-                  <path d="M6 6l12 12"/>
-                </svg>
-            </button>
+            
             <h3 id="modalTitle">Nueva categoría</h3>
             <p class="modal-sub">Asigna un nombre claro y único para identificar la categoría.</p>
             <input type="hidden" id="cat_id_modal"> 
