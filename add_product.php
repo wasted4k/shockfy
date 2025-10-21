@@ -239,6 +239,85 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         body.dark .prefix{ background:#0e1630; border-color:#1f2a4a; color:#9fb1ff; }
         body.dark .btn{ background:#0e1630; border-color:#2a365a; color:#e5e7eb; }
         body.dark .btn:hover{ background:#132146; }
+
+
+        .crear-categoria {
+            text-align: center;
+            border: none;
+            background: none;
+            color: #555;
+            transition: color 0.2s ease;
+            cursor: pointer; /* Añadido cursor para indicar interactividad */
+            font-size: 13px; /* Tamaño de fuente más pequeño para un enlace */
+            margin-top: 4px; /* Pequeño margen */
+        }
+
+        .crear-categoria:hover {
+            color: #000; /* Se oscurece al pasar el ratón */
+            text-decoration: underline; /* Subrayado al pasar el ratón */
+        }
+        
+        /* === ESTILOS DEL MODAL AGREGADOS === */
+        #categoryModal{
+            display:none;
+            position:fixed;
+            inset:0;
+            background:rgba(15,23,42,.2);
+            backdrop-filter:blur(2px);
+            justify-content:center;
+            align-items:center;
+            z-index:1000;
+        }
+        #categoryModal.active{
+            display:flex;
+            animation:fadeIn .2s ease;
+        }
+        @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+        .modal-content{
+            background:#ffffff;
+            border:1px solid var(--border);
+            border-radius:18px;
+            box-shadow:0 20px 40px rgba(2,6,23,.15);
+            max-width:440px;
+            width:92%;
+            padding:24px 22px;
+            position:relative;
+        }
+        .modal-content h3{margin:0 0 12px;font-size:18px;color:#0b1220}
+        .modal-sub{margin:0 0 14px;color:var(--muted);font-size:12px}
+        .modal-content input#cat_name_modal { /* Específico para el input del modal */
+            width:100%;
+            padding:12px 14px;
+            border-radius:12px;
+            border:1px solid var(--border);
+            background:#fff;
+            color:var(--text);
+            font-size: 14px; /* Asegurar tamaño consistente */
+        }
+        .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
+        .btn.cancel{background:#fff;color:var(--muted);border:1px solid var(--border)}
+        .modal-close{
+            position:absolute;
+            top:12px;
+            right:12px;
+            width:34px;
+            height:34px;
+            border-radius:10px;
+            border:1px solid var(--border);
+            display:grid;
+            place-items:center;
+            background:#f8fafc;
+            cursor:pointer
+        }
+        /* Modo oscuro del Modal */
+        body.dark .modal-content{ background:#0b1220; border-color:#1f2a4a; }
+        body.dark .modal-content h3{ color:#e5e7eb; }
+        body.dark .modal-content input#cat_name_modal{ background:#0e1630; border-color:#2a365a; color:#e5e7eb; }
+        body.dark .modal-close{ background:#0e1630; border-color:#2a365a; }
+        body.dark .modal-close svg{ stroke:#e5e7eb; }
+        body.dark .btn.cancel{ background:#0e1630; border-color:#2a365a; color:#aeb9cf; }
+
     </style>
 </head>
 <body>
@@ -249,18 +328,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="header">
             <div class="title">
                 <div class="icon">
-                    <!-- SVG etiqueta/producto -->
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                      <path d="M3 7v10a2 2 0 0 0 2 2h11l4-4V7a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 2 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" stroke="#2563eb" stroke-width="2" />
-                      <path d="M16 19v-4h4" stroke="#60a5fa" stroke-width="2" />
-                      <circle cx="8" cy="10" r="1" fill="#2563eb"/>
-                      <circle cx="12" cy="10" r="1" fill="#2563eb"/>
-                      <circle cx="16" cy="10" r="1" fill="#2563eb"/>
+                        <path d="M3 7v10a2 2 0 0 0 2 2h11l4-4V7a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 2 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" stroke="#2563eb" stroke-width="2" />
+                        <path d="M16 19v-4h4" stroke="#60a5fa" stroke-width="2" />
+                        <circle cx="8" cy="10" r="1" fill="#2563eb"/>
+                        <circle cx="12" cy="10" r="1" fill="#2563eb"/>
+                        <circle cx="16" cy="10" r="1" fill="#2563eb"/>
                     </svg>
                 </div>
                 <div>
                     <h1>Agregar producto</h1>
-                    <div class="subtitle">Completa los campos y guarda. La imagen es opcional.</div>
+                    <div class="subtitle">Agrega un producto a tu inventario.</div>
                 </div>
             </div>
         </div>
@@ -268,7 +346,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="card">
             <div class="card-header">
                 <div class="card-title">Formulario</div>
-                <div class="subtitle">Los campos obligatorios están marcados</div>
+                <div class="subtitle">Los campos marcados con * son obligatorios.</div>
             </div>
             <div class="card-body">
 
@@ -278,28 +356,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                   </div>
                 <?php endif; ?>
 
-                <!-- IMPORTANTE: no cambiar names ni método/enctype -->
                 <form method="post" enctype="multipart/form-data" id="productForm" novalidate>
 
                     <div class="form-grid">
-                        <!-- Código -->
                         <div>
-                            <label for="code">Código (opcional)</label>
+                            <label for="code">Código</label>
                             <div class="field">
                                 <input id="code" name="code" type="text" placeholder="ABC-123">
                             </div>
                         </div>
 
-                        <!-- Nombre -->
                         <div>
-                            <label for="name">Nombre de la prenda *</label>
+                            <label for="name">Nombre del producto *</label>
                             <div class="field">
                                 <input id="name" name="name" type="text" required placeholder="Ej: Polo básico">
                             </div>
                             <div class="hint">Requerido.</div>
                         </div>
 
-                        <!-- Talla -->
                         <div>
                             <label for="size">Talla</label>
                             <div class="field">
@@ -307,7 +381,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </div>
                         </div>
 
-                        <!-- Color -->
                         <div>
                             <label for="color">Color</label>
                             <div class="field">
@@ -315,7 +388,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </div>
                         </div>
 
-                        <!-- Costo -->
                         <div>
                             <label for="cost_price">Precio de costo *</label>
                             <div class="field">
@@ -324,7 +396,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </div>
                         </div>
 
-                        <!-- Venta -->
                         <div>
                             <label for="sale_price">Precio de venta *</label>
                             <div class="field">
@@ -333,7 +404,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </div>
                         </div>
 
-                        <!-- Stock -->
                         <div>
                             <label for="stock">Stock inicial *</label>
                             <div class="field">
@@ -341,25 +411,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </div>
                         </div>
 
-                        <!-- Categoría -->
                         <div>
                             <label for="category_id">Categoría *</label>
                             <div class="field">
                                 <select id="category_id" name="category_id" required>
-                                    <option value="">-- Seleccione categoría --</option>
+                                    <option value=""> Selecciona una categoría </option>
                                     <?php foreach($categories as $cat): ?>
                                         <option value="<?= (int)$cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
+                            <p class="crear-categoria" onclick="openCreateModal()">
+                                Crear categoría
+                            </p>
                         </div>
 
-                        <!-- Imagen -->
                         <div class="form-col-span-2">
                             <label for="image">Imagen del producto (opcional)</label>
                             <div class="image-uploader">
                                 <div class="image-preview" id="imagePreview">
-                                    <!-- Placeholder SVG -->
                                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
                                         <rect x="3" y="3" width="18" height="14" rx="3" stroke="#94a3b8" stroke-width="2"/>
                                         <path d="M3 14l4-4 4 4 3-3 4 3" stroke="#94a3b8" stroke-width="2" fill="none"/>
@@ -391,36 +461,142 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <div id="toast" role="status" aria-live="polite"></div>
 
+    <div id="categoryModal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal()" aria-label="Cerrar">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M18 6 6 18"/>
+                  <path d="M6 6l12 12"/>
+                </svg>
+            </button>
+            <h3 id="modalTitle">Nueva categoría</h3>
+            <p class="modal-sub">Asigna un nombre claro y único para identificar la categoría.</p>
+            <input type="hidden" id="cat_id_modal"> 
+            <input type="text" id="cat_name_modal" placeholder="Nombre de la categoría" autocomplete="off">
+            <div class="modal-actions">
+                <button type="button" class="btn cancel" onclick="closeModal()">Cancelar</button>
+                <button type="button" class="btn primary" onclick="saveCategory()">Guardar</button>
+            </div>
+        </div>
+    </div>
     <script>
-      // Dark coherente
-      window.addEventListener('load', () => {
+    // ------------------------------------------------------------------
+    // 1. VARIABLES GLOBALES DEL MODAL (¡CRÍTICO PARA QUE FUNCIONE!)
+    // ------------------------------------------------------------------
+    const modal = document.getElementById('categoryModal');
+    const catIdInput = document.getElementById('cat_id_modal');
+    const catNameInput = document.getElementById('cat_name_modal');
+    const modalTitle = document.getElementById('modalTitle');
+    const categorySelect = document.getElementById('category_id'); // El <select> principal
+
+    // ------------------------------------------------------------------
+    // 2. FUNCIONES DEL MODAL
+    // ------------------------------------------------------------------
+
+    // Función para abrir el modal en modo CREACIÓN
+    function openCreateModal() {
+        if (!modal) { console.error("Modal element not found!"); return; } 
+        
+        modalTitle.textContent = 'Nueva categoría';
+        catIdInput.value = ''; // Indica que es una INSERCIÓN
+        catNameInput.value = '';
+        modal.classList.add('active'); // Abre el modal
+        setTimeout(() => catNameInput.focus(), 60);
+    }
+    
+    // Función para cerrar el modal
+    function closeModal() {
+        if (modal) {
+            modal.classList.remove('active');
+            catIdInput.value = '';
+            catNameInput.value = '';
+        }
+    }
+
+    // Lógica AJAX para guardar la categoría (POST a categories.php)
+    function saveCategory() {
+        const name = catNameInput.value.trim();
+        if (!name) { showToast('El nombre no puede estar vacío', 'err'); return; }
+        
+        const formData = new FormData();
+        formData.append('name', name);
+        // NO enviamos el ID porque estamos creando.
+        
+        // El request se envía a categories.php
+        fetch('categories.php', { method: 'POST', body: formData })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'ok' && data.action === 'add') {
+                    // 1. Añadir la nueva categoría al SELECT del formulario
+                    const newOption = document.createElement('option');
+                    newOption.value = data.id; // ID devuelto por PHP
+                    newOption.textContent = data.name; // Nombre devuelto por PHP
+                    categorySelect.appendChild(newOption);
+                    
+                    // 2. Seleccionar la categoría recién creada
+                    categorySelect.value = data.id;
+
+                    showToast('Categoría creada correctamente', 'ok');
+                    closeModal();
+                } else {
+                    showToast('Error: ' + (data.message || 'No se pudo guardar la categoría'), 'err');
+                }
+            })
+            .catch(err => {
+                console.error('Error de red/servidor:', err);
+                showToast('Error de red al intentar guardar la categoría', 'err');
+            });
+    }
+
+    // Opcional: para cerrar el modal presionando ESC
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal && modal.classList.contains('active')) {
+            closeModal();
+        }
+    });
+    // Opcional: para guardar la categoría presionando ENTER dentro del input
+    if (catNameInput) {
+        catNameInput.addEventListener('keydown', e => { 
+            if (e.key === 'Enter') {
+                e.preventDefault(); // Evita enviar el formulario principal
+                saveCategory();
+            }
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // 3. TU CÓDIGO JS EXISTENTE
+    // ------------------------------------------------------------------
+    
+    // Dark coherente
+    window.addEventListener('load', () => {
         if(localStorage.getItem('darkMode') === 'true'){
             document.body.classList.add('dark');
         }
-      });
+    });
 
-      // Toast helper
-      function showToast(msg, type='ok'){
+    // Toast helper
+    function showToast(msg, type='ok'){
         const el = document.getElementById('toast');
         el.textContent = msg;
         el.classList.remove('ok','err');
         el.classList.add(type === 'ok' ? 'ok' : 'err');
         el.classList.add('show');
         setTimeout(() => el.classList.remove('show'), 2500);
-      }
+    }
+    
+    // Si vino flash del servidor, dispara toast (ok/err)
+    <?php if (!empty($flash)): ?>
+      showToast(<?= json_encode($flash['text']) ?>, <?= json_encode($flash['type'] === 'ok' ? 'ok' : 'err') ?>);
+    <?php endif; ?>
 
-      // Si vino flash del servidor, dispara toast (ok/err)
-      <?php if (!empty($flash)): ?>
-        showToast(<?= json_encode($flash['text']) ?>, <?= json_encode($flash['type'] === 'ok' ? 'ok' : 'err') ?>);
-      <?php endif; ?>
+    // Previsualización + validación de tamaño (2 MB)
+    const MAX_MB = 2;
+    const inputImage = document.getElementById('image');
+    const preview = document.getElementById('imagePreview');
+    const btnRemove = document.getElementById('btnRemoveImage');
 
-      // Previsualización + validación de tamaño (2 MB)
-      const MAX_MB = 2;
-      const inputImage = document.getElementById('image');
-      const preview = document.getElementById('imagePreview');
-      const btnRemove = document.getElementById('btnRemoveImage');
-
-      inputImage.addEventListener('change', (e) => {
+    inputImage.addEventListener('change', (e) => {
         const file = e.target.files && e.target.files[0];
         if(!file){ resetPreview(); return; }
         if (file.size > MAX_MB * 1024 * 1024) {
@@ -431,21 +607,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         const url = URL.createObjectURL(file);
         renderPreview(url);
-      });
+    });
 
-      btnRemove.addEventListener('click', () => {
+    btnRemove.addEventListener('click', () => {
         inputImage.value = '';
         resetPreview();
-      });
+    });
 
-      function renderPreview(src){
+    function renderPreview(src){
         preview.innerHTML = '';
         const img = document.createElement('img');
         img.src = src;
         preview.appendChild(img);
         btnRemove.style.display = 'inline-flex';
-      }
-      function resetPreview(){
+    }
+    function resetPreview(){
         preview.innerHTML = `
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
             <rect x="3" y="3" width="18" height="14" rx="3" stroke="#94a3b8" stroke-width="2"/>
@@ -454,11 +630,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           </svg>
         `;
         btnRemove.style.display = 'none';
-      }
+    }
 
-      // Validación rápida en cliente (incluye límite 2 MB)
-      const form = document.getElementById('productForm');
-      form.addEventListener('submit', (e) => {
+    // Validación rápida en cliente (incluye límite 2 MB)
+    const form = document.getElementById('productForm');
+    form.addEventListener('submit', (e) => {
         const name = document.getElementById('name').value.trim();
         const cost = parseFloat(document.getElementById('cost_price').value || '0');
         const sale = parseFloat(document.getElementById('sale_price').value || '0');
@@ -485,7 +661,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if(parseInt(document.getElementById('stock').value || '0', 10) < 0){
           e.preventDefault(); showToast('El stock no puede ser negativo', 'err'); return;
         }
-      });
+    });
     </script>
 </body>
 </html>
