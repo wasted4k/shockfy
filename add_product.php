@@ -2,7 +2,6 @@
 // add_product.php
 require 'db.php';
 require_once __DIR__ . '/auth_check.php'; // protege login / verificación
-// if (session_status() === PHP_SESSION_NONE) session_start();
 
 $user_id = $_SESSION['user_id']; // ID del usuario logueado
 
@@ -40,52 +39,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: add_product.php'); exit;
     }
 
-    // Procesar imagen si se sube (tope 2 MB)
-    $imagePath = null;
-    $MAX_IMAGE_BYTES = 2 * 1024 * 1024; // 2 MB
+    // === NUEVO: recibir URL de imagen desde upload.php (en lugar de manejar $_FILES) ===
+    // El front sube la imagen a upload.php y envía aquí la URL en 'image_url'
+    $imagePath = null; // ahora será la URL pública devuelta por upload.php
+    $imageUrl = trim($_POST['image_url'] ?? '');
 
-    if (!empty($_FILES['image']) && ($_FILES['image']['name'] ?? '') !== '') {
-        $err = (int)$_FILES['image']['error'];
-
-        // PHP ya pudo rechazar por tamaño (upload_max_filesize/post_max_size)
-        if ($err === UPLOAD_ERR_INI_SIZE || $err === UPLOAD_ERR_FORM_SIZE) {
-            $_SESSION['flash'] = ['type' => 'error', 'text' => 'La imagen no puede superar 2 MB.'];
+    if ($imageUrl !== '') {
+        if (!filter_var($imageUrl, FILTER_VALIDATE_URL)) {
+            $_SESSION['flash'] = ['type' => 'error', 'text' => 'La URL de imagen no es válida.'];
             header('Location: add_product.php'); exit;
         }
+        // OPCIONAL: restringir al mismo host (descomenta si quieres)
+        // $host = parse_url($imageUrl, PHP_URL_HOST);
+        // if ($host !== $_SERVER['HTTP_HOST']) {
+        //     $_SESSION['flash'] = ['type' => 'error', 'text' => 'Origen de imagen no permitido.'];
+        //     header('Location: add_product.php'); exit;
+        // }
 
-        if ($err === UPLOAD_ERR_OK) {
-            // Tope propio
-            if ((int)$_FILES['image']['size'] > $MAX_IMAGE_BYTES) {
-                $_SESSION['flash'] = ['type' => 'error', 'text' => 'La imagen no puede superar 2 MB.'];
-                header('Location: add_product.php'); exit;
-            }
-
-            $tmpName = $_FILES['image']['tmp_name'];
-            $originalName = basename((string)$_FILES['image']['name']);
-            $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
-            $allowed = ['jpg','jpeg','png','gif'];
-            if (!in_array($ext, $allowed, true)) {
-                $_SESSION['flash'] = ['type' => 'error', 'text' => 'Formato de imagen no permitido (JPG, PNG o GIF).'];
-                header('Location: add_product.php'); exit;
-            }
-
-            $uploadDir = 'uploads/';
-            if (!is_dir($uploadDir)) @mkdir($uploadDir, 0777, true);
-
-            $newName = uniqid('prod_', true) . '.' . $ext;
-            $imagePath = $uploadDir . $newName;
-
-            if (!@move_uploaded_file($tmpName, $imagePath)) {
-                $_SESSION['flash'] = ['type' => 'error', 'text' => 'No se pudo guardar la imagen. Inténtalo de nuevo.'];
-                header('Location: add_product.php'); exit;
-            }
-        } elseif ($err !== UPLOAD_ERR_NO_FILE) {
-            $_SESSION['flash'] = ['type' => 'error', 'text' => 'No se pudo subir la imagen. Inténtalo de nuevo.'];
-            header('Location: add_product.php'); exit;
-        }
+        $imagePath = $imageUrl;
     }
 
-    // INSERT del producto
+    // INSERT del producto (sin cambios, 'image' ahora guarda URL)
     $sql = 'INSERT INTO products (code, name, size, color, cost_price, sale_price, stock, category_id, image, user_id)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
     $stmt = $pdo->prepare($sql);
@@ -240,23 +214,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         body.dark .btn{ background:#0e1630; border-color:#2a365a; color:#e5e7eb; }
         body.dark .btn:hover{ background:#132146; }
 
-
         .crear-categoria {
             text-align: center;
             border: none;
             background: none;
             color: #555;
             transition: color 0.2s ease;
-            cursor: pointer; /* Añadido cursor para indicar interactividad */
-            font-size: 13px; /* Tamaño de fuente más pequeño para un enlace */
-            margin-top: 4px; /* Pequeño margen */
+            cursor: pointer;
+            font-size: 13px;
+            margin-top: 4px;
+        }
+        .crear-categoria:hover {
+            color: #000;
+            text-decoration: underline;
         }
 
-        .crear-categoria:hover {
-            color: #000; /* Se oscurece al pasar el ratón */
-            text-decoration: underline; /* Subrayado al pasar el ratón */
-        }
-        
         /* === ESTILOS DEL MODAL AGREGADOS === */
         #categoryModal{
             display:none;
@@ -286,82 +258,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         .modal-content h3{margin:0 0 12px;font-size:18px;color:#0b1220}
         .modal-sub{margin:0 0 14px;color:var(--muted);font-size:12px}
-        .modal-content input#cat_name_modal { /* Específico para el input del modal */
+        .modal-content input#cat_name_modal {
             width:100%;
             padding:12px 14px;
             border-radius:12px;
             border:1px solid var(--border);
             background:#fff;
-            color:var(--text);
-            font-size: 14px; /* Asegurar tamaño consistente */
+            color:#0f172a;
+            font-size: 14px;
         }
-       .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
+        .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
 
-/* 1. Botón Cancelar (Modo CLARO) */
-.btn.cancel{
-    background:#fff;
-    color:var(--muted);
-    border:1px solid var(--border);
-    transition: all .2s ease; /* Añadimos transición para un efecto suave */
-}
+        .btn.cancel{
+            background:#fff;
+            color:var(--muted);
+            border:1px solid var(--border);
+            transition: all .2s ease;
+        }
+        .btn.cancel:hover{
+            background: var(--bg);
+            color: var(--text);
+            border-color: var(--muted);
+            transform: translateY(-1px);
+        }
+        .modal-close{
+            position:absolute;
+            top:12px;
+            right:12px;
+            width:34px;
+            height:34px;
+            border-radius:10px;
+            border:1px solid var(--border);
+        }
+        .modal-close:hover { background: #e2e8f0; border-color: #cbd5e1; }
+        .modal-close svg { transform: translateY(-0.5px); }
 
-/* ✅ Hover del botón Cancelar (Modo CLARO) */
-.btn.cancel:hover{
-    background: var(--bg); /* Usa el fondo de la página, un blanco suave */
-    color: var(--text); /* Texto oscuro para mejor legibilidad */
-    border-color: var(--muted); /* Borde un poco más notable */
-    transform: translateY(-1px); /* Mantiene el efecto de "elevación" del botón */
-}
+        body.dark .modal-content{ background:#0b1220; border-color:#1f2a4a; }
+        body.dark .modal-content h3{ color:#e5e7eb; }
+        body.dark .modal-content input#cat_name_modal{ background:#0e1630; border-color:#2a365a; color:#e5e7eb; }
+        body.dark .modal-close{ background:#0e1630; border-color:#2a365a; }
+        body.dark .modal-close svg{ stroke:#e5e7eb; }
 
-
-.modal-close{
-    position:absolute;
-    top:12px;
-    right:12px;
-    width:34px;
-    height:34px;
-    border-radius:10px;
-    border:1px solid var(--border);
-
-}
-
-/* ✅ Hover del botón de cerrar (¡Añadido para mejor UX!) */
-.modal-close:hover {
-    background: #e2e8f0; 
-    border-color: #cbd5e1;
-}
-
-/* Opcional: Centrado visual más fino en el SVG, por si acaso */
-.modal-close svg {
-    /* Desplazamos visualmente 0.5px hacia arriba */
-    transform: translateY(-0.5px); 
-}
-
-/* Modo oscuro del Modal */
-body.dark .modal-content{ background:#0b1220; border-color:#1f2a4a; }
-body.dark .modal-content h3{ color:#e5e7eb; }
-body.dark .modal-content input#cat_name_modal{ background:#0e1630; border-color:#2a365a; color:#e5e7eb; }
-body.dark .modal-close{ background:#0e1630; border-color:#2a365a; }
-body.dark .modal-close svg{ stroke:#e5e7eb; }
-
-/* 2. Botón Cancelar (Modo OSCURO) */
-body.dark .btn.cancel{ 
-    background:#0e1630; 
-    border-color:#2a365a; 
-    color:#aeb9cf; 
-    transition: all .2s ease; /* Aseguramos la transición también aquí */
-}
-
-/* ✅ Hover del botón Cancelar (Modo OSCURO) */
-body.dark .btn.cancel:hover{
-    background: #132146; /* Un color ligeramente más oscuro para resaltar */
-    border-color: #43548a; /* Un borde que contraste */
-    color: #fff; /* Texto blanco puro */
-    transform: translateY(-1px);
-}
-
-
-
+        body.dark .btn.cancel{
+            background:#0e1630;
+            border-color:#2a365a;
+            color:#aeb9cf;
+            transition: all .2s ease;
+        }
+        body.dark .btn.cancel:hover{
+            background: #132146;
+            border-color: #43548a;
+            color: #fff;
+            transform: translateY(-1px);
+        }
     </style>
 </head>
 <body>
@@ -493,6 +442,9 @@ body.dark .btn.cancel:hover{
                         </div>
                     </div>
 
+                    <!-- NUEVO: aquí guardaremos la URL devuelta por upload.php -->
+                    <input type="hidden" name="image_url" id="imageUrl">
+
                     <div class="actions">
                         <a href="index.php" class="btn ghost">Cancelar</a>
                         <button type="submit" class="btn primary">Guardar producto</button>
@@ -507,10 +459,9 @@ body.dark .btn.cancel:hover{
 
     <div id="categoryModal">
         <div class="modal-content">
-            
             <h3 id="modalTitle">Nueva categoría</h3>
             <p class="modal-sub">Asigna un nombre claro y único para identificar la categoría.</p>
-            <input type="hidden" id="cat_id_modal"> 
+            <input type="hidden" id="cat_id_modal">
             <input type="text" id="cat_name_modal" placeholder="Nombre de la categoría" autocomplete="off">
             <div class="modal-actions">
                 <button type="button" class="btn cancel" onclick="closeModal()">Cancelar</button>
@@ -520,30 +471,25 @@ body.dark .btn.cancel:hover{
     </div>
     <script>
     // ------------------------------------------------------------------
-    // 1. VARIABLES GLOBALES DEL MODAL (¡CRÍTICO PARA QUE FUNCIONE!)
+    // 1. VARIABLES GLOBALES DEL MODAL
     // ------------------------------------------------------------------
     const modal = document.getElementById('categoryModal');
     const catIdInput = document.getElementById('cat_id_modal');
     const catNameInput = document.getElementById('cat_name_modal');
     const modalTitle = document.getElementById('modalTitle');
-    const categorySelect = document.getElementById('category_id'); // El <select> principal
+    const categorySelect = document.getElementById('category_id');
 
     // ------------------------------------------------------------------
     // 2. FUNCIONES DEL MODAL
     // ------------------------------------------------------------------
-
-    // Función para abrir el modal en modo CREACIÓN
     function openCreateModal() {
-        if (!modal) { console.error("Modal element not found!"); return; } 
-        
+        if (!modal) { console.error("Modal element not found!"); return; }
         modalTitle.textContent = 'Nueva categoría';
-        catIdInput.value = ''; // Indica que es una INSERCIÓN
+        catIdInput.value = '';
         catNameInput.value = '';
-        modal.classList.add('active'); // Abre el modal
+        modal.classList.add('active');
         setTimeout(() => catNameInput.focus(), 60);
     }
-    
-    // Función para cerrar el modal
     function closeModal() {
         if (modal) {
             modal.classList.remove('active');
@@ -551,30 +497,20 @@ body.dark .btn.cancel:hover{
             catNameInput.value = '';
         }
     }
-
-    // Lógica AJAX para guardar la categoría (POST a categories.php)
     function saveCategory() {
         const name = catNameInput.value.trim();
         if (!name) { showToast('El nombre no puede estar vacío', 'err'); return; }
-        
         const formData = new FormData();
         formData.append('name', name);
-        // NO enviamos el ID porque estamos creando.
-        
-        // El request se envía a categories.php
         fetch('categories.php', { method: 'POST', body: formData })
             .then(r => r.json())
             .then(data => {
                 if (data.status === 'ok' && data.action === 'add') {
-                    // 1. Añadir la nueva categoría al SELECT del formulario
                     const newOption = document.createElement('option');
-                    newOption.value = data.id; // ID devuelto por PHP
-                    newOption.textContent = data.name; // Nombre devuelto por PHP
+                    newOption.value = data.id;
+                    newOption.textContent = data.name;
                     categorySelect.appendChild(newOption);
-                    
-                    // 2. Seleccionar la categoría recién creada
                     categorySelect.value = data.id;
-
                     showToast('Categoría creada correctamente', 'ok');
                     closeModal();
                 } else {
@@ -586,35 +522,28 @@ body.dark .btn.cancel:hover{
                 showToast('Error de red al intentar guardar la categoría', 'err');
             });
     }
-
-    // Opcional: para cerrar el modal presionando ESC
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && modal && modal.classList.contains('active')) {
             closeModal();
         }
     });
-    // Opcional: para guardar la categoría presionando ENTER dentro del input
     if (catNameInput) {
-        catNameInput.addEventListener('keydown', e => { 
+        catNameInput.addEventListener('keydown', e => {
             if (e.key === 'Enter') {
-                e.preventDefault(); // Evita enviar el formulario principal
+                e.preventDefault();
                 saveCategory();
             }
         });
     }
 
     // ------------------------------------------------------------------
-    // 3. TU CÓDIGO JS EXISTENTE
+    // 3. UTILIDADES Y PREVIA IMAGEN
     // ------------------------------------------------------------------
-    
-    // Dark coherente
     window.addEventListener('load', () => {
         if(localStorage.getItem('darkMode') === 'true'){
             document.body.classList.add('dark');
         }
     });
-
-    // Toast helper
     function showToast(msg, type='ok'){
         const el = document.getElementById('toast');
         el.textContent = msg;
@@ -623,13 +552,10 @@ body.dark .btn.cancel:hover{
         el.classList.add('show');
         setTimeout(() => el.classList.remove('show'), 2500);
     }
-    
-    // Si vino flash del servidor, dispara toast (ok/err)
     <?php if (!empty($flash)): ?>
       showToast(<?= json_encode($flash['text']) ?>, <?= json_encode($flash['type'] === 'ok' ? 'ok' : 'err') ?>);
     <?php endif; ?>
 
-    // Previsualización + validación de tamaño (2 MB)
     const MAX_MB = 2;
     const inputImage = document.getElementById('image');
     const preview = document.getElementById('imagePreview');
@@ -671,20 +597,24 @@ body.dark .btn.cancel:hover{
         btnRemove.style.display = 'none';
     }
 
-    // Validación rápida en cliente (incluye límite 2 MB)
-    const form = document.getElementById('productForm');
-    form.addEventListener('submit', (e) => {
+    // ------------------------------------------------------------------
+    // 4. SUBMIT: valida, sube a upload.php (si hay archivo) y luego envía el form
+    // ------------------------------------------------------------------
+    (function(){
+      const API_UPLOAD = '/upload.php'; // AJUSTA la ruta si tu upload.php está en otro directorio
+      const form = document.getElementById('productForm');
+      const fileInput = document.getElementById('image');
+      const imageUrlInput = document.getElementById('imageUrl');
+
+      form.addEventListener('submit', async (e) => {
+        // Validaciones de campos básicos (mismas condiciones que tenías)
         const name = document.getElementById('name').value.trim();
         const cost = parseFloat(document.getElementById('cost_price').value || '0');
         const sale = parseFloat(document.getElementById('sale_price').value || '0');
         const cat  = document.getElementById('category_id').value;
-        const file = inputImage.files && inputImage.files[0];
+        const stockVal = parseInt(document.getElementById('stock').value || '0', 10);
+        const file = fileInput.files && fileInput.files[0];
 
-        if(file && file.size > MAX_MB * 1024 * 1024){
-          e.preventDefault();
-          showToast('La imagen no puede superar ' + MAX_MB + ' MB.', 'err');
-          return;
-        }
         if(!name){
           e.preventDefault(); showToast('El nombre es obligatorio', 'err'); document.getElementById('name').focus(); return;
         }
@@ -697,10 +627,45 @@ body.dark .btn.cancel:hover{
         if(cost < 0 || sale < 0){
           e.preventDefault(); showToast('Los precios no pueden ser negativos', 'err'); return;
         }
-        if(parseInt(document.getElementById('stock').value || '0', 10) < 0){
+        if(isNaN(stockVal) || stockVal < 0){
           e.preventDefault(); showToast('El stock no puede ser negativo', 'err'); return;
         }
-    });
+
+        // Si NO hay archivo, enviamos normal (image_url quedará vacío -> producto sin imagen)
+        if (!file) return;
+
+        // Si hay archivo, validar tamaño (2 MB) y subir primero a upload.php
+        if (file.size > MAX_MB * 1024 * 1024) {
+          e.preventDefault();
+          showToast('La imagen no puede superar ' + MAX_MB + ' MB.', 'err');
+          return;
+        }
+
+        // Interceptamos envío para subir el archivo y luego postear la URL
+        e.preventDefault();
+
+        try {
+          const fd = new FormData();
+          fd.append('file', file); // ¡campo EXACTO "file"!
+          const res = await fetch(API_UPLOAD, { method: 'POST', body: fd });
+          const data = await res.json();
+
+          if (!data?.success || !data?.file_url) {
+            showToast('Error al subir la imagen: ' + (data?.message || 'Servidor sin respuesta'), 'err');
+            return;
+          }
+
+          // Inyectar URL, limpiar el file y enviar formulario definitivo
+          imageUrlInput.value = data.file_url;
+          fileInput.value = '';
+          form.submit();
+
+        } catch (err) {
+          console.error(err);
+          showToast('Error de red al subir la imagen.', 'err');
+        }
+      }, { capture: true });
+    })();
     </script>
 </body>
 </html>
