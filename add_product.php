@@ -601,7 +601,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // 4. SUBMIT: valida, sube a upload.php (si hay archivo) y luego envía el form
     // ------------------------------------------------------------------
     (function(){
-      const API_UPLOAD = '/upload.php'; // AJUSTA la ruta si tu upload.php está en otro directorio
+      const API_UPLOAD = 'https://projects-imagenes-shockfy.m3qiqz.easypanel.host/index.php';
       const form = document.getElementById('productForm');
       const fileInput = document.getElementById('image');
       const imageUrlInput = document.getElementById('imageUrl');
