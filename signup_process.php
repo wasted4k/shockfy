@@ -169,7 +169,7 @@ try {
         'type' => 'success',
         'text' => '¡Cuenta creada y sesión iniciada! Bienvenido a ShockFy.'
     );
-    header('Location: index.php'); // o a tu onboarding
+    header('Location: welcome.php?step=1'); // redirige al usuario a welcome.php y al paso numero 1 (elegir su moneda preferida)
     exit;
 
 } catch (Throwable $e) {
