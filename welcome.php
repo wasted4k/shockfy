@@ -1,5 +1,5 @@
-<?php
-// welcome.php — 
+<?php 
+ob_start(); // Evita que cualquier salida HTML rompa SMTP
 session_start();
 if (empty($_SESSION['logged_in'])) { header('Location: login.php'); exit; }
 
@@ -28,12 +28,7 @@ if (!empty($_GET['step'])) {
   $try = (int)$_GET['step'];
   if ($try < 1) $try = 1;
   if ($try > 4) $try = 4;
-  // No permitir Step 4 si no está verificado
-  if ($try === 4 && !$verified) {
-    $step = 3;
-  } else {
-    $step = $try;
-  }
+  if ($try === 4 && !$verified) { $step = 3; } else { $step = $try; }
 }
 
 // Helper UI
@@ -157,7 +152,7 @@ $err = isset($_GET['err']) ? trim($_GET['err']) : '';
     <div class="alert"><?= htmlspecialchars($err) ?></div>
   <?php endif; ?>
 
-  <!-- Paso 1: Moneda -->
+  <!-- Paso 1 -->
   <?php if (isActive(1, $step)): ?>
     <section class="card">
       <h2>1) Moneda</h2>
@@ -178,7 +173,7 @@ $err = isset($_GET['err']) ? trim($_GET['err']) : '';
     </section>
   <?php endif; ?>
 
-  <!-- Paso 2: Zona horaria -->
+  <!-- Paso 2 -->
   <?php if (isActive(2, $step)): ?>
     <section class="card">
       <h2>2) Zona horaria</h2>
@@ -190,16 +185,8 @@ $err = isset($_GET['err']) ? trim($_GET['err']) : '';
           <select class="select" id="timezone" name="timezone" required>
             <option value="" selected disabled hidden>Selecciona…</option>
             <?php
-              $tzs = [
-                'UTC','America/Lima','America/Mexico_City','America/Bogota','America/Santiago','America/Buenos_Aires',
-                'America/Asuncion','America/La_Paz','America/Montevideo','America/Guayaquil','America/Panama',
-                'America/Guatemala','America/El_Salvador','America/Tegucigalpa','America/Costa_Rica','America/Managua',
-                'America/New_York','America/Chicago','America/Denver','America/Los_Angeles',
-                'Europe/Madrid','Europe/Lisbon'
-              ];
-              foreach ($tzs as $tz) {
-                echo '<option value="'.htmlspecialchars($tz).'">'.htmlspecialchars($tz).'</option>';
-              }
+              $tzs = ['UTC','America/Lima','America/Mexico_City','America/Bogota','America/Santiago','America/Buenos_Aires','America/Asuncion','America/La_Paz','America/Montevideo','America/Guayaquil','America/Panama','America/Guatemala','America/El_Salvador','America/Tegucigalpa','America/Costa_Rica','America/Managua','America/New_York','America/Chicago','America/Denver','America/Los_Angeles','Europe/Madrid','Europe/Lisbon'];
+              foreach ($tzs as $tz) { echo '<option value="'.htmlspecialchars($tz).'">'.htmlspecialchars($tz).'</option>'; }
             ?>
           </select>
         </div>
@@ -208,7 +195,7 @@ $err = isset($_GET['err']) ? trim($_GET['err']) : '';
     </section>
   <?php endif; ?>
 
-  <!-- Paso 3: Verificar email -->
+  <!-- Paso 3 -->
   <?php if (isActive(3, $step)): ?>
     <section class="card">
       <h2>3) Verificación de email</h2>
@@ -221,6 +208,7 @@ $err = isset($_GET['err']) ? trim($_GET['err']) : '';
 
       <?php if (!$verified): ?>
         <div class="row" style="display:flex; gap:10px; flex-wrap:wrap">
+          <!-- Enviamos código via AJAX para evitar problemas de output -->
           <form action="send_verification.php" method="post" id="formSendCode">
             <input type="hidden" name="action" value="send_email_verification">
             <button class="btn" type="submit" id="btnSendCode">Enviar código</button>
@@ -241,7 +229,7 @@ $err = isset($_GET['err']) ? trim($_GET['err']) : '';
     </section>
   <?php endif; ?>
 
-  <!-- Paso 4: Todo OK -->
+  <!-- Paso 4 -->
   <?php if (isActive(4, $step)): ?>
     <section class="card">
       <h2>¡Listo!</h2>
@@ -261,25 +249,19 @@ $err = isset($_GET['err']) ? trim($_GET['err']) : '';
 <!-- Toast container + script -->
 <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <script>
-  // Lee un parámetro del querystring (?sent=1, ?err=..., ?dev=1)
   function getParam(name){
     const p = new URLSearchParams(window.location.search);
     return p.get(name);
   }
-
-  // Muestra toast simple
   function showToast(msg, type='info', ms=3500){
     const el = document.getElementById('toast');
     el.className = 'toast ' + (type || 'info');
     el.innerHTML = `<span>${msg}</span>`;
-    // Reflow para aplicar animación
     void document.body.offsetHeight;
     el.classList.add('show');
     clearTimeout(el._t);
     el._t = setTimeout(()=> el.classList.remove('show'), ms);
   }
-
-  // 1) Mostrar toasts según query (?sent=1, ?err=..., ?dev=1)
   (function(){
     const sent = getParam('sent');
     const err  = getParam('err');
@@ -290,24 +272,20 @@ $err = isset($_GET['err']) ? trim($_GET['err']) : '';
       catch(e){ showToast(err, 'error', 5000); }
     } else if (sent === '1'){
       showToast('Código enviado ✅ Revisa tu correo.', 'success', 3500);
-      if (dev === '1'){
-        showToast('Modo DEV: el código también se guardó en el .txt', 'info', 4000);
-      }
+      if (dev === '1'){ showToast('Modo DEV: el código también se guardó en el .txt', 'info', 4000); }
     }
   })();
 
-  // 2) UX: al enviar el formulario, desactivar botón y mostrar "Enviando…"
   (function(){
     const form = document.getElementById('formSendCode');
     const btn  = document.getElementById('btnSendCode');
     if(!form || !btn) return;
 
-    form.addEventListener('submit', function(){
+    form.addEventListener('submit', function(e){
       btn.classList.add('loading');
       const original = btn.textContent;
       btn.textContent = 'Enviando…';
       showToast('Enviando código…', 'info', 2000);
-      // si algo falla y no hay redirección, reactivar tras 8s
       setTimeout(()=>{
         btn.classList.remove('loading');
         btn.textContent = original;
@@ -317,3 +295,4 @@ $err = isset($_GET['err']) ? trim($_GET['err']) : '';
 </script>
 </body>
 </html>
+<?php ob_end_flush(); // Envía todo el HTML al navegador ?>
