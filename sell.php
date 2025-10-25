@@ -358,6 +358,7 @@ $PLACEHOLDER_DATAURI = 'data:image/svg+xml;utf8,' . rawurlencode(
   <div class="count">🛒 <span id="dockCount">0</span></div>
   <div class="total" id="dockTotal"><?= htmlspecialchars($currencySymbol) ?> 0.00</div>
   <a href="#sellPanel" class="cta" id="dockGo">Ir al carrito</a>
+  
 </div>
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
