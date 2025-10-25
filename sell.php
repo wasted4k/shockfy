@@ -276,8 +276,9 @@ $PLACEHOLDER_DATAURI = 'data:image/svg+xml;utf8,' . rawurlencode(
               $codigo = 'P' . str_pad((string)$p['id'], 5, '0', STR_PAD_LEFT);
 
               // Sanitizar ruta de imagen (evitar esquemas peligrosos)
-              $img = (string)($p['image'] ?? '');
-              if (!preg_match('~^(uploads/|https?://)~i', $img)) { $img = ''; }
+$img = (string)($p['image'] ?? '');
+// MODIFICACIÓN APLICADA AQUÍ:
+if (!preg_match('~^(uploads/|https?://images\.shockfy\.net)~i', $img)) { $img = ''; }
             ?>
             <div class="card"
                  data-id="<?= (int)$p['id'] ?>"
