@@ -277,7 +277,7 @@ $PLACEHOLDER_DATAURI = 'data:image/svg+xml;utf8,' . rawurlencode(
 
               // Sanitizar ruta de imagen (evitar esquemas peligrosos)
               $img = (string)($p['image'] ?? '');
-              
+              if (!preg_match('~^(uploads/|https?://)~i', $img)) { $img = ''; }
             ?>
             <div class="card"
                  data-id="<?= (int)$p['id'] ?>"
