@@ -252,6 +252,11 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
   .select svg{ flex: 0 0 auto; }  /* el ícono no estira el contenedor */
 }
 
+/* ocultar boton de soporte/ayuda para que no interfiera con el de "añadir producto" */
+#supportFab {
+  display: none !important;
+}
+
 
   </style>
 </head>
